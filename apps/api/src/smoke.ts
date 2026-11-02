@@ -70,9 +70,12 @@ async function main() {
   ok('register returns leases', /"totalCount":\d{3,}/.test(leases) || /"edges":\[\{/.test(leases));
   const firstId = /"id":"(TGVhc2U6[^"]+)"/.exec(leases)?.[1];
 
+  ok('register lists a lease to open', firstId !== undefined);
   if (firstId) {
-    const lease = await gql<{ node: { lease: { reference: string } | null } | null }>('LeasePageQuery', { id: firstId });
-    ok('lease page loads', Boolean(lease.node?.lease?.reference));
+    // The page's `@alias(as: "lease")` exists only in the Relay client; the server answers with the
+    // Lease fields directly on `node`.
+    const lease = await gql<{ node: { reference?: string } | null }>('LeasePageQuery', { id: firstId });
+    ok('lease page loads', Boolean(lease.node?.reference));
   }
 
   console.log(`smoke: ${checks.length} checks passed`);
