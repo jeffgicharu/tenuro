@@ -9,10 +9,10 @@ export default defineConfig({
     babel({ plugins: [['relay', { eagerEsModules: true }]] }),
   ],
   server: {
-    port: 5173,
+    port: Number(process.env.WEB_PORT ?? 5173),
     proxy: {
-      '/graphql': 'http://127.0.0.1:4000',
-      '/api': 'http://127.0.0.1:4000',
+      '/graphql': `http://127.0.0.1:${process.env.API_PORT ?? 4000}`,
+      '/api': `http://127.0.0.1:${process.env.API_PORT ?? 4000}`,
     },
   },
   build: {
