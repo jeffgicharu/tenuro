@@ -30,7 +30,7 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
   await db.transaction().execute(async (tx) => {
     await sql`SET LOCAL statement_timeout = 0`.execute(tx);
     for (const table of DELETE_ORDER) await tx.deleteFrom(table).execute();
-    const batches = generateBatches(opts);
+    const batches = generateBatches(opts, 200);
     let batchCount = 0;
     for (;;) {
       const g0 = performance.now();
@@ -44,13 +44,17 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
         if (!list.length) continue;
         // Small statements keep the SQL text and parameter arrays small as well.
         const columns = Object.keys(list[0]!).length;
-        const chunk = Math.max(1, Math.floor(8_000 / columns));
+        const chunk = Math.max(1, Math.floor(4_000 / columns));
         for (let j = 0; j < list.length; j += chunk) {
           await tx.insertInto(table).values(list.slice(j, j + chunk) as never).execute();
         }
         list.length = 0;
       }
       batchCount += 1;
+      if (process.env.SEED_DEBUG && batchCount % 5 === 0) {
+        const m = process.memoryUsage();
+        log(`  batch ${batchCount}: heap ${Math.round(m.heapUsed / 1048576)}/${Math.round(m.heapTotal / 1048576)} MB, rss ${Math.round(m.rss / 1048576)} MB`);
+      }
     }
     log(`  ${batchCount} batches written`);
   });
