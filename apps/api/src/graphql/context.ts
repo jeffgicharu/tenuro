@@ -49,6 +49,10 @@ export function createLoaders(tx: Tx) {
   return {
     tenant: new DataLoader<string, Selectable<TenantTable> | null>(async (ids) =>
       byKey(ids, await tx.selectFrom('tenant').selectAll().where('id', 'in', ids as string[]).execute(), (r) => r.id)),
+    tenantSummary: new DataLoader<string, { tenant_id: string; lease_count: number; countries: string[] } | null>(async (ids) => {
+      const { rows } = await sql<{ tenant_id: string; lease_count: number; countries: string[] }>`SELECT * FROM app.tenant_summary()`.execute(tx);
+      return byKey(ids, rows, (r) => r.tenant_id);
+    }),
     user: new DataLoader<string, Selectable<AppUserTable> | null>(async (ids) =>
       byKey(ids, await tx.selectFrom('app_user').selectAll().where('id', 'in', ids as string[]).execute(), (r) => r.id)),
     property: new DataLoader<string, Selectable<PropertyTable> | null>(async (ids) =>

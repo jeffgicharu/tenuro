@@ -854,12 +854,19 @@ enum TaskStatus {
 
 """A client company whose lease portfolio this workspace holds."""
 type Tenant implements Node {
+  countries: [CountryCode!]!
+
   """Text direction of the default language."""
   direction: String!
   id: ID!
 
   """Interface languages, first is the default."""
   languages: [String!]!
+
+  """
+  Leases in the shared portfolio (excludes any visitor’s private changes).
+  """
+  leaseCount: Int!
 
   """BCP 47 locale for dates, numbers and currency."""
   locale: String!

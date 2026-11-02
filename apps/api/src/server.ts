@@ -6,7 +6,7 @@ import type { Db } from './db/client.ts';
 import { config } from './config.ts';
 import { hashIp, LimitReached, readCookie, resolveSession, sessionCookie, signInAccount, signOut } from './auth/session.ts';
 import { newContext, type Context } from './graphql/context.ts';
-import { useOperationLimits, usePersistedOnly, useScopedTransaction } from './graphql/plugins.ts';
+import { useOperationLimits, usePersisted, useScopedTransaction } from './graphql/plugins.ts';
 import { schema } from './graphql/schema.ts';
 import { API_CSP, COMMON_HEADERS, newNonce, pageCsp } from './http/security.ts';
 import { serveDocument } from './http/documents.ts';
@@ -54,7 +54,7 @@ export function createApp(db: Db) {
     cors: false,
     plugins: [
       useOperationLimits({ maxTokens: 3_000, maxAliases: 15 }),
-      ...(config.production ? [usePersistedOnly(config.persistedQueries)] : []),
+      usePersisted(config.persistedQueries, !config.production),
       useScopedTransaction(),
     ],
     context: async ({ req }) => {

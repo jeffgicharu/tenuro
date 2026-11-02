@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { GraphQLError, parse, type ASTVisitor, type ValidationContext } from 'graphql';
 import type { Plugin } from 'graphql-yoga';
 import { usePersistedOperations } from '@graphql-yoga/plugin-persisted-operations';
@@ -61,12 +61,24 @@ export function useOperationLimits(opts: { maxTokens: number; maxAliases: number
   };
 }
 
-// The client sends {"id": "<hash>"}; only operations relay-compiler wrote at build time can run.
-export function usePersistedOnly(mapPath: string): Plugin {
-  const map: Record<string, string> = existsSync(mapPath) ? JSON.parse(readFileSync(mapPath, 'utf8')) : {};
+// The client sends {"id": "<hash>"} for operations relay-compiler wrote at build time. In production
+// nothing else can run; in development arbitrary queries are allowed too, and the map is re-read
+// whenever the compiler rewrites it.
+export function usePersisted(mapPath: string, allowArbitrary: boolean): Plugin {
+  let map: Record<string, string> = {};
+  let loadedAt = -1;
+  const current = () => {
+    if (!existsSync(mapPath)) return map;
+    const mtime = statSync(mapPath).mtimeMs;
+    if (mtime !== loadedAt) {
+      map = JSON.parse(readFileSync(mapPath, 'utf8')) as Record<string, string>;
+      loadedAt = mtime;
+    }
+    return map;
+  };
   return usePersistedOperations({
-    allowArbitraryOperations: false,
+    allowArbitraryOperations: allowArbitrary,
     extractPersistedOperationId: (params) => (typeof (params as { id?: unknown }).id === 'string' ? (params as { id: string }).id : null),
-    getPersistedOperation: (key) => map[key] ?? null,
+    getPersistedOperation: (key) => current()[key] ?? null,
   });
 }
