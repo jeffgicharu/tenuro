@@ -39,11 +39,18 @@ for (const k of [...initial].sort((a, b) => sizeOf([b]) - sizeOf([a]))) {
 }
 const rows = [['first page (entry and its static imports)', initialKb, BUDGET_INITIAL_KB]];
 
+// Each lazily loaded chunk is measured by what it adds to what is already loaded when it loads: the
+// first page, plus the chunk that loads it when that is itself lazy (the register's desktop table
+// loads from the register page, so the code they share is counted once, with the page).
 const routes = new Set(Object.values(manifest).flatMap((e) => e.dynamicImports ?? []));
 for (const r of routes) {
   if (!manifest[r] || manifest[r].file.includes('catalogues')) continue;
-  const extra = [...closure(r)].filter((k) => !initial.has(k));
-  rows.push([r.replace(/^src\//, ''), sizeOf(extra) / 1024, BUDGET_ROUTE_KB]);
+  const loaded = new Set(initial);
+  const importers = Object.keys(manifest).filter((k) => manifest[k].dynamicImports?.includes(r));
+  if (importers.length && importers.every((k) => !initial.has(k))) for (const k of closure(importers[0])) loaded.add(k);
+  const extra = [...closure(r)].filter((k) => !loaded.has(k));
+  const via = importers.length && importers.every((k) => !initial.has(k)) ? ` (on top of ${importers[0].replace(/^src\//, '')})` : '';
+  rows.push([r.replace(/^src\//, '') + via, sizeOf(extra) / 1024, BUDGET_ROUTE_KB]);
 }
 
 let failed = false;

@@ -99,7 +99,8 @@ describe('lease register', () => {
     await user.click(await screen.findByRole('checkbox', { name: 'Open break option' }));
     const op = await waitFor(() => lastOperation(env));
     expect(op.request.node.operation.name).toBe('RegisterGridPaginationQuery');
-    expect(op.request.variables).toMatchObject({ first: 100, filter: { hasOpenBreak: true } });
+    // The test screen is phone-sized (the card list), which starts each answer with 20 leases.
+    expect(op.request.variables).toMatchObject({ first: 20, filter: { hasOpenBreak: true } });
   });
 
   // The filter bar used to be ten buttons that filled a phone's first screen; filters now sit behind

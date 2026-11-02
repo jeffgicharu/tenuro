@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { Link as RouterLink, useRevalidator, useSearchParams } from 'react-router';
 import Box from '@mui/material/Box';
@@ -6,7 +6,8 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { GridPreferencePanelsValue, useGridApiRef, type GridColumnVisibilityModel } from '@mui/x-data-grid';
+// Types only: the grid's code loads with the desktop table, never on phones.
+import type { GridColumnVisibilityModel, GridPreferencePanelsValue, useGridApiRef } from '@mui/x-data-grid';
 import { Columns3, FilePlus2 } from 'lucide-react';
 import type { RegisterPageQuery } from './__generated__/RegisterPageQuery.graphql';
 import { useRouteQuery } from '../../app/relayRoute.ts';
@@ -86,7 +87,7 @@ export function RegisterView({ viewer }: { viewer: RegisterViewer }) {
   const state = useMemo(() => parseState(params), [params]);
   const [columns, setColumns] = useState<GridColumnVisibilityModel>(readColumns);
   const [total, setTotal] = useState<number | null>(null);
-  const apiRef = useGridApiRef();
+  const apiRef = useRef(null) as ReturnType<typeof useGridApiRef>;
 
   const commit = useCallback((next: RegisterState, replace = true) => setParams(toParams(next), { replace }), [setParams]);
   const setFilter = useCallback((filter: RegisterFilter) => commit({ filter, orderBy: state.orderBy, view: null }), [commit, state.orderBy]);
@@ -120,7 +121,7 @@ export function RegisterView({ viewer }: { viewer: RegisterViewer }) {
           <Button
             variant="outlined"
             startIcon={<Columns3 size={16} strokeWidth={1.7} />}
-            onClick={() => apiRef.current?.showPreferences(GridPreferencePanelsValue.columns)}
+            onClick={() => apiRef.current?.showPreferences('columns' as GridPreferencePanelsValue)}
           >
             <FormattedMessage id="register.columns" />
           </Button>

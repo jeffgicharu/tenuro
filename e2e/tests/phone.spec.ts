@@ -3,9 +3,16 @@ import { expectAccessible, signIn, watchPage } from './helpers.ts';
 
 test('on a phone the register is a card list and the page never scrolls sideways', async ({ page }) => {
   const problems = watchPage(page);
+  const scripts: string[] = [];
+  page.on('request', (r) => { if (r.resourceType() === 'script') scripts.push(r.url()); });
   await signIn(page, 'Mbuyu Court Holdings', 'Lease manager');
   await expect(page.getByRole('heading', { level: 1, name: 'Leases' })).toBeVisible();
   await expect(page.getByRole('grid')).toHaveCount(0);
+  // The card list starts short (more on request) and the data grid's code is never downloaded.
+  const cards = page.getByRole('list', { name: 'Lease register' }).getByRole('listitem');
+  await expect(cards).toHaveCount(20);
+  await expect(page.getByRole('button', { name: 'Load more' })).toBeVisible();
+  expect(scripts.filter((u) => /RegisterTable-/.test(u))).toEqual([]);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, 'horizontal overflow in px').toBeLessThanOrEqual(0);
   await expectAccessible(page, 'register on a phone');

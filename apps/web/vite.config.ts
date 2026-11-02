@@ -27,9 +27,14 @@ function preloadDefaultCatalogue(): Plugin {
         visit(entry.fileName);
         const links = [...files]
           .filter((f) => !html.includes(`/${f}"`))
-          .map((f) => `<link rel="modulepreload" crossorigin href="/${f}">`)
-          .join('\n    ');
-        return html.replace('</head>', `    ${links}\n  </head>`);
+          .map((f) => `<link rel="modulepreload" crossorigin href="/${f}">`);
+        // The body face (IBM Plex Sans, Latin, regular: about 23 KB) is asked for with the page, not once
+        // the stylesheet is parsed. The display face is left to load normally: at about 130 KB it would
+        // hold up the code that paints the page on a slow connection.
+        const body = Object.values(bundle).find((a) => a.type === 'asset' && /ibm-plex-sans-latin-400-normal-[^/]*\.woff2$/.test(a.fileName));
+        if (!body) throw new Error('The body font file was not found; the font preload would silently stop working');
+        links.push(`<link rel="preload" as="font" type="font/woff2" crossorigin href="/${body.fileName}">`);
+        return html.replace('</head>', `    ${links.join('\n    ')}\n  </head>`);
       },
     },
   };
