@@ -19,6 +19,7 @@ export const ar: Catalogue = {
   'palette.select': "للفتح",
   'palette.open': "بحث",
   'nav.leases': 'عقود الإيجار',
+  'nav.keyDates': 'المواعيد المهمة',
   'nav.newLease': 'عقد جديد',
   'nav.drafts': 'المسودات',
   'nav.collapse': 'طي القائمة',

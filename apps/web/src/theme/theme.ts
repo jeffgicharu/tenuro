@@ -61,6 +61,10 @@ export function createAppTheme(brand: BrandInput, mode: Mode, direction: 'ltr' |
       button: { textTransform: 'none', fontWeight: 500, letterSpacing: 0 },
     },
     components: {
+      // MUI's unselected toggle text is a translucent grey that falls just under 4.5:1 on paper.
+      MuiToggleButton: {
+        styleOverrides: { root: { color: t.inkSecondary, '&.Mui-selected': { color: t.ink } } },
+      },
       MuiCssBaseline: {
         styleOverrides: {
           ':root': { colorScheme: mode },

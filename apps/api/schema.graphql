@@ -280,6 +280,35 @@ type KeyDate implements Node {
   version: Int!
 }
 
+"""Open key dates falling on one day, by kind."""
+type KeyDateDay {
+  date: Date!
+  kinds: [KeyDateKindCount!]!
+  overdue: Int!
+  total: Int!
+}
+
+input KeyDateFilter {
+  """Due on or after."""
+  from: Date
+  kinds: [KeyDateKind!]
+
+  """Only dates the signed-in person owns."""
+  mine: Boolean
+
+  """Only open dates already past due."""
+  overdue: Boolean
+
+  """Lease reference, property or city."""
+  search: String
+
+  """Defaults to open (UPCOMING) dates."""
+  statuses: [KeyDateStatus!]
+
+  """Due on or before."""
+  to: Date
+}
+
 enum KeyDateKind {
   BREAK_NOTICE
   CUSTOM
@@ -290,6 +319,11 @@ enum KeyDateKind {
   RENT_REVIEW
 }
 
+type KeyDateKindCount {
+  count: Int!
+  kind: KeyDateKind!
+}
+
 """
 One kind of key date: how many are open in the next 90 days, and the soonest.
 """
@@ -297,6 +331,13 @@ type KeyDateKindSummary {
   count: Int!
   kind: KeyDateKind!
   next: KeyDate!
+}
+
+"""A reminder falling due: a number of days before a key date."""
+type KeyDateReminder {
+  daysBefore: Int!
+  keyDate: KeyDate!
+  remindOn: Date!
 }
 
 enum KeyDateStatus {
@@ -638,6 +679,7 @@ type Mutation {
   saveLeaseDraft(input: SaveLeaseDraftInput!): MutationSaveLeaseDraftResult!
   saveView(input: SaveViewInput!): MutationSaveViewResult!
   submitLease(input: SubmitLeaseInput!): MutationSubmitLeaseResult!
+  updateKeyDate(input: UpdateKeyDateInput!): MutationUpdateKeyDateResult!
   updateTask(input: UpdateTaskInput!): MutationUpdateTaskResult!
 }
 
@@ -687,6 +729,12 @@ union MutationSubmitLeaseResult = MutationSubmitLeaseSuccess | NotFound | Permis
 
 type MutationSubmitLeaseSuccess {
   data: SubmitLeasePayload!
+}
+
+union MutationUpdateKeyDateResult = MutationUpdateKeyDateSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationUpdateKeyDateSuccess {
+  data: UpdateKeyDatePayload!
 }
 
 union MutationUpdateTaskResult = MutationUpdateTaskSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
@@ -1052,6 +1100,22 @@ type TypeRent {
   rent: RentShare!
 }
 
+input UpdateKeyDateInput {
+  id: ID!
+  ownerId: ID
+
+  """Days before the date to remind the owner."""
+  remindDays: [Int!]
+
+  """ACTIONED when done, DISMISSED when not needed, UPCOMING to reopen."""
+  status: KeyDateStatus
+  version: Int!
+}
+
+type UpdateKeyDatePayload {
+  keyDate: KeyDate!
+}
+
 input UpdateTaskInput {
   assigneeId: ID
   clearAssignee: Boolean
@@ -1100,6 +1164,14 @@ enum ViewScope {
 type Viewer {
   canEdit: Boolean!
   isAdmin: Boolean!
+
+  """
+  Open key dates per day between two dates (at most 62 days), for the month calendar.
+  """
+  keyDateCalendar(filter: KeyDateFilter, from: Date!, to: Date!): [KeyDateDay!]!
+
+  """Key dates across the portfolio, soonest first (open ones by default)."""
+  keyDates(after: String, before: String, filter: KeyDateFilter, first: Int, last: Int): ViewerKeyDatesConnection!
   leaseDrafts(after: String, before: String, first: Int, last: Int): ViewerLeaseDraftsConnection!
   leaseFacets(filter: LeaseFilter): LeaseFacets!
   leases(after: String, before: String, filter: LeaseFilter, first: Int, last: Int, orderBy: [LeaseOrder!]): ViewerLeasesConnection!
@@ -1108,10 +1180,28 @@ type Viewer {
   newLeaseTemplate: String!
   portfolio: Portfolio!
   properties(after: String, before: String, first: Int, last: Int, search: String): ViewerPropertiesConnection!
+
+  """
+  Reminders falling due from today within the window, on open key dates the person owns.
+  """
+  remindersDue(first: Int = 20, withinDays: Int = 7): [KeyDateReminder!]!
   sandbox: Sandbox
   savedViews(after: String, before: String, first: Int, last: Int, scope: ViewScope!): ViewerSavedViewsConnection!
   tenant: Tenant!
   user: User!
+}
+
+type ViewerKeyDatesConnection {
+  edges: [ViewerKeyDatesConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type ViewerKeyDatesConnectionEdge {
+  cursor: String!
+  node: KeyDate!
 }
 
 type ViewerLeaseDraftsConnection {

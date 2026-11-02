@@ -102,3 +102,28 @@ test.describe('main journeys', () => {
     expect(headers['x-frame-options']).toBe('DENY');
   });
 });
+
+test.describe('key dates', () => {
+  test('a manager works the key dates as a list, a calendar and the next 90 days', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', '/key-dates');
+    await expect(page.getByRole('heading', { level: 1, name: 'Key dates' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Key dates' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Done' }).first()).toBeVisible();
+    await expectAccessible(page, 'key dates list');
+
+    await page.getByRole('button', { name: 'Calendar' }).click();
+    await expect(page).toHaveURL(/view=calendar/);
+    const day = page.getByRole('button', { pressed: false, name: /: \d+ dates?$/ }).first();
+    await day.click();
+    await expect(page).toHaveURL(/day=\d{4}-\d{2}-\d{2}/);
+    await expect(page.getByRole('status').filter({ hasText: /\d+ dates?/ }).first()).toBeVisible();
+    await expectAccessible(page, 'key dates calendar');
+
+    await page.getByRole('button', { name: 'Next 90 days' }).click();
+    await expect(page).toHaveURL(/view=next90/);
+    await page.getByRole('button', { name: 'Rent review', exact: true }).click();
+    await expect(page).toHaveURL(/kind=RENT_REVIEW/);
+    expect(problems).toEqual([]);
+  });
+});

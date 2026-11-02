@@ -18,6 +18,7 @@ export const en = {
   'palette.select': "to open",
   'palette.open': "Search",
   'nav.leases': 'Leases',
+  'nav.keyDates': 'Key dates',
   'nav.newLease': 'New lease',
   'nav.drafts': 'Drafts',
   'nav.collapse': 'Collapse navigation',

@@ -19,6 +19,7 @@ export const sw: Catalogue = {
   'palette.select': "kufungua",
   'palette.open': "Tafuta",
   'nav.leases': 'Mikataba ya upangishaji',
+  'nav.keyDates': 'Tarehe muhimu',
   'nav.newLease': 'Mkataba mpya',
   'nav.drafts': 'Rasimu',
   'nav.collapse': 'Kunja menyu',

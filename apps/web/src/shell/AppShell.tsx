@@ -9,7 +9,7 @@ import Tooltip from '@mui/material/Tooltip';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { styled, useTheme } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
-import { FilePlus2, LayoutDashboard, LogOut, Menu, Search, PanelLeftClose, PanelLeftOpen, ScrollText } from 'lucide-react';
+import { CalendarClock, FilePlus2, LayoutDashboard, LogOut, Menu, Search, PanelLeftClose, PanelLeftOpen, ScrollText } from 'lucide-react';
 import { signOut } from '../app/session.ts';
 import type { AppShell_viewer$key } from './__generated__/AppShell_viewer.graphql';
 import { usePreferences } from '../app/preferences.tsx';
@@ -72,6 +72,7 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
   const items: NavItem[] = [
     { to: '/', label: intl.formatMessage({ id: 'nav.overview' }), icon: <LayoutDashboard size={18} strokeWidth={1.6} aria-hidden />, end: true },
     { to: '/leases', label: intl.formatMessage({ id: 'nav.leases' }), icon: <ScrollText size={18} strokeWidth={1.6} aria-hidden />, end: false },
+    { to: '/key-dates', label: intl.formatMessage({ id: 'nav.keyDates' }), icon: <CalendarClock size={18} strokeWidth={1.6} aria-hidden />, end: false },
     ...(viewer.canEdit ? [{ to: '/leases/new', label: intl.formatMessage({ id: 'nav.newLease' }), icon: <FilePlus2 size={18} strokeWidth={1.6} aria-hidden />, end: true }] : []),
   ];
 

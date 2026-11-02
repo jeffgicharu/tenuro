@@ -455,3 +455,61 @@ describe('portfolio dashboard', () => {
     expect(await rent(other)).toBe(before);
   });
 });
+
+describe('key dates across the portfolio', () => {
+  const UPDATE = `mutation($input: UpdateKeyDateInput!) { updateKeyDate(input: $input) {
+    __typename
+    ... on MutationUpdateKeyDateSuccess { data { keyDate { id status version remindDays } } }
+    ... on ValidationFailed { fieldErrors { path code } }
+    ... on PermissionDenied { requiredRole }
+    ... on StaleVersion { currentVersion }
+  } }`;
+  type List = { viewer: { keyDates: { totalCount: number; edges: { node: { id: string; dueOn: string; status: string; version: number; kind: string } }[] } } };
+  const list = (v: Visitor, filter: string) => v.gql<List>(`{ viewer { keyDates(first: 50, filter: ${filter}) { totalCount edges { node { id dueOn status version kind } } } } }`);
+
+  it('lists open dates soonest first, and the month calendar adds up to the same total', async () => {
+    const v = new Visitor(app, '198.51.100.40');
+    await v.signIn('mbuyu-court', 'VIEWER');
+    const today = new Date().toISOString().slice(0, 10);
+    const end = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const r = await list(v, `{ from: "${today}", to: "${end}" }`);
+    expect(r.errors).toBeUndefined();
+    const due = r.data!.viewer.keyDates.edges.map((e) => e.node.dueOn);
+    expect(due).toEqual([...due].sort());
+    expect(r.data!.viewer.keyDates.edges.every((e) => e.node.status === 'UPCOMING')).toBe(true);
+    const cal = await v.gql<{ viewer: { keyDateCalendar: { date: string; total: number; kinds: { count: number }[] }[] } }>(
+      `{ viewer { keyDateCalendar(from: "${today}", to: "${end}") { date total kinds { count } } } }`);
+    const days = cal.data!.viewer.keyDateCalendar;
+    expect(days.reduce((n, d) => n + d.total, 0)).toBe(r.data!.viewer.keyDates.totalCount);
+    expect(days.every((d) => d.kinds.reduce((n, k) => n + k.count, 0) === d.total)).toBe(true);
+  });
+
+  it('lets a manager mark a date done in their own session only, and refuses viewers and bad reminders', async () => {
+    const manager = new Visitor(app, '198.51.100.41');
+    const other = new Visitor(app, '198.51.100.42');
+    const viewer = new Visitor(app, '198.51.100.43');
+    await manager.signIn('mbuyu-court', 'MANAGER');
+    await other.signIn('mbuyu-court', 'MANAGER');
+    await viewer.signIn('mbuyu-court', 'VIEWER');
+    const first = (await list(manager, '{}')).data!.viewer.keyDates.edges[0]!.node;
+
+    const denied = await viewer.gql<{ updateKeyDate: { __typename: string } }>(UPDATE, { input: { id: first.id, version: first.version, status: 'ACTIONED' } });
+    expect(denied.data!.updateKeyDate.__typename).toBe('PermissionDenied');
+
+    const bad = await manager.gql<{ updateKeyDate: { __typename: string } }>(UPDATE, { input: { id: first.id, version: first.version, remindDays: [400] } });
+    expect(bad.data!.updateKeyDate.__typename).toBe('ValidationFailed');
+
+    const done = await manager.gql<{ updateKeyDate: { __typename: string; data: { keyDate: { status: string; remindDays: number[] } } } }>(
+      UPDATE, { input: { id: first.id, version: first.version, status: 'ACTIONED', remindDays: [14, 60, 14] } });
+    expect(done.data!.updateKeyDate.__typename).toBe('MutationUpdateKeyDateSuccess');
+    expect(done.data!.updateKeyDate.data.keyDate).toMatchObject({ status: 'ACTIONED', remindDays: [60, 14] });
+
+    const mine = (await list(manager, '{}')).data!.viewer.keyDates.edges.map((e) => e.node.id);
+    const theirs = (await list(other, '{}')).data!.viewer.keyDates.edges.map((e) => e.node.id);
+    expect(mine).not.toContain(first.id);
+    expect(theirs).toContain(first.id);
+
+    const stale = await manager.gql<{ updateKeyDate: { __typename: string } }>(UPDATE, { input: { id: first.id, version: first.version, status: 'UPCOMING' } });
+    expect(stale.data!.updateKeyDate.__typename).toBe('StaleVersion');
+  });
+});
