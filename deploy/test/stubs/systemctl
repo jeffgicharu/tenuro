@@ -1,0 +1,8 @@
+#!/bin/bash
+# Records calls; fails migrations or journey checks on request.
+printf 'systemctl %s\n' "$*" >>"$STUB_LOG"
+case "$*" in
+  "start tenuro-migrate@"*) [[ ${STUB_FAIL_MIGRATE:-} == 1 ]] && exit 1 ;;
+  "start tenuro-smoke@"*) [[ ${STUB_FAIL_SMOKE:-} == 1 ]] && exit 1 ;;
+esac
+exit 0

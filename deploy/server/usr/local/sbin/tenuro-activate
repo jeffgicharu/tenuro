@@ -1,0 +1,228 @@
+#!/bin/bash
+# Activates one Tenuro release on the idle slot with zero downtime.
+# Usage: tenuro-activate <40-character lowercase commit sha>
+#
+# Order of work:
+#   1. freeze the upload into a root-owned release (mv, chown -h, chmod, then reject links,
+#      hardlinks and special files), then share the Node binary with an earlier frozen
+#      release only if both are byte-identical to runtime/SHA256
+#   2. point the idle slot at it, run migrations, start it
+#   3. check it directly: health reports the sha, noindex and CSP present, journey smoke
+#   4. switch nginx with one reload after nginx -t
+#   5. check again through nginx; on failure restore the snippet and reload (rollback)
+#   6. record the new active slot, retire the old one after a delay, keep 3 releases
+set -euo pipefail
+umask 022
+
+# Test mode exists only for deploy/test/run.sh. It needs an explicit flag AND a non-root
+# caller, so it can never apply under sudo (EUID 0, and sudo's env_reset drops the flag).
+if [[ ${TENURO_ACTIVATE_TEST:-} == 1 && $EUID -ne 0 ]]; then
+  BASE=${TENURO_TEST_BASE:?}
+  SNIPPET=${TENURO_TEST_SNIPPET:?}
+  LOCK=${TENURO_TEST_LOCK:?}
+  OWNER_USER=$(id -un)
+  TRIES_IDLE=2 TRIES_NGINX=2 PAUSE=0
+else
+  export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  BASE=/srv/tenuro
+  SNIPPET=/etc/nginx/tenuro/active-slot.conf
+  LOCK=/run/lock/tenuro-activate.lock
+  OWNER_USER=root
+  TRIES_IDLE=30 TRIES_NGINX=10 PAUSE=1
+fi
+readonly BASE SNIPPET LOCK OWNER_USER TRIES_IDLE TRIES_NGINX PAUSE
+readonly HOST=tenuro.jeffgicharu.com KEEP=3 RETIRE_AFTER=120
+
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >&2; logger -t tenuro-activate -- "$*" 2>/dev/null || true; }
+die() { log "FAIL: $*"; exit 1; }
+
+[[ $# -eq 1 ]] || die "usage: tenuro-activate <40-character commit sha>"
+SHA=$1
+[[ $SHA =~ ^[0-9a-f]{40}$ ]] || die "not a 40-character lowercase sha"
+readonly SHA
+
+exec 9>"$LOCK"
+flock -n 9 || die "another activation is running"
+
+ACTIVE=$(cat "$BASE/state/active" 2>/dev/null || echo none)
+case $ACTIVE in
+  blue) IDLE=green IDLE_PORT=9001 ;;
+  green | none) IDLE=blue IDLE_PORT=9000 ;;
+  *) die "unrecognised state file" ;;
+esac
+readonly ACTIVE IDLE IDLE_PORT
+log "activating $SHA on $IDLE (active: $ACTIVE)"
+
+fail_idle() { systemctl stop "tenuro@$IDLE.service" || true; die "$*"; }
+sha256_of() { sha256sum -- "$1" | cut -d' ' -f1; }
+
+# ---------------------------------------------------------------- 1. freeze
+REL=$BASE/releases/$SHA
+if [[ ! -d $REL ]]; then
+  INC=$BASE/incoming/$SHA
+  [[ -d $INC && ! -L $INC ]] || die "no upload found for $SHA"
+  TMP=$BASE/releases/.$SHA.tmp
+  rm -rf --one-file-system -- "$TMP"
+
+  # Take the tree away from the upload user first, then fix ownership without following
+  # links, then permissions (chmod -R does not follow symlinks), and only then inspect it.
+  mv -T -- "$INC" "$TMP"
+  chown -hR root:tenuro -- "$TMP"
+  chmod -R u=rwX,g=rX,o= -- "$TMP"
+  bad=$(find "$TMP" \( -type l -o \( ! -type f ! -type d \) -o \( -type f -links +1 \) \) -print -quit)
+  if [[ -n $bad ]]; then
+    rm -rf --one-file-system -- "$TMP"
+    die "upload rejected: symlink, hardlink or special file at ${bad#"$TMP"/}"
+  fi
+
+  reject() { rm -rf --one-file-system -- "$TMP"; die "upload rejected: $*"; }
+  for f in REVISION runtime/bin/node runtime/SHA256 server/index.mjs server/migrate.mjs \
+           server/smoke.mjs server/rebuild.mjs ops/smoke-query.json; do
+    [[ -f $TMP/$f ]] || reject "missing $f"
+  done
+  [[ -d $TMP/public ]] || reject "missing public/"
+  [[ $(tr -d '[:space:]' <"$TMP/REVISION") == "$SHA" ]] || reject "REVISION does not match $SHA"
+
+  want=$(tr -d '[:space:]' <"$TMP/runtime/SHA256")
+  [[ $want =~ ^[0-9a-f]{64}$ ]] || reject "runtime/SHA256 is not a sha256"
+  [[ $(sha256_of "$TMP/runtime/bin/node") == "$want" ]] || reject "runtime/bin/node does not match runtime/SHA256"
+
+  # Share the Node binary with an earlier frozen release when it is byte-identical.
+  # Both sides are root-owned and verified; incoming/ is never involved.
+  for prev in "$BASE"/releases/*/; do
+    prev=${prev%/}
+    [[ -d $prev && ! -L $prev ]] || continue
+    pn=$prev/runtime/bin/node
+    [[ -f $pn && ! -L $pn ]] || continue
+    [[ $(stat -c %U -- "$pn") == "$OWNER_USER" ]] || continue
+    [[ $(tr -d '[:space:]' <"$prev/runtime/SHA256" 2>/dev/null) == "$want" ]] || continue
+    [[ $(sha256_of "$pn") == "$want" ]] || continue
+    ln -f -- "$pn" "$TMP/runtime/bin/node.link"
+    mv -f -- "$TMP/runtime/bin/node.link" "$TMP/runtime/bin/node"
+    log "runtime/bin/node shared with $(basename "$prev")"
+    break
+  done
+
+  chmod 0750 -- "$TMP/runtime/bin/node"
+  # nginx (www-data) serves public/ directly; everything else stays tenuro-only.
+  chmod o+x -- "$TMP"
+  chmod -R o+rX -- "$TMP/public"
+  mv -T -- "$TMP" "$REL"
+  log "froze release $SHA"
+else
+  log "reusing kept release $SHA"
+  [[ $(tr -d '[:space:]' <"$REL/REVISION") == "$SHA" ]] || die "kept release REVISION does not match $SHA"
+fi
+touch -- "$REL"
+
+# ---------------------------------------------------------------- 2. start the idle slot
+if [[ -d $REL/public/assets ]]; then
+  # Hashed assets from recent releases stay reachable, so open tabs survive a deploy.
+  rsync -r --ignore-existing --chmod=D755,F644 -- "$REL/public/assets/" "$BASE/assets/"
+fi
+ln -sfn -- "$REL" "$BASE/slots/.$IDLE.new"
+mv -Tf -- "$BASE/slots/.$IDLE.new" "$BASE/slots/$IDLE"
+systemctl start "tenuro-migrate@$IDLE.service" || fail_idle "migrations failed"
+systemctl restart "tenuro@$IDLE.service"
+
+# ---------------------------------------------------------------- 3. check it directly
+health_ok() { # $1 base url, then extra curl args
+  local body
+  body=$(curl -fsS --max-time 3 "${@:2}" "$1/api/health") || return 1
+  grep -Eq "\"sha\" *: *\"$SHA\"" <<<"$body" && grep -Eq '"db" *: *"ok"' <<<"$body"
+}
+page_ok() { # $1 base url, then extra curl args: noindex (header and meta) and a CSP header
+  local hdrs page
+  hdrs=$(curl -fsS -D - -o /dev/null --max-time 5 "${@:2}" "$1/") || return 1
+  grep -qi '^x-robots-tag: *noindex' <<<"$hdrs" || return 1
+  grep -qi '^content-security-policy:' <<<"$hdrs" || return 1
+  page=$(curl -fsS --max-time 5 "${@:2}" "$1/") || return 1
+  grep -Eqi '<meta[^>]+name="robots"[^>]+noindex' <<<"$page"
+}
+retry() { # $1 tries, then command
+  local n=$1 i
+  shift
+  for ((i = 0; i < n; i++)); do
+    "$@" && return 0
+    sleep "$PAUSE"
+  done
+  return 1
+}
+
+IDLE_URL=http://127.0.0.1:$IDLE_PORT
+retry "$TRIES_IDLE" health_ok "$IDLE_URL" || fail_idle "idle slot $IDLE never reported $SHA as healthy"
+page_ok "$IDLE_URL" || fail_idle "idle slot $IDLE is missing noindex or CSP"
+systemctl start "tenuro-smoke@$IDLE.service" || fail_idle "journey checks failed on $IDLE"
+
+# ---------------------------------------------------------------- 4. switch
+cp -p -- "$SNIPPET" "$SNIPPET.prev"
+tmp=$(mktemp "$SNIPPET.XXXXXX")
+# shellcheck disable=SC2016  # nginx variables are literal text
+printf 'set $tenuro_slot %s;\nset $tenuro_port %s;\n' "$IDLE" "$IDLE_PORT" >"$tmp"
+chmod 644 -- "$tmp"
+mv -f -- "$tmp" "$SNIPPET"
+if ! nginx -t -q; then
+  mv -f -- "$SNIPPET.prev" "$SNIPPET"
+  fail_idle "nginx -t failed; nothing was switched"
+fi
+systemctl reload nginx
+
+# ---------------------------------------------------------------- 5. check through nginx
+VIA=(--resolve "$HOST:443:127.0.0.1" -k) # origin certificate; the name is pinned to loopback
+nginx_ok() {
+  health_ok "https://$HOST" "${VIA[@]}" || return 1
+  page_ok "https://$HOST" "${VIA[@]}" || return 1
+  local page asset
+  page=$(curl -fsS --max-time 5 "${VIA[@]}" "https://$HOST/") || return 1
+  asset=$(grep -Eo '/assets/[A-Za-z0-9._-]+\.js' <<<"$page" | head -n1) || true
+  [[ -n $asset ]] || return 1
+  curl -fsS -o /dev/null --max-time 5 "${VIA[@]}" "https://$HOST$asset" || return 1
+  curl -fsS --max-time 5 "${VIA[@]}" -H 'content-type: application/json' -H 'x-tenuro-client: smoke' \
+    --data-binary @"$REL/ops/smoke-query.json" "https://$HOST/graphql" | grep -q '"data"'
+}
+if ! retry "$TRIES_NGINX" nginx_ok; then
+  mv -f -- "$SNIPPET.prev" "$SNIPPET"
+  if nginx -t -q; then systemctl reload nginx; else log "nginx -t failed while restoring the snippet"; fi
+  fail_idle "checks through nginx failed; rolled back to $ACTIVE"
+fi
+
+# ---------------------------------------------------------------- 6. commit
+printf '%s\n' "$IDLE" >"$BASE/state/active.tmp"
+mv -f -- "$BASE/state/active.tmp" "$BASE/state/active"
+rm -f -- "$SNIPPET.prev"
+ln -sfn -- "$REL" "$BASE/.current.new"
+mv -Tf -- "$BASE/.current.new" "$BASE/current"
+if [[ $ACTIVE != none ]]; then
+  systemd-run --quiet --collect --on-active="$RETIRE_AFTER" \
+    --unit="tenuro-retire-$(date +%s)" /usr/local/sbin/tenuro-retire
+fi
+
+# Keep the newest $KEEP releases, never one a slot points at; prune assets to match.
+declare -A pinned=()
+for s in blue green; do
+  t=$(readlink -f -- "$BASE/slots/$s" 2>/dev/null || true)
+  [[ -n $t ]] && pinned[$(basename "$t")]=1
+done
+n=0
+while IFS= read -r r; do
+  [[ $r =~ ^[0-9a-f]{40}$ ]] || continue
+  if [[ -n ${pinned[$r]:-} ]] || ((n < KEEP)); then
+    n=$((n + 1))
+    continue
+  fi
+  rm -rf --one-file-system -- "${BASE:?}/releases/$r"
+  log "pruned release $r"
+done < <(ls -1t -- "$BASE/releases")
+
+declare -A live=()
+for f in "$BASE"/releases/*/public/assets/*; do
+  [[ -e $f ]] && live[$(basename "$f")]=1
+done
+for f in "$BASE"/assets/*; do
+  [[ -e $f ]] || continue
+  [[ -n ${live[$(basename "$f")]:-} ]] || rm -rf --one-file-system -- "$f"
+done
+find "$BASE/incoming" -mindepth 1 -maxdepth 1 -mtime +2 -exec rm -rf --one-file-system -- {} +
+
+log "OK: $SHA is live on $IDLE (port $IDLE_PORT)"
+echo "OK $SHA $IDLE"

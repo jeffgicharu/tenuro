@@ -1,0 +1,15 @@
+#!/bin/bash
+# Stops whichever slot is not active. Started by tenuro-activate two minutes after a switch,
+# so connections on the old slot can finish. Takes the activation lock, so it never stops a
+# slot an activation is busy starting.
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+exec 9>/run/lock/tenuro-activate.lock
+flock -w 300 9
+
+case "$(cat /srv/tenuro/state/active 2>/dev/null || true)" in
+  blue) systemctl stop tenuro@green.service ;;
+  green) systemctl stop tenuro@blue.service ;;
+  *) echo "no active slot recorded; nothing to retire" >&2 ;;
+esac

@@ -1,0 +1,44 @@
+#!/bin/bash
+# Pretends to be each app slot and nginx. A slot reports the sha its slot symlink points at;
+# "through nginx" answers as whichever slot the snippet currently names, so a switch that
+# didn't happen shows up as the wrong sha.
+url='' dump_headers=0 out=''
+while (($#)); do
+  case $1 in
+    -D) [[ $2 == - ]] && dump_headers=1; shift 2 ;;
+    -o) out=$2; shift 2 ;;
+    --max-time | --resolve | -H | --data-binary) shift 2 ;;
+    http://* | https://*) url=$1; shift ;;
+    *) shift ;;
+  esac
+done
+printf 'curl %s\n' "$url" >>"$STUB_LOG"
+
+case $url in
+  http://127.0.0.1:9000/*) slot=blue; path=${url#http://127.0.0.1:9000}; via=direct ;;
+  http://127.0.0.1:9001/*) slot=green; path=${url#http://127.0.0.1:9001}; via=direct ;;
+  https://tenuro.jeffgicharu.com/*)
+    slot=$(grep -Eo 'tenuro_slot [a-z]+' "$TENURO_TEST_SNIPPET" | cut -d' ' -f2)
+    path=${url#https://tenuro.jeffgicharu.com}; via=nginx ;;
+  *) exit 6 ;;
+esac
+[[ $via == direct && ${STUB_FAIL_IDLE_HEALTH:-} == 1 && $path == /api/health ]] && exit 7
+[[ $via == nginx && ${STUB_FAIL_NGINX_CHECK:-} == 1 ]] && exit 22
+
+target=$(readlink -f "$TENURO_TEST_BASE/slots/$slot" 2>/dev/null) || exit 7
+sha=$(basename "$target")
+
+emit() { if [[ -n $out ]]; then cat >"$out"; else cat; fi; }
+case $path in
+  /api/health) printf '{"sha":"%s","db":"ok","slot":"%s"}\n' "$sha" "$slot" | emit ;;
+  /)
+    if ((dump_headers)); then
+      printf 'HTTP/1.1 200 OK\r\nX-Robots-Tag: noindex, nofollow\r\nContent-Security-Policy: default-src %s\r\n\r\n' "'none'"
+      printf '<html></html>' | emit
+    else
+      printf '<!doctype html><meta name="robots" content="noindex, nofollow"><script type="module" src="/assets/app-%s.js"></script>\n' "${sha: -8}" | emit
+    fi ;;
+  /assets/*) [[ -f $TENURO_TEST_BASE$path ]] || exit 22; emit </dev/null ;;
+  /graphql) printf '{"data":{"viewer":null}}\n' | emit ;;
+  *) exit 22 ;;
+esac
