@@ -364,6 +364,9 @@ describe('server timing', () => {
     const header = res.headers.get('server-timing') ?? '';
     expect(header).toMatch(/^session;dur=\d+\.\d, execute;dur=\d+\.\d/);
     expect(header).toMatch(/desc="Viewer\.portfolio";dur=/);
+    // The database share, with the slowest statements by their text.
+    expect(header).toMatch(/db;desc="\d+ statements";dur=/);
+    expect(header).toMatch(/s1;desc="[^"]*(select|SELECT)[^"]*";dur=/);
     expect(header).toMatch(/desc="Portfolio\.(liveLeases|keyDatesDue)";dur=/);
   });
 });

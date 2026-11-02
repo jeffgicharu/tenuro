@@ -2,7 +2,8 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { GraphQLError, parse, type ASTVisitor, type ValidationContext } from 'graphql';
 import type { Plugin } from 'graphql-yoga';
 import { usePersistedOperations } from '@graphql-yoga/plugin-persisted-operations';
-import { withScope } from '../db/client.ts';
+import { statementTimings, withScope } from '../db/client.ts';
+import { recordStatement } from './timing.ts';
 import { createLoaders, type Context } from './context.ts';
 
 // Runs each operation inside one transaction scoped to the caller's tenant and sandbox.
@@ -12,7 +13,8 @@ export function useScopedTransaction(): Plugin<Context> {
       setExecuteFn((args) => {
         const ctx = args.contextValue as Context;
         const scope = { tenantId: ctx.session?.tenantId ?? null, sandboxId: ctx.session?.sandboxId ?? null };
-        return withScope(ctx.db, scope, async (tx) => {
+        const record = ctx.timings ? recordStatement(ctx.timings) : undefined;
+        const run = () => withScope(ctx.db, scope, async (tx) => {
           ctx.tx = tx;
           ctx.loaders = createLoaders(tx);
           const result = await executeFn(args);
@@ -23,6 +25,7 @@ export function useScopedTransaction(): Plugin<Context> {
           if (err instanceof RollbackWith) return err.result;
           throw err;
         });
+        return record ? statementTimings.run(record, run) : run();
       });
     },
   };

@@ -14,6 +14,22 @@ export function startTimings(request: object, session: number): Map<string, numb
   return t;
 }
 
+// Statements are grouped by their text (parameters are placeholders, so one query shape is one entry).
+const statementsOf = new WeakMap<Map<string, number>, Map<string, { ms: number; n: number }>>();
+
+export function recordStatement(timings: Map<string, number>) {
+  const statements = new Map<string, { ms: number; n: number }>();
+  statementsOf.set(timings, statements);
+  return (sqlText: string, ms: number) => {
+    const s = statements.get(sqlText) ?? { ms: 0, n: 0 };
+    s.ms += ms; s.n += 1;
+    statements.set(sqlText, s);
+  };
+}
+
+// A short, header-safe label for a statement: its text on one line, without quotes, cut to 90 characters.
+const label = (sqlText: string) => sqlText.replace(/\s+/g, ' ').replace(/["\\]/g, '').trim().slice(0, 90);
+
 const TIMED = new Set(['Query', 'Mutation', 'Viewer', 'Portfolio', 'AccountingSummary', 'Lease', 'LeaseAccounting']);
 const SHOWN = 6;
 
@@ -63,7 +79,17 @@ export function useServerTiming(): Plugin<Context> {
         .sort((a, b) => b[1] - a[1])
         .slice(0, SHOWN)
         .map(([k, v], i) => `f${i + 1};desc="${k}";dur=${v.toFixed(1)}`);
-      response.headers.set('server-timing', [...fixed, ...fields].join(', '));
+      const statements = statementsOf.get(t);
+      const db: string[] = [];
+      if (statements?.size) {
+        const all = [...statements.entries()];
+        const total = all.reduce((a, [, s]) => a + s.ms, 0);
+        const count = all.reduce((a, [, s]) => a + s.n, 0);
+        db.push(`db;desc="${count} statements";dur=${total.toFixed(1)}`);
+        all.sort((a, b) => b[1].ms - a[1].ms).slice(0, 4)
+          .forEach(([text, s], i) => db.push(`s${i + 1};desc="${s.n > 1 ? `${s.n}x ` : ''}${label(text)}";dur=${s.ms.toFixed(1)}`));
+      }
+      response.headers.set('server-timing', [...fixed, ...db, ...fields].join(', '));
     },
   };
 }

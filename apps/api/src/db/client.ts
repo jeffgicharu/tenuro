@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Kysely, PostgresDialect, sql, type Transaction } from 'kysely';
 import pg from 'pg';
 import type { Database } from './types.ts';
@@ -10,6 +11,9 @@ pg.types.setTypeParser(pg.types.builtins.NUMERIC, (v) => v);
 export type Db = Kysely<Database>;
 export type Tx = Transaction<Database>;
 
+// Statements run on behalf of a request report their time here (see graphql/timing.ts).
+export const statementTimings = new AsyncLocalStorage<(sqlText: string, ms: number) => void>();
+
 export function createDb(connectionString: string | undefined, max = 6): Db {
   const pool = new pg.Pool({
     ...(connectionString ? { connectionString } : {}),
@@ -19,7 +23,10 @@ export function createDb(connectionString: string | undefined, max = 6): Db {
     statement_timeout: 8_000,
     application_name: `tenuro-${process.env.SLOT ?? 'dev'}`,
   });
-  return new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
+  return new Kysely<Database>({
+    dialect: new PostgresDialect({ pool }),
+    log: (event) => statementTimings.getStore()?.(event.query.sql, event.queryDurationMillis),
+  });
 }
 
 export interface Scope {
