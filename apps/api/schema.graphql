@@ -1,0 +1,998 @@
+input AccountingInput {
+  asc842Class: Asc842Class
+
+  """Incremental borrowing rate in percent."""
+  discountRatePercent: Decimal!
+  exemption: LeaseExemption!
+  incentives: Decimal
+  initialDirectCosts: Decimal
+  ownershipTransfers: Boolean!
+  prepayments: Decimal
+  restorationCost: Decimal
+  standard: AccountingStandard!
+  usefulLifeMonths: Int
+}
+
+enum AccountingStandard {
+  ASC842
+  IFRS16
+}
+
+type Activity implements Node {
+  actor: User
+  createdAt: DateTime!
+
+  """JSON list of field changes, when the activity changed fields."""
+  diff: String
+  id: ID!
+  summary: String!
+  verb: String!
+}
+
+input AmendLeaseInput {
+  draftId: ID
+  id: ID!
+  lease: LeaseInput!
+
+  """The version the person started from."""
+  version: Int!
+}
+
+type AmendLeasePayload {
+  lease: Lease!
+}
+
+enum Asc842Class {
+  FINANCE
+  OPERATING
+}
+
+"""An ISO 3166-1 alpha-2 country code."""
+scalar CountryCode
+
+input CreateTaskInput {
+  assigneeId: ID
+  description: String
+  dueOn: Date
+  keyDateId: ID
+  leaseId: ID
+  priority: TaskPriority
+  title: String!
+}
+
+type CreateTaskPayload {
+  task: Task!
+}
+
+"""An ISO 4217 currency code."""
+scalar CurrencyCode
+
+"""A calendar date, YYYY-MM-DD, with no time zone."""
+scalar Date
+
+input DateRange {
+  from: Date
+  to: Date
+}
+
+"""An instant, ISO 8601 with offset."""
+scalar DateTime
+
+"""An exact decimal number, sent as a string so no precision is lost."""
+scalar Decimal
+
+input DecimalRange {
+  max: Decimal
+  min: Decimal
+}
+
+input DeleteViewInput {
+  id: ID!
+}
+
+type DeleteViewPayload {
+  deletedViewId: ID!
+}
+
+enum Density {
+  COMFORTABLE
+  COMPACT
+  STANDARD
+}
+
+type Deposit {
+  amount: Money!
+  heldBy: String!
+  kind: DepositKind!
+  returnDueOn: Date
+  status: DepositStatus!
+}
+
+input DepositInput {
+  amount: Decimal!
+  heldBy: String!
+  kind: DepositKind!
+  returnDueOn: Date
+}
+
+enum DepositKind {
+  BANK_GUARANTEE
+  CASH
+  LETTER_OF_CREDIT
+}
+
+enum DepositStatus {
+  HELD
+  PARTLY_RETURNED
+  RETURNED
+}
+
+input DiscardLeaseDraftInput {
+  id: ID!
+}
+
+type DiscardLeaseDraftPayload {
+  deletedDraftId: ID!
+}
+
+type Document implements Node {
+  createdAt: DateTime!
+  filename: String!
+
+  """True for documents rendered from the lease data."""
+  generated: Boolean!
+  id: ID!
+  kind: DocumentKind!
+  mimeType: String!
+  pageCount: Int
+  sizeBytes: Int!
+  title: String!
+  uploadedBy: User
+
+  """Same-origin URL that streams the file for preview or download."""
+  url: String!
+}
+
+enum DocumentKind {
+  AMENDMENT
+  CERTIFICATE
+  CORRESPONDENCE
+  FLOOR_PLAN
+  LEASE
+  OTHER
+  PHOTO
+}
+
+"""An expected failure the client can show to the person who caused it."""
+interface DomainError {
+  message: String!
+}
+
+type Escalation {
+  cap: Decimal
+  collar: Decimal
+  everyMonths: Int!
+  firstReviewOn: Date!
+  indexName: String
+  kind: EscalationKind!
+
+  """Fixed uplift as a fraction, e.g. 0.05 for 5%."""
+  rate: Decimal
+}
+
+input EscalationInput {
+  capPercent: Decimal
+  collarPercent: Decimal
+  everyMonths: Int!
+  firstReviewOn: Date!
+  indexName: String
+  kind: EscalationKind!
+
+  """Fixed uplift in percent, e.g. "5" for 5%."""
+  ratePercent: Decimal
+}
+
+enum EscalationKind {
+  CPI
+  FIXED
+  MARKET_REVIEW
+}
+
+type FacetCount {
+  count: Int!
+  value: String!
+}
+
+type FieldError {
+  code: String!
+  message: String!
+
+  """Dotted path of the input field, e.g. "rent.amount"."""
+  path: String!
+
+  """The form step the field belongs to."""
+  step: String
+}
+
+type KeyDate implements Node {
+  daysUntil: Int!
+  dueOn: Date!
+  id: ID!
+  kind: KeyDateKind!
+  lease: Lease!
+  owner: User
+  remindDays: [Int!]!
+  status: KeyDateStatus!
+  title: String!
+  version: Int!
+}
+
+enum KeyDateKind {
+  BREAK_NOTICE
+  CUSTOM
+  DEPOSIT_RETURN
+  EXPIRY
+  INSURANCE
+  RENEWAL_NOTICE
+  RENT_REVIEW
+}
+
+enum KeyDateStatus {
+  ACTIONED
+  DISMISSED
+  UPCOMING
+}
+
+"""
+One lease of one set of premises. Its id is stable across a visitor’s private edits.
+"""
+type Lease implements Node {
+  activity(after: String, before: String, first: Int, last: Int): LeaseActivityConnection!
+
+  """Passing rent today, annualised."""
+  annualRent: Money!
+
+  """
+  Passing rent today in the company’s reporting currency, at indicative exchange rates.
+  """
+  annualRentReporting: Money!
+  areaSqm: Decimal!
+  asc842Class: Asc842Class
+
+  """People in this company who can own tasks."""
+  assignableUsers: [User!]!
+
+  """True when this is the visitor’s private copy."""
+  changedInSandbox: Boolean!
+  city: String!
+  commencementDate: Date!
+  costCentre: String
+  countryCode: CountryCode!
+  createdAt: DateTime!
+  currency: CurrencyCode!
+
+  """Negative once the lease has expired."""
+  daysToExpiry: Int!
+  deposits: [Deposit!]!
+
+  """Incremental borrowing rate, effective annual, as a fraction."""
+  discountRate: Decimal!
+  documents(after: String, before: String, first: Int, last: Int): LeaseDocumentsConnection!
+  escalations: [Escalation!]!
+  exemption: LeaseExemption!
+  expiryDate: Date!
+
+  """The lease as form data (JSON), the starting point for an amendment."""
+  formData: String!
+  id: ID!
+  incentives: Money!
+  initialDirectCosts: Money!
+  keyDates(after: String, before: String, first: Int, includeClosed: Boolean, last: Int): LeaseKeyDatesConnection!
+  landlordName: String!
+  lesseeEntity: String!
+  nextKeyDate: Date
+  nextKeyKind: KeyDateKind
+  notes: String
+  options: [LeaseOption!]!
+  ownershipTransfers: Boolean!
+  parties: [LeaseParty!]!
+  paymentFrequency: PaymentFrequency!
+  paymentTiming: PaymentTiming!
+  premises: String!
+  prepayments: Money!
+  property: Property!
+  propertyName: String!
+  propertyType: PropertyType!
+  reference: String!
+
+  """Rent per payment period at commencement."""
+  rentPerPeriod: Money!
+  rentSchedule(after: String, before: String, first: Int, last: Int): LeaseRentScheduleConnection!
+  rentSteps: [RentStep!]!
+  restorationCost: Money!
+  serviceChargePerPeriod: Money!
+  standard: AccountingStandard!
+  status: LeaseStatus!
+  tasks(after: String, before: String, first: Int, includeDone: Boolean, last: Int): LeaseTasksConnection!
+  termMonths: Int!
+  updatedAt: DateTime!
+  updatedBy: User
+  usefulLifeMonths: Int
+
+  """Increments on every change; send it back with amendments."""
+  version: Int!
+}
+
+type LeaseActivityConnection {
+  edges: [LeaseActivityConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type LeaseActivityConnectionEdge {
+  cursor: String!
+  node: Activity!
+}
+
+type LeaseDocumentsConnection {
+  edges: [LeaseDocumentsConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type LeaseDocumentsConnectionEdge {
+  cursor: String!
+  node: Document!
+}
+
+"""
+An unfinished new lease or amendment, saved as the person works through the form.
+"""
+type LeaseDraft implements Node {
+  currentStep: String!
+
+  """The form data as JSON."""
+  data: String!
+  id: ID!
+
+  """Set when the draft amends an existing lease."""
+  lease: Lease
+
+  """
+  Outstanding issues per step, so the stepper can show where work remains.
+  """
+  steps: [LeaseFormStepState!]!
+  updatedAt: DateTime!
+  version: Int!
+}
+
+enum LeaseExemption {
+  LOW_VALUE
+  NONE
+  SHORT_TERM
+}
+
+"""Counts for each filter value, within the other active filters."""
+type LeaseFacets {
+  city: [FacetCount!]!
+  countryCode: [FacetCount!]!
+  currency: [FacetCount!]!
+  propertyType: [FacetCount!]!
+  status: [FacetCount!]!
+}
+
+"""All set fields must match. List fields match any of their values."""
+input LeaseFilter {
+  """Passing rent in the reporting currency."""
+  annualRent: DecimalRange
+  changedInSandbox: Boolean
+  city: [String!]
+  countryCode: [CountryCode!]
+  currency: [CurrencyCode!]
+  expiresWithinDays: Int
+  expiry: DateRange
+  hasOpenBreak: Boolean
+  nextKeyKind: [KeyDateKind!]
+  nextKeyWithinDays: Int
+  propertyType: [PropertyType!]
+
+  """Matches reference, property, landlord, city, premises or cost centre."""
+  search: String
+  status: [LeaseStatus!]
+}
+
+enum LeaseFormStep {
+  accounting
+  deposits
+  options
+  parties
+  property
+  rent
+  review
+  term
+}
+
+type LeaseFormStepState {
+  issueCount: Int!
+  step: String!
+}
+
+"""A complete lease, as entered on the new-lease and amend-lease form."""
+input LeaseInput {
+  accounting: AccountingInput!
+  agent: PartyInput
+  areaSqm: Decimal!
+  commencementDate: Date!
+  costCentre: String
+  currency: CurrencyCode!
+  deposits: [DepositInput!]!
+  escalation: EscalationInput
+  expiryDate: Date!
+  guarantor: PartyInput
+  landlord: PartyInput!
+  lesseeEntity: String!
+  notes: String
+  options: [LeaseOptionInput!]!
+  paymentFrequency: PaymentFrequency!
+  paymentTiming: PaymentTiming!
+  premises: String!
+  propertyId: ID!
+  rentPerPeriod: Decimal!
+  rentSteps: [RentStepInput!]!
+  serviceChargePerPeriod: Decimal
+}
+
+type LeaseKeyDatesConnection {
+  edges: [LeaseKeyDatesConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type LeaseKeyDatesConnectionEdge {
+  cursor: String!
+  node: KeyDate!
+}
+
+type LeaseOption {
+  exerciseOn: Date!
+  kind: OptionKind!
+  noticeBy: Date
+  price: Money
+
+  """
+  Whether the lessee is reasonably certain to exercise it, which changes the accounting term.
+  """
+  reasonablyCertain: Boolean!
+  status: OptionStatus!
+  termMonths: Int
+  terms: String
+}
+
+input LeaseOptionInput {
+  exerciseOn: Date!
+  kind: OptionKind!
+  noticeBy: Date
+  price: Decimal
+  reasonablyCertain: Boolean!
+  termMonths: Int
+  terms: String
+}
+
+input LeaseOrder {
+  direction: SortDirection!
+  field: LeaseOrderField!
+}
+
+enum LeaseOrderField {
+  ANNUAL_RENT
+  AREA
+  CITY
+  COMMENCEMENT_DATE
+  COUNTRY
+  EXPIRY_DATE
+  LANDLORD
+  NEXT_KEY_DATE
+  PROPERTY_NAME
+  REFERENCE
+  STATUS
+  UPDATED_AT
+}
+
+type LeaseParty {
+  address: String
+  contactName: String
+  email: String
+  name: String!
+  phone: String
+  role: PartyRole!
+}
+
+type LeaseRentScheduleConnection {
+  edges: [LeaseRentScheduleConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type LeaseRentScheduleConnectionEdge {
+  cursor: String!
+  node: RentPeriod!
+}
+
+enum LeaseStatus {
+  ACTIVE
+  DRAFT
+  EXPIRED
+  HOLDING_OVER
+  TERMINATED
+}
+
+type LeaseTasksConnection {
+  edges: [LeaseTasksConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type LeaseTasksConnectionEdge {
+  cursor: String!
+  node: Task!
+}
+
+"""
+An exact amount in one currency. Format it with the viewer locale; never parse it as a float.
+"""
+type Money {
+  amount: Decimal!
+  currency: CurrencyCode!
+}
+
+type Mutation {
+  amendLease(input: AmendLeaseInput!): MutationAmendLeaseResult!
+  createTask(input: CreateTaskInput!): MutationCreateTaskResult!
+  deleteView(input: DeleteViewInput!): MutationDeleteViewResult!
+  discardLeaseDraft(input: DiscardLeaseDraftInput!): MutationDiscardLeaseDraftResult!
+
+  """
+  Discards every change the visitor made, returning their copy to the company’s shared data.
+  """
+  resetMySandbox: MutationResetMySandboxResult!
+  saveLeaseDraft(input: SaveLeaseDraftInput!): MutationSaveLeaseDraftResult!
+  saveView(input: SaveViewInput!): MutationSaveViewResult!
+  submitLease(input: SubmitLeaseInput!): MutationSubmitLeaseResult!
+  updateTask(input: UpdateTaskInput!): MutationUpdateTaskResult!
+}
+
+union MutationAmendLeaseResult = MutationAmendLeaseSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationAmendLeaseSuccess {
+  data: AmendLeasePayload!
+}
+
+union MutationCreateTaskResult = MutationCreateTaskSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationCreateTaskSuccess {
+  data: CreateTaskPayload!
+}
+
+union MutationDeleteViewResult = MutationDeleteViewSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationDeleteViewSuccess {
+  data: DeleteViewPayload!
+}
+
+union MutationDiscardLeaseDraftResult = MutationDiscardLeaseDraftSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationDiscardLeaseDraftSuccess {
+  data: DiscardLeaseDraftPayload!
+}
+
+union MutationResetMySandboxResult = MutationResetMySandboxSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationResetMySandboxSuccess {
+  data: ResetMySandboxPayload!
+}
+
+union MutationSaveLeaseDraftResult = MutationSaveLeaseDraftSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationSaveLeaseDraftSuccess {
+  data: SaveLeaseDraftPayload!
+}
+
+union MutationSaveViewResult = MutationSaveViewSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationSaveViewSuccess {
+  data: SaveViewPayload!
+}
+
+union MutationSubmitLeaseResult = MutationSubmitLeaseSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationSubmitLeaseSuccess {
+  data: SubmitLeasePayload!
+}
+
+union MutationUpdateTaskResult = MutationUpdateTaskSuccess | NotFound | PermissionDenied | QuotaExceeded | StaleVersion | ValidationFailed
+
+type MutationUpdateTaskSuccess {
+  data: UpdateTaskPayload!
+}
+
+interface Node {
+  id: ID!
+}
+
+type NotFound implements DomainError {
+  message: String!
+}
+
+enum OptionKind {
+  BREAK
+  PURCHASE
+  RENEWAL
+}
+
+enum OptionStatus {
+  EXERCISED
+  LAPSED
+  OPEN
+  WAIVED
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+}
+
+input PartyInput {
+  contactName: String
+  email: String
+  name: String!
+  phone: String
+}
+
+enum PartyRole {
+  AGENT
+  GUARANTOR
+  LANDLORD
+  LESSEE_ENTITY
+}
+
+enum PaymentFrequency {
+  ANNUAL
+  MONTHLY
+  QUARTERLY
+}
+
+"""
+Whether each payment falls at the start (advance) or end (arrears) of its period.
+"""
+enum PaymentTiming {
+  ADVANCE
+  ARREARS
+}
+
+type PermissionDenied implements DomainError {
+  message: String!
+  requiredRole: String!
+}
+
+type Property implements Node {
+  addressLine: String!
+  areaSqm: Decimal!
+  city: String!
+  code: String!
+  countryCode: CountryCode!
+  district: String
+  id: ID!
+  latitude: Decimal
+  longitude: Decimal
+  name: String!
+  photo: String
+  type: PropertyType!
+  yearBuilt: Int
+}
+
+enum PropertyType {
+  INDUSTRIAL
+  MIXED_USE
+  OFFICE
+  RETAIL
+  WAREHOUSE
+}
+
+type Query {
+  """The one-click sign-ins: one per role in each company."""
+  signInAccounts: [User!]!
+  node(id: ID!): Node
+  nodes(ids: [ID!]!): [Node]!
+
+  """Null when nobody is signed in."""
+  viewer: Viewer
+}
+
+type QuotaExceeded implements DomainError {
+  limit: String!
+  message: String!
+}
+
+type RentPeriod {
+  """FIXED_UPLIFT or STEP when the rent changed in this period."""
+  change: String
+  dueOn: Date!
+  end: Date!
+  index: Int!
+  isCurrent: Boolean!
+  rent: Money!
+  start: Date!
+}
+
+"""
+A settled rent change, such as an agreed market review or applied indexation.
+"""
+type RentStep {
+  rentPerPeriod: Money!
+  startsOn: Date!
+}
+
+input RentStepInput {
+  rentPerPeriod: Decimal!
+  startsOn: Date!
+}
+
+type ResetMySandboxPayload {
+  viewer: Viewer!
+}
+
+"""The visitor’s private copy of the data."""
+type Sandbox {
+  """When the nightly rebuild clears every private copy (03:00 Nairobi time)."""
+  nextResetAt: DateTime!
+  writesLimit: Int!
+  writesUsed: Int!
+}
+
+input SaveLeaseDraftInput {
+  currentStep: LeaseFormStep!
+  data: String!
+  id: ID
+
+  """The lease being amended, for a new amendment draft."""
+  leaseId: ID
+  version: Int
+}
+
+type SaveLeaseDraftPayload {
+  draft: LeaseDraft!
+}
+
+input SaveViewInput {
+  config: String!
+  id: ID
+  name: String!
+  scope: ViewScope!
+  shared: Boolean
+}
+
+type SaveViewPayload {
+  view: SavedView!
+  viewer: Viewer!
+}
+
+type SavedView implements Node {
+  """The view as JSON: filters, sort and visible columns."""
+  config: String!
+  id: ID!
+  name: String!
+  position: Int!
+  scope: ViewScope!
+
+  """Shared views belong to the company; others to one person."""
+  shared: Boolean!
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+type StaleVersion implements DomainError {
+  currentVersion: Int!
+  message: String!
+}
+
+input SubmitLeaseInput {
+  """The draft this lease came from; it is removed on success."""
+  draftId: ID
+  lease: LeaseInput!
+}
+
+type SubmitLeasePayload {
+  lease: Lease!
+  viewer: Viewer!
+}
+
+type Task implements Node {
+  assignee: User
+  completedAt: DateTime
+  createdAt: DateTime!
+  createdBy: User
+  description: String
+  dueOn: Date
+  id: ID!
+  isOverdue: Boolean!
+  keyDate: KeyDate
+  lease: Lease
+  priority: TaskPriority!
+  status: TaskStatus!
+  title: String!
+  version: Int!
+}
+
+enum TaskPriority {
+  HIGH
+  LOW
+  NORMAL
+  URGENT
+}
+
+enum TaskStatus {
+  CANCELLED
+  DONE
+  IN_PROGRESS
+  TODO
+}
+
+"""A client company whose lease portfolio this workspace holds."""
+type Tenant implements Node {
+  """Text direction of the default language."""
+  direction: String!
+  id: ID!
+
+  """Interface languages, first is the default."""
+  languages: [String!]!
+
+  """BCP 47 locale for dates, numbers and currency."""
+  locale: String!
+  name: String!
+
+  """The name in the company’s own script, where different."""
+  nameLocal: String
+  reportingCurrency: CurrencyCode!
+  slug: String!
+  theme: TenantTheme!
+}
+
+"""Brand inputs the client turns into a full light and dark theme."""
+type TenantTheme {
+  accentHue: Float!
+
+  """OKLCH hue, in degrees, of the primary brand colour."""
+  brandHue: Float!
+  density: Density!
+  logo: String!
+  logoOnDark: String!
+  mark: String!
+}
+
+input UpdateTaskInput {
+  assigneeId: ID
+  clearAssignee: Boolean
+  clearDueOn: Boolean
+  dueOn: Date
+  id: ID!
+  priority: TaskPriority
+  status: TaskStatus
+  title: String
+  version: Int!
+}
+
+type UpdateTaskPayload {
+  task: Task!
+}
+
+type User implements Node {
+  displayName: String!
+  email: String!
+  id: ID!
+  initials: String!
+  jobTitle: String!
+  locale: String
+  role: UserRole!
+  tenant: Tenant!
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+type ValidationFailed implements DomainError {
+  fieldErrors: [FieldError!]!
+  message: String!
+}
+
+enum ViewScope {
+  KEY_DATES
+  LEASE_REGISTER
+  TASKS
+}
+
+"""The signed-in person and everything scoped to them."""
+type Viewer {
+  canEdit: Boolean!
+  isAdmin: Boolean!
+  leaseDrafts(after: String, before: String, first: Int, last: Int): ViewerLeaseDraftsConnection!
+  leaseFacets(filter: LeaseFilter): LeaseFacets!
+  leases(after: String, before: String, filter: LeaseFilter, first: Int, last: Int, orderBy: [LeaseOrder!]): ViewerLeasesConnection!
+
+  """Empty form data (JSON) with this company’s defaults filled in."""
+  newLeaseTemplate: String!
+  properties(after: String, before: String, first: Int, last: Int, search: String): ViewerPropertiesConnection!
+  sandbox: Sandbox
+  savedViews(after: String, before: String, first: Int, last: Int, scope: ViewScope!): ViewerSavedViewsConnection!
+  tenant: Tenant!
+  user: User!
+}
+
+type ViewerLeaseDraftsConnection {
+  edges: [ViewerLeaseDraftsConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type ViewerLeaseDraftsConnectionEdge {
+  cursor: String!
+  node: LeaseDraft!
+}
+
+type ViewerLeasesConnection {
+  edges: [ViewerLeasesConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type ViewerLeasesConnectionEdge {
+  cursor: String!
+  node: Lease!
+}
+
+type ViewerPropertiesConnection {
+  edges: [ViewerPropertiesConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type ViewerPropertiesConnectionEdge {
+  cursor: String!
+  node: Property!
+}
+
+type ViewerSavedViewsConnection {
+  edges: [ViewerSavedViewsConnectionEdge!]!
+  pageInfo: PageInfo!
+
+  """Rows matching the current filters, across all pages."""
+  totalCount: Int!
+}
+
+type ViewerSavedViewsConnectionEdge {
+  cursor: String!
+  node: SavedView!
+}
