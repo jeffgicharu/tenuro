@@ -23,6 +23,7 @@ setup() {
   : >"$T/calls.log"
   unset STUB_FAIL_IDLE_HEALTH STUB_FAIL_NGINX_T STUB_FAIL_NGINX_CHECK STUB_FAIL_MIGRATE STUB_FAIL_SMOKE \
         STUB_FAIL_RESTART STUB_FAIL_RELOAD STUB_SIGNAL_ON_RELOAD STUB_RACE_SYMLINK \
+        STUB_FAIL_NGINX_T_FOR_SLOT STUB_NGINX_INACTIVE TENURO_TEST_MAX_UPLOAD_MB \
         TENURO_TEST_OWNER_USER TENURO_TEST_OWNER_GROUP TENURO_TEST_DETACH INVOCATION_ID
   export TENURO_ACTIVATE_TEST=1 TENURO_TEST_BASE=$T/base TENURO_TEST_SNIPPET=$T/active-slot.conf \
          STUB_LOG=$T/calls.log PATH="$HERE/stubs:$ORIG_PATH"
@@ -94,6 +95,8 @@ deploy "$S2"; rc=$?
 ok "exits 0" test "$rc" -eq 0
 ok "state is green" state_is green
 ok "snippet names green" slot_is green 9001
+ok "first re-asserts the active slot for boot" has "$T/calls.log" "systemctl enable --quiet --now tenuro@blue.service"
+ok "and keeps the idle slot off boot until commit" test "$(grep -n 'disable --quiet tenuro@green' "$T/calls.log" | cut -d: -f1)" -lt "$(grep -n 'restart tenuro@green' "$T/calls.log" | cut -d: -f1)"
 ok "green enabled for boot" has "$T/calls.log" "systemctl enable --quiet tenuro@green.service"
 ok "blue disabled for boot" has "$T/calls.log" "systemctl disable --quiet tenuro@blue.service"
 ok "blue not stopped yet" lacks "$T/calls.log" "systemctl stop tenuro@blue.service"
@@ -181,13 +184,39 @@ ok "staging left empty" test "$(count "$T/base/staging")" -eq 0
 ok "never started a slot" lacks "$T/calls.log" "tenuro@"
 ok "/etc/passwd untouched" test "$(mode /etc/passwd)" = 644
 
-echo "a hardlinked file in the upload is rejected"
+echo "a hardlinked file in the upload is rejected before chown"
 setup
 S=$(sha 5); upload "$S"; ln "$T/base/incoming/$S/server/index.mjs" "$T/base/incoming/$S/public/index.mjs"
 activate "$S"; rc=$?
 ok "exits non-zero" test "$rc" -ne 0
-ok "explains" has "$T/out.log" "upload rejected: symlink, hardlink, special file or wrong owner"
+ok "explains" has "$T/out.log" "upload rejected: hardlinked file at"
 ok "no release created" test ! -e "$T/base/releases/$S"
+ok "no chown attempted" lacks "$T/calls.log" "chown"
+
+echo "a hardlink to a file outside the upload never has it re-owned or re-moded"
+setup
+mkdir -p "$T/outside"; printf 'secret' >"$T/outside/other-site.env"; chmod 0666 "$T/outside/other-site.env"
+S=$(sha 5); upload "$S"; ln "$T/outside/other-site.env" "$T/base/incoming/$S/public/x.env"
+activate "$S"; rc=$?
+ok "exits non-zero" test "$rc" -ne 0
+ok "explains" has "$T/out.log" "upload rejected: hardlinked file at public/x.env"
+ok "no chown attempted" lacks "$T/calls.log" "chown"
+ok "outside file mode untouched" test "$(mode "$T/outside/other-site.env")" = 666
+ok "outside file still there" test -f "$T/outside/other-site.env"
+
+echo "an upload over the size cap is refused before anything else"
+setup
+export TENURO_TEST_MAX_UPLOAD_MB=1
+S=$(sha 12); upload "$S"; head -c 3000000 /dev/zero >"$T/base/incoming/$S/public/big.bin"
+activate "$S"; rc=$?
+ok "exits non-zero" test "$rc" -ne 0
+ok "explains" has "$T/out.log" "is larger than the 1 MB cap"
+ok "upload removed" test ! -e "$T/base/incoming/$S" -a "$(count "$T/base/staging")" -eq 0
+ok "no chown attempted" lacks "$T/calls.log" "chown"
+S=$(sha 13); upload "$S"
+activate "$S"; rc=$?
+unset TENURO_TEST_MAX_UPLOAD_MB
+ok "a small upload under the same cap is fine" test "$rc" -eq 0
 
 echo "a special file in the upload is rejected"
 setup
@@ -259,7 +288,8 @@ ok "state still blue" state_is blue
 ok "snippet unchanged" cmp -s "$T/snippet.before" "$T/active-slot.conf"
 ok "green stopped" has "$T/calls.log" "systemctl stop tenuro@green.service"
 ok "nginx never reloaded" lacks "$T/calls.log" "systemctl reload nginx"
-ok "boot setup untouched" lacks "$T/calls.log" "enable"
+ok "green never enabled for boot" lacks "$T/calls.log" "enable --quiet tenuro@green"
+ok "blue re-asserted for boot" has "$T/calls.log" "systemctl enable --quiet --now tenuro@blue.service"
 
 echo "the idle slot fails to restart: no switch"
 export STUB_FAIL_RESTART=1
@@ -309,7 +339,27 @@ ok "reloaded twice (switch, rollback)" test "$(grep -c 'systemctl reload nginx' 
 ok "green stopped" has "$T/calls.log" "systemctl stop tenuro@green.service"
 ok "state still blue" state_is blue
 ok "current still blue's release" test "$(readlink -f "$T/base/current")" = "$T/base/releases/$S1"
-ok "boot setup untouched" lacks "$T/calls.log" "enable"
+ok "green never enabled for boot" lacks "$T/calls.log" "enable --quiet tenuro@green"
+ok "green stopped only after the rollback reload" test "$(grep -n 'stop tenuro@green' "$T/calls.log" | cut -d: -f1)" -gt "$(grep -n 'reload nginx' "$T/calls.log" | tail -n1 | cut -d: -f1)"
+
+echo "the rollback's own nginx -t fails: both slots keep running, the next run repairs it"
+export STUB_FAIL_NGINX_CHECK=1 STUB_FAIL_NGINX_T_FOR_SLOT=blue
+activate "$S2"; rc=$?
+unset STUB_FAIL_NGINX_CHECK STUB_FAIL_NGINX_T_FOR_SLOT
+ok "exits non-zero" test "$rc" -ne 0
+ok "explains" has "$T/out.log" "ROLLBACK INCOMPLETE"
+ok "and says both slots are running" has "$T/out.log" "both slots are running"
+ok "green left running (nginx may still point at it)" lacks "$T/calls.log" "stop tenuro@green"
+ok "snippet backup kept as the marker" test -e "$T/active-slot.conf.prev"
+ok "state still blue" state_is blue
+export STUB_FAIL_IDLE_HEALTH=1   # stop the next run after step 0, to look at the repair alone
+activate "$S2"; rc=$?
+unset STUB_FAIL_IDLE_HEALTH
+ok "next run repairs nginx first" has "$T/out.log" "restoring nginx to the active slot blue"
+ok "and names the interruption" has "$T/out.log" "an earlier switch or rollback was interrupted"
+ok "snippet on blue" cmp -s "$T/snippet.before" "$T/active-slot.conf"
+ok "backup cleared" test ! -e "$T/active-slot.conf.prev"
+ok "nginx reloaded by the repair" has "$T/calls.log" "systemctl reload nginx"
 
 echo "the reload itself fails after the snippet swap: the trap rolls back"
 export STUB_FAIL_RELOAD=1
@@ -350,11 +400,89 @@ S3=$(sha 3); upload "$S3"
 export STUB_FAIL_IDLE_HEALTH=1   # make this run fail later, so we see the reconcile on its own
 activate "$S3"; rc=$?
 unset STUB_FAIL_IDLE_HEALTH
-ok "reconciled before anything else" has "$T/out.log" "nginx names 'blue' but the active slot is green; restoring"
-ok "active slot started" has "$T/calls.log" "systemctl start tenuro@green.service"
+ok "reconciled before anything else" has "$T/out.log" "restoring nginx to the active slot green (it named 'blue'"
+ok "active slot enabled and started" has "$T/calls.log" "systemctl enable --quiet --now tenuro@green.service"
+ok "other slot taken off boot" has "$T/calls.log" "systemctl disable --quiet tenuro@blue.service"
 ok "snippet back on green" slot_is green 9001
 ok "stale backup removed" test ! -e "$T/active-slot.conf.prev"
 ok "state still green" state_is green
+
+echo "a killed rollback (backup present, snippet already right) is still re-applied"
+cp "$T/active-slot.conf" "$T/active-slot.conf.prev"
+export STUB_FAIL_IDLE_HEALTH=1
+activate "$S3"; rc=$?
+unset STUB_FAIL_IDLE_HEALTH
+ok "re-applied" has "$T/out.log" "restoring nginx to the active slot green (it named 'green', and an earlier switch or rollback was interrupted)"
+ok "reloaded" has "$T/calls.log" "systemctl reload nginx"
+ok "backup cleared" test ! -e "$T/active-slot.conf.prev"
+
+echo "power lost between the commit and the boot handover: the next run enables the active slot"
+setup
+deploy "$(sha 1)"
+printf 'green\n' >"$T/base/state/active"   # committed green, but blue is still the one enabled
+# shellcheck disable=SC2016  # nginx variables are literal text
+printf 'set $tenuro_slot green;\nset $tenuro_port 9001;\n' >"$T/active-slot.conf"
+upload "$(sha 2)"; export STUB_FAIL_IDLE_HEALTH=1
+activate "$(sha 2)"
+unset STUB_FAIL_IDLE_HEALTH
+ok "green enabled and started" has "$T/calls.log" "systemctl enable --quiet --now tenuro@green.service"
+ok "blue taken off boot" has "$T/calls.log" "systemctl disable --quiet tenuro@blue.service"
+
+# ----------------------------------------------------------------------------------------
+BOOT=$HERE/../server/usr/local/sbin/tenuro-boot
+boot() { : >"$T/calls.log"; bash "$BOOT" >"$T/out.log" 2>&1; }
+echo "tenuro-boot: nginx names the wrong slot"
+setup
+printf 'blue\n' >"$T/base/state/active"
+# shellcheck disable=SC2016  # nginx variables are literal text
+printf 'set $tenuro_slot green;\nset $tenuro_port 9001;\n' >"$T/active-slot.conf"
+boot; rc=$?
+ok "exits 0" test "$rc" -eq 0
+ok "blue enabled" has "$T/calls.log" "systemctl enable --quiet tenuro@blue.service"
+ok "green taken off boot" has "$T/calls.log" "systemctl disable --quiet tenuro@green.service"
+ok "blue started without blocking boot" has "$T/calls.log" "systemctl start --no-block tenuro@blue.service"
+ok "snippet re-rendered" slot_is blue 9000
+ok "nginx -t before the reload" test "$(grep -n 'nginx -t' "$T/calls.log" | cut -d: -f1)" -lt "$(grep -n 'reload nginx' "$T/calls.log" | cut -d: -f1)"
+
+echo "tenuro-boot: snippet already right"
+boot; rc=$?
+ok "exits 0" test "$rc" -eq 0
+ok "blue started" has "$T/calls.log" "systemctl start --no-block tenuro@blue.service"
+ok "no nginx -t" lacks "$T/calls.log" "nginx -t"
+ok "no reload" lacks "$T/calls.log" "reload nginx"
+
+echo "tenuro-boot: a backup left by an interrupted switch forces a re-render"
+cp "$T/active-slot.conf" "$T/active-slot.conf.prev"
+boot; rc=$?
+ok "exits 0" test "$rc" -eq 0
+ok "reloaded" has "$T/calls.log" "systemctl reload nginx"
+ok "backup cleared" test ! -e "$T/active-slot.conf.prev"
+
+echo "tenuro-boot: nginx -t fails with the new snippet"
+# shellcheck disable=SC2016  # nginx variables are literal text
+printf 'set $tenuro_slot green;\nset $tenuro_port 9001;\n' >"$T/active-slot.conf"
+cp "$T/active-slot.conf" "$T/snippet.before"
+export STUB_FAIL_NGINX_T_FOR_SLOT=blue
+boot; rc=$?
+unset STUB_FAIL_NGINX_T_FOR_SLOT
+ok "exits non-zero" test "$rc" -ne 0
+ok "previous snippet put back" cmp -s "$T/snippet.before" "$T/active-slot.conf"
+ok "no reload" lacks "$T/calls.log" "reload nginx"
+ok "no temp files left" test -z "$(find "$T" -maxdepth 1 -name 'active-slot.conf.*')"
+
+echo "tenuro-boot: nginx not running yet"
+export STUB_NGINX_INACTIVE=1
+boot; rc=$?
+unset STUB_NGINX_INACTIVE
+ok "exits 0" test "$rc" -eq 0
+ok "snippet re-rendered for nginx's start" slot_is blue 9000
+ok "no reload attempted" lacks "$T/calls.log" "reload nginx"
+
+echo "tenuro-boot: no active slot recorded"
+rm -f "$T/base/state/active"
+boot; rc=$?
+ok "exits 0" test "$rc" -eq 0
+ok "does nothing" test ! -s "$T/calls.log"
 
 # ----------------------------------------------------------------------------------------
 echo "detached mode runs the work as a transient unit and relays its log and status"

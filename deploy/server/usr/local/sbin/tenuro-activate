@@ -7,11 +7,13 @@
 # Its log is printed at the end and kept in /srv/tenuro/state/activate-<sha>.log.
 #
 # Order of work, under a lock on the root-only state folder:
-#   0. bring nginx back in line with the recorded active slot if an earlier run was killed
+#   0. bring nginx and the boot setup back in line with the recorded active slot if an
+#      earlier run was killed (including mid-rollback)
 #   1. freeze the upload into a root-owned release: move it into a root-only staging folder,
-#      re-check it is a real folder, chown -h, set modes top-down without following links,
-#      then reject links, hardlinks, special files and anything not root:tenuro; share the
-#      Node binary with an earlier frozen release only if both match runtime/SHA256
+#      re-check it is a real folder, enforce the size cap, refuse hardlinks, chown -h, set
+#      modes top-down without following links, then reject links, hardlinks, special files
+#      and anything not root:tenuro; share the Node binary with an earlier frozen release
+#      only if both match runtime/SHA256
 #   2. point the idle slot at it, run migrations, start it
 #   3. check it directly: health reports the sha, noindex and CSP present, journey checks
 #   4. switch nginx with one reload after nginx -t
@@ -31,6 +33,7 @@ if [[ ${TENURO_ACTIVATE_TEST:-} == 1 && $EUID -ne 0 ]]; then
   OWNER_GROUP=${TENURO_TEST_OWNER_GROUP:-$(id -gn)}
   SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
   DETACH=${TENURO_TEST_DETACH:-0}
+  MAX_UPLOAD_MB=${TENURO_TEST_MAX_UPLOAD_MB:-400}
   TRIES_IDLE=2 TRIES_NGINX=2 PAUSE=0
 else
   export PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -40,9 +43,10 @@ else
   OWNER_USER=root OWNER_GROUP=tenuro
   SELF=/usr/local/sbin/tenuro-activate
   DETACH=1
+  MAX_UPLOAD_MB=400
   TRIES_IDLE=30 TRIES_NGINX=10 PAUSE=1
 fi
-readonly BASE SNIPPET OWNER_USER OWNER_GROUP SELF DETACH TRIES_IDLE TRIES_NGINX PAUSE
+readonly BASE SNIPPET OWNER_USER OWNER_GROUP SELF DETACH MAX_UPLOAD_MB TRIES_IDLE TRIES_NGINX PAUSE
 readonly HOST=tenuro.jeffgicharu.com KEEP=3 RETIRE_AFTER=120
 readonly STATE=$BASE/state STAGE=$BASE/staging
 
@@ -101,26 +105,51 @@ IDLE_PORT=$(slot_port "$IDLE")
 readonly ACTIVE IDLE IDLE_PORT
 
 # ---------------------------------------------------------------- 0. reconcile
-# A run killed outright (SIGKILL, power loss) can leave nginx pointing somewhere other than
-# the last verified slot. The state file is written only after every check passed, so trust it.
-rm -f -- "$SNIPPET.prev"
-if [[ $ACTIVE != none && $(snippet_slot) != "$ACTIVE" ]]; then
-  log "nginx names '$(snippet_slot)' but the active slot is $ACTIVE; restoring"
-  systemctl start "tenuro@$ACTIVE.service" || true
-  write_snippet "$ACTIVE"
-  nginx -t -q || die "nginx -t failed while restoring the active slot"
-  systemctl reload nginx
+# A run killed outright (SIGKILL, power loss) can leave things out of line with the last
+# verified slot: nginx pointing elsewhere, an interrupted rollback (its snippet backup still
+# present), or the boot setup not handed over. The state file is written only after every
+# check passed, so trust it and repair all three before doing anything else.
+if [[ $ACTIVE != none ]]; then
+  systemctl enable --quiet --now "tenuro@$ACTIVE.service" || log "warning: could not enable and start tenuro@$ACTIVE"
+  systemctl disable --quiet "tenuro@$IDLE.service" || true
+  if [[ -e $SNIPPET.prev || $(snippet_slot) != "$ACTIVE" ]]; then
+    log "restoring nginx to the active slot $ACTIVE (it named '$(snippet_slot)'$([[ -e $SNIPPET.prev ]] && echo ', and an earlier switch or rollback was interrupted'))"
+    write_snippet "$ACTIVE"
+    nginx -t -q || die "nginx -t failed with the snippet for the active slot $ACTIVE; fix nginx, then run again"
+    systemctl reload nginx || die "nginx reload failed while restoring the active slot $ACTIVE"
+    rm -f -- "$SNIPPET.prev"
+  fi
+elif [[ -e $SNIPPET.prev ]]; then
+  # The very first activation was interrupted mid-switch; nothing is live yet.
+  log "restoring the snippet left by an interrupted first activation"
+  mv -f -- "$SNIPPET.prev" "$SNIPPET"
+  if nginx -t -q; then systemctl reload nginx || true; fi
 fi
 log "activating $SHA on $IDLE (active: $ACTIVE)"
 
 # ---------------------------------------------------------------- rollback on exit
-PHASE=prepare # prepare -> switched -> committed
+PHASE=prepare # prepare -> switched -> committed (rolling-back while a rollback runs)
+# Puts the previous snippet back and reloads. The backup stays until the reload has
+# succeeded, so an interrupted rollback is caught by step 0 of the next run. The idle slot is
+# stopped only once nginx no longer points at it; if nginx -t or the reload fails, both slots
+# keep running and this returns 1.
 rollback_switch() {
   [[ $PHASE == switched ]] || return 0
+  PHASE=rolling-back
+  if [[ -e $SNIPPET.prev ]]; then
+    cp -p -- "$SNIPPET.prev" "$SNIPPET.restore" && mv -f -- "$SNIPPET.restore" "$SNIPPET" || true
+  fi
+  if nginx -t -q && systemctl reload nginx; then
+    rm -f -- "$SNIPPET.prev"
+    systemctl stop "tenuro@$IDLE.service" || true
+    PHASE=prepare
+    return 0
+  fi
+  log "ROLLBACK INCOMPLETE: nginx -t or the reload failed with the previous snippet restored," \
+      "so both slots are left running. Fix nginx, then run tenuro-activate again: it restores" \
+      "nginx to $ACTIVE before anything else."
   PHASE=prepare
-  if [[ -e $SNIPPET.prev ]]; then mv -f -- "$SNIPPET.prev" "$SNIPPET" || true; fi
-  if nginx -t -q; then systemctl reload nginx || true; else log "nginx -t failed while restoring the snippet"; fi
-  systemctl stop "tenuro@$IDLE.service" || true
+  return 1
 }
 on_exit() {
   local rc=$?
@@ -130,7 +159,7 @@ on_exit() {
       rm -f -- "$SNIPPET.prev"
     else
       log "interrupted after the switch; restoring nginx to $ACTIVE"
-      rollback_switch
+      rollback_switch || true
     fi
   fi
   exit "$rc"
@@ -161,11 +190,19 @@ if [[ ! -d $REL ]]; then
   fi
   reject() { rm -rf --one-file-system -- "$TMP"; die "upload rejected: $*"; }
 
+  # A size cap protects the shared disk. du never follows links (-P is its default).
+  size_mb=$(du -sxm -- "$TMP" | cut -f1)
+  ((size_mb <= MAX_UPLOAD_MB)) || reject "${size_mb} MB is larger than the ${MAX_UPLOAD_MB} MB cap"
+  # A hardlink could point at a file outside the upload; refuse before chown could touch it.
+  bad=$(find "$TMP" -xdev -type f -links +1 -print -quit)
+  [[ -z $bad ]] || reject "hardlinked file at ${bad#"$TMP"/}"
+
   # Ownership first, without following links. Then modes, top-down and one entry at a time
   # (-exec ... \;): each folder is locked before find reads its contents, so no entry can be
-  # swapped for a link between find's check and chmod. find never follows links itself.
+  # swapped for a link between find's check and chmod. find never follows links itself, and
+  # -links 1 keeps chmod off any file that gained a second link in the meantime.
   chown -hR "$OWNER_USER:$OWNER_GROUP" -- "$TMP"
-  find "$TMP" -xdev \( -type d -exec chmod 0750 -- {} \; \) -o \( -type f -exec chmod 0640 -- {} \; \)
+  find "$TMP" -xdev \( -type d -exec chmod 0750 -- {} \; \) -o \( -type f -links 1 -exec chmod 0640 -- {} \; \)
   bad=$(find "$TMP" -xdev \( -type l -o \( ! -type f ! -type d \) -o \( -type f -links +1 \) \
           -o ! -user "$OWNER_USER" -o ! -group "$OWNER_GROUP" \) -print -quit)
   [[ -z $bad ]] || reject "symlink, hardlink, special file or wrong owner at ${bad#"$TMP"/}"
@@ -254,8 +291,10 @@ cp -p -- "$SNIPPET" "$SNIPPET.prev"
 PHASE=switched
 write_snippet "$IDLE"
 if ! nginx -t -q; then
-  rollback_switch
-  die "nginx -t failed; nothing was switched"
+  # nginx was never reloaded, so it still serves the old slot: put the file back, no reload.
+  mv -f -- "$SNIPPET.prev" "$SNIPPET"
+  PHASE=prepare
+  fail_idle "nginx -t failed; nothing was switched"
 fi
 systemctl reload nginx
 
@@ -273,7 +312,7 @@ nginx_ok() {
     --data-binary @"$REL/ops/smoke-query.json" "https://$HOST/graphql" | grep -q '"data"'
 }
 if ! retry "$TRIES_NGINX" nginx_ok; then
-  rollback_switch
+  rollback_switch || die "checks through nginx failed and the rollback could not reload nginx; both slots are running"
   die "checks through nginx failed; rolled back to $ACTIVE"
 fi
 

@@ -6,6 +6,7 @@ case "$*" in
   "start tenuro-migrate@"*) [[ ${STUB_FAIL_MIGRATE:-} == 1 ]] && exit 1 ;;
   "start tenuro-smoke@"*) [[ ${STUB_FAIL_SMOKE:-} == 1 ]] && exit 1 ;;
   "restart tenuro@"*) [[ ${STUB_FAIL_RESTART:-} == 1 ]] && exit 1 ;;
+  "is-active --quiet nginx") [[ ${STUB_NGINX_INACTIVE:-} == 1 ]] && exit 3 ;;
   "reload nginx")
     if [[ -n ${STUB_SIGNAL_ON_RELOAD:-} && ! -e $STUB_LOG.signalled ]]; then
       : >"$STUB_LOG.signalled"
