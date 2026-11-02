@@ -21,7 +21,7 @@ groups, the database roles and databases listed below, one sudoers drop-in, and 
 
 | Check | Expected |
 |---|---|
-| `/usr/bin/rrsync` | present (rsync 3.2.7, supports `-wo`) |
+| `/usr/bin/rrsync` | present, with `-wo` and `-munge`. `-munge` needs rsync 3.2.4 or later (the server has 3.2.7), so the installer checks both `rsync --version` and that rrsync knows `-munge`. |
 | `/usr/lib/postgresql/16/bin/{pg_dump,pg_restore,psql}` | present |
 | `/etc/ssl/cloudflare/jeffgicharu.com.{pem,key}` | readable |
 | `sysctl fs.protected_hardlinks` | `1`. The release freeze relies on it: an upload can't hardlink files the CI user doesn't own. |
@@ -61,7 +61,7 @@ awk -v host="$TENURO_DEPLOY_HOST" '{print host, $1, $2}' /etc/ssh/ssh_host_ed255
    - If the test fails, it puts back exactly what was there before: the previous site file, or no file and no link on a first install. It then runs `nginx -t` again and stops without reloading. A bad file therefore never stays in place for the shared nginx's next reload.
    - If `nginx -t` still fails after that, it says the fault lies outside Tenuro's file.
    - Only after a pass does it run `systemctl reload nginx`; `--no-reload` skips the reload.
-10. **systemd.** `daemon-reload`, `systemd-analyze verify`, then it enables the three timers. The installer never enables an app slot. `tenuro-activate` enables the slot it makes live and disables the old one, so only the active slot starts at boot.
+10. **systemd.** `daemon-reload`, `systemd-analyze verify`, then it enables the four timers (backup, restore test, nightly rebuild, incoming sweep) and `tenuro-boot.service`. The installer never enables an app slot. `tenuro-activate` enables the slot it makes live and disables the old one, so only the active slot starts at boot, and `tenuro-boot` checks this again at every boot.
 
 The first deploy needs nothing more on the server. Once installation is done, Website-7 sets
 the repository variable `DEPLOY_ENABLED=true`. It also sets up the `production` environment:
@@ -79,6 +79,9 @@ deploys only from `main`, with the three secrets below.
 | `/etc/systemd/system/tenuro-reset.{service,timer}` | root 0644 | The nightly data rebuild at 03:00 Nairobi time. It runs at `Nice=10`, `IOSchedulingClass=idle` and `CPUQuota=50%`. |
 | `/etc/systemd/system/tenuro-backup.{service,timer}` | root 0644 | `pg_dump` nightly at 02:00 Nairobi time, keeping 10. |
 | `/etc/systemd/system/tenuro-restore-test.{service,timer}` | root 0644 | Every Sunday at 04:00, restores the newest dump into `tenuro_restore_test`, verifies it and records the result. |
+| `/etc/systemd/system/tenuro-boot.service` | root 0644 | Runs once at boot, after PostgreSQL and nginx (it does nothing before the first activation). It starts the slot named in `state/active` and keeps it the only one enabled. If the nginx snippet names another slot, or a switch was interrupted, it rewrites the snippet, runs `nginx -t`, and reloads nginx only if the snippet changed and nginx is running. |
+| `/etc/systemd/system/tenuro-incoming-sweep.{service,timer}` | root 0644 | Hourly, as `tenuro-ci`, removes uploads left in `incoming/` for more than 6 hours. |
+| `/usr/local/sbin/tenuro-boot` | root 0755 | What `tenuro-boot.service` runs. It holds the activation lock. |
 | `/usr/local/sbin/tenuro-activate` | root 0755 | The zero-downtime activation (section 6). It refuses to run unless it is root. It runs its work as a transient unit, so a dropped SSH session can't interrupt it. |
 | `/usr/local/sbin/tenuro-activate-ssh` | root 0755 | Forced command for the CI activation key. It accepts a single 40-character sha and nothing else. |
 | `/usr/local/sbin/tenuro-retire` | root 0755 | Stops and disables the old slot two minutes after a switch. It holds the activation lock and re-reads the state under it. |
@@ -127,6 +130,23 @@ The units that run Node differ in three ways:
 
 The backup and restore units, which run only bash, keep `MemoryDenyWriteExecute` on and have no netlink. Each unit's only writable path is its own `StateDirectory`. Uploads are stored in PostgreSQL, so the two slots share no folder. `systemd-analyze security` rates the app unit 1.3 ("OK").
 
+**Filesystem view.** No Tenuro unit can see other sites' files, even world-readable ones such
+as another site's `wp-config.php` or `.env`:
+- `TemporaryFileSystem=/var:ro /srv:ro /opt:ro /mnt:ro /media:ro` replaces those trees with empty read-only folders.
+- The Node units get `/srv/tenuro` back read-only (`BindReadOnlyPaths`): their releases, slots and the public files. The `staging/`, `state/` and `incoming/` folders inside it stay unreadable to them by mode.
+- Each unit gets its own `StateDirectory` back read-write (`BindPaths`).
+- `InaccessiblePaths` hides `/etc/nginx`, `/etc/letsencrypt`, `/etc/ssl/private` and `/etc/ssl/cloudflare`, and `ProtectHome` already hides `/home` and `/root`.
+- The env files don't need to be visible, because systemd reads `EnvironmentFile=` before the sandbox applies.
+- `deploy/test/units.sh` runs Node under the app unit's exact settings. It starts, reads its release, writes its state folder and reaches a TCP service on 127.0.0.1, as it reaches PostgreSQL. It can't read world-readable stand-ins under `/var`, `/etc/nginx` and `/opt`.
+
+**Known residual: local TCP ports.** `IPAddressAllow=localhost` lets the units reach every TCP
+port on 127.0.0.1, not just PostgreSQL's 5432. systemd 249 can't restrict by port without
+custom BPF programs (`SocketBindDeny=` covers only binding, and `IPEgressFilterPath=` needs a
+BPF program we'd have to ship). So every local service on the box should require
+authentication, which PostgreSQL does here with scram-sha-256. A service that trusts
+loopback without a password would be reachable from Tenuro's processes, as it is from every
+other site's.
+
 nginx (`www-data`) is in neither group. It can read each release's `public/` and nothing else.
 
 ## 5. Secrets
@@ -169,13 +189,17 @@ unit's exit status is CI's exit status. `--run` only works inside that unit
 
 Inside the unit, it holds a lock on the root-only `state/` folder and does the following.
 
-0. **Reconcile.** If a previous run was killed outright, after the switch but before the commit, nginx may name a slot other than the one in `state/active`. The state file is written only after every check has passed, so the script trusts it: it starts that slot, rewrites the snippet, runs `nginx -t` and reloads.
+0. **Reconcile.** `state/active` is written only after every check has passed, so the script trusts it, and on every run it:
+   - enables and starts the slot it names (`systemctl enable --now`) and disables the other. A power loss between a commit and its boot handover therefore can't leave the live slot off at boot;
+   - rewrites the snippet for that slot, runs `nginx -t` and reloads, if nginx names a different slot or the snippet backup (`active-slot.conf.prev`) is still there. That covers a run killed after the switch, and a rollback killed before its reload finished: the backup is deleted only after a successful reload, so its presence is the sign. If `nginx -t` fails at this point, it stops without changing anything else.
 1. **Freeze**, in this order:
    1. `mv` the upload from `incoming/` into the root-only `staging/` folder;
    2. check again that what arrived is a real folder and not a symlink. The upload user could have swapped `incoming/<sha>` between the first check and the `mv`; in that case only the link is removed, and nothing is ever handed a link;
-   3. `chown -hR root:tenuro`, which never follows links;
-   4. modes, applied top-down by `find -xdev -exec chmod … \;`: folders 0750, files 0640. `find` never follows links. Each folder is locked before its contents are read, so no entry can be swapped between the check and the `chmod`;
-   5. then `find`, which rejects symlinks, special files, hardlinked files (`-type f -links +1`) and anything not `root:tenuro`.
+   3. refuse it if `du -sxm` measures more than 400 MB, a cap that protects the shared disk;
+   4. refuse any hardlinked file (`-type f -links +1`) before `chown`, so a hardlink to a file outside the upload is never re-owned;
+   5. `chown -hR root:tenuro`, which never follows links;
+   6. modes, applied top-down by `find -xdev -exec chmod … \;`: folders 0750, files 0640. Only files with `-links 1` are touched. `find` never follows links. Each folder is locked before its contents are read, so no entry can be swapped between the check and the `chmod`;
+   7. then `find`, which rejects symlinks, special files, hardlinked files and anything not `root:tenuro`.
 
    It then checks the required files, `REVISION == sha`, and `runtime/bin/node` against `runtime/SHA256`. Only after that does it hardlink `runtime/bin/node` from an earlier frozen, root-owned release, and only if that file's sha256 matches too. It never links into `incoming/` or `staging/`. Last, it makes `public/` world-readable and moves the tree into `releases/<sha>`.
 2. **Start the idle slot.** It adds the hashed assets to the pool, points the idle slot at the release, runs `tenuro-migrate@<idle>` and restarts `tenuro@<idle>`. If any of these fails, it stops the idle slot and exits.
@@ -183,8 +207,11 @@ Inside the unit, it holds a lock on the root-only `state/` folder and does the f
    - `/api/health` reports the sha and `db: ok`;
    - `/` carries the `X-Robots-Tag: noindex` header, a robots meta noindex and a CSP header;
    - `tenuro-smoke@<idle>` passes the main journeys and the CPU self-check.
-4. **Switch.** It writes the new snippet to a temporary file and renames it into place. If `nginx -t` fails, it puts the old snippet back and stops; otherwise it runs one `systemctl reload nginx`.
-5. **Check again through nginx,** using `curl --resolve tenuro.jeffgicharu.com:443:127.0.0.1`: health and sha, noindex and CSP, a hashed asset, and a persisted GraphQL query sent with `x-tenuro-client: smoke`. On failure it restores the old snippet, reloads, stops the idle slot and exits non-zero, which is an **automatic rollback**.
+4. **Switch.** It writes the new snippet to a temporary file and renames it into place. If `nginx -t` fails, nginx was never reloaded and still serves the old slot, so it puts the old snippet back, stops the idle slot and exits. Otherwise it runs one `systemctl reload nginx`.
+5. **Check again through nginx,** using `curl --resolve tenuro.jeffgicharu.com:443:127.0.0.1`: health and sha, noindex and CSP, a hashed asset, and a persisted GraphQL query sent with `x-tenuro-client: smoke`. On failure it rolls back automatically and exits non-zero:
+   - It puts the old snippet back, runs `nginx -t` and reloads.
+   - It stops the idle slot only once that reload has succeeded, so nginx no longer points at it.
+   - If `nginx -t` or the reload fails, it keeps both slots running, says so plainly ("ROLLBACK INCOMPLETE … both slots are running"), and leaves the snippet backup in place, so the next run's step 0 finishes the job.
    - An EXIT trap covers the whole stretch from the snippet swap to the commit, so a failed reload, an unexpected error, or SIGTERM, SIGHUP or SIGINT gets the same rollback.
    - If the commit had already landed when the signal arrived, the trap sees that in `state/active` and leaves the switch in place.
    - Only SIGKILL or power loss can skip the trap, and step 0 of the next run repairs that.
@@ -208,7 +235,7 @@ checks `sha` and `db`.
 | `REVISION` | the commit sha |
 | `runtime/bin/node`, `runtime/LICENSE`, `runtime/SHA256` | the official Node build named in `deploy/ci/node.env`, checked against the pinned sha256 and nodejs.org's `SHASUMS256.txt` |
 | `server/index.mjs` | the app. `--selfcheck` runs offline: it loads every module, renders a PDF, writes an XLSX and computes a schedule. |
-| `server/migrate.mjs`, `server/smoke.mjs`, `server/rebuild.mjs` | migrations, journey checks (`--selfcheck` adds the self-check), and the nightly rebuild |
+| `server/migrate.mjs`, `server/smoke.mjs`, `server/rebuild.mjs` | migrations, journey checks (`--selfcheck` adds the self-check), and the nightly rebuild. `smoke.mjs` sends `x-tenuro-client: smoke` on every GraphQL POST against the idle slot, as the activation script does through nginx. |
 | `server/web/index.html` | the SPA's HTML template. The app renders it with a fresh CSP nonce per request; nginx never serves it as a file. |
 | `public/` | the SPA build (`assets/`, `static/`), and Storybook at `public/storybook/` |
 | `ops/smoke-query.json` | a persisted-query request body the activation script posts to `/graphql` |
@@ -246,6 +273,15 @@ sandbox cookie can't grow disk use without bound. The API's test suite hits each
 | `web_vital` rows | 100,000 |
 | `csp_report` rows | 20,000 |
 | Sandbox expiry | 24 hours after last activity, plus everything cleared in the nightly rebuild |
+
+**Disk on the shared host.** Tenuro bounds what it can write under `/srv/tenuro` in three ways:
+- **Uploads:** `tenuro-activate` refuses an upload over 400 MB, and `tenuro-incoming-sweep` removes anything left in `incoming/` for more than 6 hours.
+- **Releases:** 3 are kept, with the Node binary shared between them.
+- **Backups:** the 10 newest dumps are kept in `/var/lib/tenuro-backup`.
+
+**Request for Portfolio:** the CI key could still fill `incoming/` within that 6-hour window,
+since rrsync can't cap how much it writes. If the host supports it, please put `/srv/tenuro`
+under an XFS or ext4 project quota (for example 2 GB), or on its own size-limited filesystem.
 
 ## 8. Database
 
@@ -295,7 +331,8 @@ addons, and CI fails if one appears.
 - **Bad release caught during activation.** Nothing to do: the script stops before the switch, or rolls the switch back, and exits non-zero. The live slot never changed.
 - **Bad release noticed later.** Run the Deploy workflow by hand with `sha` set to a kept release. It skips the build and just activates. From the server, the same as root: `sudo /usr/local/sbin/tenuro-activate <sha>`. `ls -t /srv/tenuro/releases` lists the kept shas.
 - **Emergency, with CI unavailable.** `sudo /usr/local/sbin/tenuro-activate <previous sha>`, as above. It still checks the slot before switching.
-- **After a reboot.** Nothing to do. Only the live slot is enabled, and the nginx snippet already names it. If an activation was killed outright mid-switch, the next activation puts nginx back on the slot in `state/active` before doing anything else.
+- **After a reboot.** Nothing to do. Only the live slot is enabled, and the nginx snippet already names it. `tenuro-boot.service` checks both again at boot. It starts the slot in `state/active`, and if power was lost mid-switch or mid-rollback, it re-renders the snippet and reloads nginx after `nginx -t`. The next activation makes the same checks before doing anything else.
+- **"ROLLBACK INCOMPLETE" from an activation.** nginx -t or the reload failed while restoring the old snippet, so both slots were left running. Fix whatever makes `sudo nginx -t` fail, then re-run the activation, or `sudo /usr/local/sbin/tenuro-boot`. Either one puts nginx back on the slot in `state/active` first.
 - **Database restore.** Restoring takes the app down briefly, and nginx serves the 503 page meanwhile.
   ```bash
   sudo systemctl stop tenuro-reset.timer tenuro@blue.service tenuro@green.service
@@ -305,7 +342,7 @@ addons, and CI fails if one appears.
   sudo /usr/local/sbin/tenuro-activate "$(basename "$(readlink -f /srv/tenuro/current)")"
   sudo systemctl start tenuro-reset.timer
   ```
-- **Remove Tenuro entirely.** Run `sudo systemctl disable --now` on the three timers and both slots. Remove the nginx site link and reload. Then remove the files in section 3, `/srv/tenuro`, the users and groups, the sudoers drop-in, and the two roles and databases.
+- **Remove Tenuro entirely.** Run `sudo systemctl disable --now` on the four timers, `tenuro-boot.service` and both slots. Remove the nginx site link and reload. Then remove the files in section 3, `/srv/tenuro`, the users and groups, the sudoers drop-in, and the two roles and databases.
 
 ## 11. Memory
 
@@ -325,20 +362,29 @@ PostgreSQL 16.
 
 | What | How | Result |
 |---|---|---|
-| Activation and retire | `deploy/test/run.sh`: the real scripts against a temp tree. systemctl, systemd-run, nginx, curl, chown and logger are stubbed, and a stub `mv` can play a hostile upload user. flock, rsync, find, chmod and sha256sum are real. | 181 checks pass, in three groups (below). |
+| Activation, retire and boot | `deploy/test/run.sh`: the real scripts against a temp tree. systemctl, systemd-run, nginx, curl, chown and logger are stubbed, and a stub `mv` can play a hostile upload user. flock, rsync, find, chmod, du and sha256sum are real. | 235 checks pass, in four groups (below). |
 | Installer's nginx step | `deploy/test/install-nginx.sh` against a stub `nginx -t` | 20 checks pass: a fresh install; a re-run; a good update; a bad update rolled back to the previous file; a bad first install leaving nothing behind; a fault elsewhere reported as such |
 | Secret generation | `deploy/test/secrets.sh` with a stub psql that echoes failing statements | 25 checks pass: names-only output; both `SET`s first; modes and groups; distinct passwords; refusal to overwrite; on failure, no password in the output and no files written |
 | Shell scripts | shellcheck 0.11 | clean |
-| Units | `deploy/test/units.sh`: hardening rules per unit, `systemd-analyze verify` and `security` (systemd 259), and Node run under the app unit's own sandbox settings through `systemd-run --user` | 142 checks pass. App unit rated 1.3. Under its sandbox settings Node reports CPUs, total memory and network interfaces (`os.networkInterfaces()` threw before AF_NETLINK was added). |
+| Units | `deploy/test/units.sh`: hardening and filesystem-view rules per unit, `systemd-analyze verify` and `security` (systemd 259), the sweep's own command against a temp folder, and Node run under the app unit's own filesystem and sandbox settings through `systemd-run --user` | 196 checks pass. App unit rated 1.3. Under its settings Node starts, reads its release, writes its state, reaches a TCP service on 127.0.0.1, and reports CPUs, memory and interfaces. It can't read world-readable stand-ins under `/var`, `/etc/nginx` and `/opt`. |
 | nginx site | `deploy/test/nginx.sh`: `nginx -t`, then nginx running for real against a stub backend | 34 checks pass (nginx 1.28 locally). Besides `nginx -t`, they cover: 503 page with Retry-After and its CSP; asset pool; robots.txt; port 80 redirect; loopback never limited; a Cloudflare-forwarded visitor limited after the burst; the real IP reaching the app; spoofed `CF-Connecting-IP` ignored; body limits; X-Robots-Tag exactly once on proxied responses and present on nginx's own 413 and 429 |
 | Backup and restore | `deploy/test/backup.sh`: the real scripts against a throwaway cluster | 13 checks pass (PostgreSQL 17 locally; 16 in CI) |
 | Node runtime | `fetch-node.sh` for real, then the binary under `qemu-x86_64 -cpu qemu64` | checksum verified; runs on the baseline CPU model |
 | Workflow | actionlint | clean |
 
-The activation and retire checks fall into three groups:
-- **Normal runs:** the happy path; boot handover (enable new, disable old); retire stopping only the inactive slot; keeping 3 releases and pruning; a pinned old release never pruned.
-- **Rejected input:** bad shas; `--run` outside its unit; a missing upload; an upload that is itself a symlink; an upload swapped for a symlink during the move, which leaves the decoy's modes untouched; a symlink, hardlink, FIFO or wrongly owned file; loose modes tightened; a node checksum mismatch; a tampered earlier release never linked; a wrong REVISION or missing file.
-- **Failures and recovery:** failed health, restart, journeys or migrations; `nginx -t` failure; failure through nginx with rollback; a failed reload and SIGTERM, SIGHUP and SIGINT mid-switch, all rolled back by the trap; reconciling after a killed run; detached mode relaying log and status; the lock held; a non-root caller refused.
+The activation, retire and boot checks fall into four groups:
+- **Normal runs:** the happy path; boot handover (enable new, disable old), re-asserted at the start of every run; retire stopping only the inactive slot; keeping 3 releases and pruning; a pinned old release never pruned.
+- **Rejected input:** bad shas; `--run` outside its unit; a missing upload; an upload that is itself a symlink; an upload swapped for a symlink during the move, which leaves the decoy's modes untouched; an upload over the size cap; a hardlink refused before `chown`, including one to an outside file, which keeps its mode; a symlink, FIFO or wrongly owned file; loose modes tightened; a node checksum mismatch; a tampered earlier release never linked; a wrong REVISION or missing file.
+- **Failures and recovery:**
+  - failed health, restart, journeys or migrations, and `nginx -t` failure at the switch;
+  - failure through nginx with rollback, where the idle slot is stopped only after the rollback reload;
+  - the rollback's own `nginx -t` failing, which keeps both slots running and keeps the backup, then the next run repairs it;
+  - a failed reload, and SIGTERM, SIGHUP and SIGINT mid-switch, all rolled back by the trap;
+  - reconciling after a killed run and after a killed rollback;
+  - a power loss between commit and boot handover;
+  - detached mode relaying log and status;
+  - the lock held, and a non-root caller refused.
+- **Boot:** `tenuro-boot` re-rendering a wrong snippet with `nginx -t` before the reload; leaving a correct one alone, with no reload; a leftover backup forcing a re-render; `nginx -t` failure putting the old snippet back; nginx not yet running; no state at all.
 
 ## 13. Notes for the shared nginx
 
