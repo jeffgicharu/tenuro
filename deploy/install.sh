@@ -12,6 +12,8 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
 SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/server" && pwd)
 readonly SRC
+# shellcheck source=deploy/lib/nginx-site.sh
+. "$SRC/../lib/nginx-site.sh"
 readonly PGBIN=/usr/lib/postgresql/16/bin
 readonly SITE=tenuro.jeffgicharu.com
 UPLOAD_KEY='' ACTIVATE_KEY='' RELOAD=1
@@ -96,8 +98,11 @@ step "Folders"
 install -d -m 755 -o root -g root /srv/tenuro /srv/tenuro/releases /srv/tenuro/slots \
   /srv/tenuro/assets /srv/tenuro/fallback /etc/nginx/tenuro /usr/local/lib/tenuro
 install -d -m 711 -o root -g root /srv/tenuro/shared
-install -d -m 700 -o root -g root /srv/tenuro/state
+install -d -m 700 -o root -g root /srv/tenuro/state /srv/tenuro/staging
 install -d -m 750 -o tenuro-ci -g tenuro-ci /srv/tenuro/incoming
+[[ $(stat -c %d /srv/tenuro/incoming) == "$(stat -c %d /srv/tenuro/staging)" &&
+   $(stat -c %d /srv/tenuro/staging) == "$(stat -c %d /srv/tenuro/releases)" ]] ||
+  die "incoming/, staging/ and releases/ must be on one filesystem (activation renames between them)"
 install -d -m 755 -o tenuro-ci -g tenuro-ci /var/lib/tenuro-ci
 install -d -m 755 -o root -g root /var/lib/tenuro-ci/.ssh
 note "ok"
@@ -136,7 +141,7 @@ step "Deploy keys"
 if [[ -n $UPLOAD_KEY ]]; then
   {
     grep '^#' "$SRC/var/lib/tenuro-ci/.ssh/authorized_keys.template"
-    printf 'restrict,command="/usr/bin/rrsync -wo /srv/tenuro/incoming" %s\n' "$(cat -- "$UPLOAD_KEY")"
+    printf 'restrict,command="/usr/bin/rrsync -wo -munge /srv/tenuro/incoming" %s\n' "$(cat -- "$UPLOAD_KEY")"
     printf 'restrict,command="/usr/local/sbin/tenuro-activate-ssh" %s\n' "$(cat -- "$ACTIVATE_KEY")"
   } >"$tmp"
   install -m 0644 -o root -g root -- "$tmp" /var/lib/tenuro-ci/.ssh/authorized_keys
@@ -179,16 +184,16 @@ if [[ ! -e /etc/nginx/tenuro/active-slot.conf ]]; then
   install -m 0644 -o root -g root -- "$SRC/etc/nginx/tenuro/active-slot.conf" /etc/nginx/tenuro/active-slot.conf
   note "installed initial /etc/nginx/tenuro/active-slot.conf (blue)"
 fi
-put 0644 root:root "etc/nginx/sites-available/$SITE"
-linked=0
-if [[ ! -L /etc/nginx/sites-enabled/$SITE ]]; then
-  ln -s "/etc/nginx/sites-available/$SITE" "/etc/nginx/sites-enabled/$SITE"
-  linked=1
-fi
-if ! nginx -t -q; then
-  ((linked)) && rm -f -- "/etc/nginx/sites-enabled/$SITE"
-  die "nginx -t failed; the site was not enabled"
-fi
+# On failure this puts back the previous site file (or removes a new one) and re-tests, so a
+# bad file never stays in place for the shared nginx's next reload.
+rc=0
+install_nginx_site "$SRC/etc/nginx/sites-available/$SITE" /etc/nginx/sites-available \
+  /etc/nginx/sites-enabled "$SITE" || rc=$?
+case $rc in
+  0) note "site installed and enabled; nginx -t passed" ;;
+  1) die "nginx -t failed with the new site file; the previous state was restored and nginx was not reloaded" ;;
+  *) die "nginx -t fails even after restoring the previous state; nginx was not reloaded" ;;
+esac
 if ((RELOAD)); then
   systemctl reload nginx
   note "nginx reloaded"
