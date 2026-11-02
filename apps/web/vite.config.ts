@@ -26,7 +26,8 @@ export default defineConfig({
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router)[\\/]/ },
             { name: 'relay', test: /node_modules[\\/](react-relay|relay-runtime)[\\/]/ },
-            { name: 'mui', test: /node_modules[\\/](@mui[\\/](material|system|utils|styled-engine|private-theming|core-downloads-tracker)|@emotion|stylis)[\\/]/ },
+            // Only the MUI the first page uses; components that just a lazy route needs stay with it.
+            { name: 'mui', test: /node_modules[\\/](@mui[\\/](material|system|utils|styled-engine|private-theming|core-downloads-tracker)|@emotion|stylis)[\\/]/, tags: ['$initial'] },
             // Only the grid itself: by default a group also pulls in its dependencies, which took MUI X
             // internals that the first page needs (date-picker localisation) into this lazy chunk.
             { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/, includeDependenciesRecursively: false },
