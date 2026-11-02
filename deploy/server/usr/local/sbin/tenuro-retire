@@ -1,15 +1,26 @@
 #!/bin/bash
-# Stops whichever slot is not active. Started by tenuro-activate two minutes after a switch,
-# so connections on the old slot can finish. Takes the activation lock, so it never stops a
-# slot an activation is busy starting.
+# Stops and disables whichever slot is not active. Started by tenuro-activate two minutes
+# after a switch, so connections on the old slot can finish. It holds the activation lock
+# and reads the state file under it, so it never stops a slot an activation is starting or
+# has just made active.
 set -euo pipefail
-export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
-exec 9>/run/lock/tenuro-activate.lock
-flock -w 300 9
+if [[ ${TENURO_ACTIVATE_TEST:-} == 1 && $EUID -ne 0 ]]; then
+  STATE=${TENURO_TEST_BASE:?}/state
+else
+  export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  if [[ $EUID -ne 0 ]]; then echo "tenuro-retire must run as root" >&2; exit 1; fi
+  STATE=/srv/tenuro/state
+fi
 
-case "$(cat /srv/tenuro/state/active 2>/dev/null || true)" in
-  blue) systemctl stop tenuro@green.service ;;
-  green) systemctl stop tenuro@blue.service ;;
-  *) echo "no active slot recorded; nothing to retire" >&2 ;;
+exec 9<"$STATE"
+flock -w 900 9
+
+case "$(cat "$STATE/active" 2>/dev/null || true)" in
+  blue) old=green ;;
+  green) old=blue ;;
+  *) echo "no active slot recorded; nothing to retire" >&2; exit 0 ;;
 esac
+systemctl stop "tenuro@$old.service"
+systemctl disable --quiet "tenuro@$old.service" || true
+echo "retired tenuro@$old"

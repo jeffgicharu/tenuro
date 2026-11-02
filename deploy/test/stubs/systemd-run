@@ -1,2 +1,16 @@
 #!/bin/bash
+# Records calls. With --wait it behaves like a transient unit: it runs the command after "--"
+# with INVOCATION_ID set, sends its output to the StandardOutput=truncate: file, and returns
+# the command's exit status.
 printf 'systemd-run %s\n' "$*" >>"$STUB_LOG"
+wait=0 out=/dev/null
+while (($#)); do
+  case $1 in
+    --wait) wait=1; shift ;;
+    --property=StandardOutput=truncate:*) out=${1#--property=StandardOutput=truncate:}; shift ;;
+    --) shift; break ;;
+    *) shift ;;
+  esac
+done
+((wait)) || exit 0
+INVOCATION_ID=stub-invocation "$@" >"$out" 2>&1

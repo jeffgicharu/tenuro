@@ -2,15 +2,23 @@
 # Activates one Tenuro release on the idle slot with zero downtime.
 # Usage: tenuro-activate <40-character lowercase commit sha>
 #
-# Order of work:
-#   1. freeze the upload into a root-owned release (mv, chown -h, chmod, then reject links,
-#      hardlinks and special files), then share the Node binary with an earlier frozen
-#      release only if both are byte-identical to runtime/SHA256
+# The call returns only when activation has finished, but the work itself runs as a transient
+# systemd unit (tenuro-activate-<sha prefix>), so a dropped SSH session can't interrupt it.
+# Its log is printed at the end and kept in /srv/tenuro/state/activate-<sha>.log.
+#
+# Order of work, under a lock on the root-only state folder:
+#   0. bring nginx back in line with the recorded active slot if an earlier run was killed
+#   1. freeze the upload into a root-owned release: move it into a root-only staging folder,
+#      re-check it is a real folder, chown -h, set modes top-down without following links,
+#      then reject links, hardlinks, special files and anything not root:tenuro; share the
+#      Node binary with an earlier frozen release only if both match runtime/SHA256
 #   2. point the idle slot at it, run migrations, start it
-#   3. check it directly: health reports the sha, noindex and CSP present, journey smoke
+#   3. check it directly: health reports the sha, noindex and CSP present, journey checks
 #   4. switch nginx with one reload after nginx -t
-#   5. check again through nginx; on failure restore the snippet and reload (rollback)
-#   6. record the new active slot, retire the old one after a delay, keep 3 releases
+#   5. check again through nginx; any failure or signal from here to the commit restores the
+#      snippet, reloads and stops the idle slot (rollback)
+#   6. record the new active slot, enable it for boot, retire the old one after a delay,
+#      keep 3 releases
 set -euo pipefail
 umask 022
 
@@ -19,39 +27,118 @@ umask 022
 if [[ ${TENURO_ACTIVATE_TEST:-} == 1 && $EUID -ne 0 ]]; then
   BASE=${TENURO_TEST_BASE:?}
   SNIPPET=${TENURO_TEST_SNIPPET:?}
-  LOCK=${TENURO_TEST_LOCK:?}
-  OWNER_USER=$(id -un)
+  OWNER_USER=${TENURO_TEST_OWNER_USER:-$(id -un)}
+  OWNER_GROUP=${TENURO_TEST_OWNER_GROUP:-$(id -gn)}
+  SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
+  DETACH=${TENURO_TEST_DETACH:-0}
   TRIES_IDLE=2 TRIES_NGINX=2 PAUSE=0
 else
   export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  if [[ $EUID -ne 0 ]]; then echo "tenuro-activate must run as root" >&2; exit 1; fi
   BASE=/srv/tenuro
   SNIPPET=/etc/nginx/tenuro/active-slot.conf
-  LOCK=/run/lock/tenuro-activate.lock
-  OWNER_USER=root
+  OWNER_USER=root OWNER_GROUP=tenuro
+  SELF=/usr/local/sbin/tenuro-activate
+  DETACH=1
   TRIES_IDLE=30 TRIES_NGINX=10 PAUSE=1
 fi
-readonly BASE SNIPPET LOCK OWNER_USER TRIES_IDLE TRIES_NGINX PAUSE
+readonly BASE SNIPPET OWNER_USER OWNER_GROUP SELF DETACH TRIES_IDLE TRIES_NGINX PAUSE
 readonly HOST=tenuro.jeffgicharu.com KEEP=3 RETIRE_AFTER=120
+readonly STATE=$BASE/state STAGE=$BASE/staging
 
-log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >&2; logger -t tenuro-activate -- "$*" 2>/dev/null || true; }
+log() {
+  printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >&2 || true
+  logger -t tenuro-activate -- "$*" 2>/dev/null || true
+}
 die() { log "FAIL: $*"; exit 1; }
 
+RUN=0
+if [[ ${1:-} == --run ]]; then RUN=1; shift; fi
 [[ $# -eq 1 ]] || die "usage: tenuro-activate <40-character commit sha>"
 SHA=$1
 [[ $SHA =~ ^[0-9a-f]{40}$ ]] || die "not a 40-character lowercase sha"
-readonly SHA
+readonly SHA RUN
+if ((RUN)) && [[ -z ${INVOCATION_ID:-} ]]; then
+  die "--run is only used inside the transient activation unit"
+fi
 
-exec 9>"$LOCK"
+# ---------------------------------------------------------------- detach from the caller
+if ((DETACH && !RUN)); then
+  trap '' HUP PIPE   # a dropped SSH session must not stop us waiting or printing
+  logf=$STATE/activate-$SHA.log
+  rc=0
+  systemd-run --quiet --wait --collect --unit="tenuro-activate-${SHA:0:12}" \
+    --property=StandardOutput="truncate:$logf" --property=StandardError=inherit \
+    --property=RuntimeMaxSec=900 -- "$SELF" --run "$SHA" || rc=$?
+  cat -- "$logf" 2>/dev/null || true
+  find "$STATE" -maxdepth 1 -name 'activate-*.log' -mtime +14 -delete 2>/dev/null || true
+  exit "$rc"
+fi
+
+# ---------------------------------------------------------------- lock
+# The state folder is root-only (0700), so no other user can pre-create or hold this lock.
+exec 9<"$STATE"
 flock -n 9 || die "another activation is running"
 
-ACTIVE=$(cat "$BASE/state/active" 2>/dev/null || echo none)
+slot_port() { case $1 in blue) echo 9000 ;; green) echo 9001 ;; esac; }
+write_snippet() { # $1 slot
+  local tmp
+  tmp=$(mktemp "$SNIPPET.XXXXXX")
+  # shellcheck disable=SC2016  # nginx variables are literal text
+  printf 'set $tenuro_slot %s;\nset $tenuro_port %s;\n' "$1" "$(slot_port "$1")" >"$tmp"
+  chmod 644 -- "$tmp"
+  mv -f -- "$tmp" "$SNIPPET"
+}
+snippet_slot() { grep -Eo 'tenuro_slot (blue|green)' "$SNIPPET" 2>/dev/null | cut -d' ' -f2; }
+
+ACTIVE=$(cat "$STATE/active" 2>/dev/null || echo none)
 case $ACTIVE in
-  blue) IDLE=green IDLE_PORT=9001 ;;
-  green | none) IDLE=blue IDLE_PORT=9000 ;;
+  blue) IDLE=green ;;
+  green | none) IDLE=blue ;;
   *) die "unrecognised state file" ;;
 esac
+IDLE_PORT=$(slot_port "$IDLE")
 readonly ACTIVE IDLE IDLE_PORT
+
+# ---------------------------------------------------------------- 0. reconcile
+# A run killed outright (SIGKILL, power loss) can leave nginx pointing somewhere other than
+# the last verified slot. The state file is written only after every check passed, so trust it.
+rm -f -- "$SNIPPET.prev"
+if [[ $ACTIVE != none && $(snippet_slot) != "$ACTIVE" ]]; then
+  log "nginx names '$(snippet_slot)' but the active slot is $ACTIVE; restoring"
+  systemctl start "tenuro@$ACTIVE.service" || true
+  write_snippet "$ACTIVE"
+  nginx -t -q || die "nginx -t failed while restoring the active slot"
+  systemctl reload nginx
+fi
 log "activating $SHA on $IDLE (active: $ACTIVE)"
+
+# ---------------------------------------------------------------- rollback on exit
+PHASE=prepare # prepare -> switched -> committed
+rollback_switch() {
+  [[ $PHASE == switched ]] || return 0
+  PHASE=prepare
+  if [[ -e $SNIPPET.prev ]]; then mv -f -- "$SNIPPET.prev" "$SNIPPET" || true; fi
+  if nginx -t -q; then systemctl reload nginx || true; else log "nginx -t failed while restoring the snippet"; fi
+  systemctl stop "tenuro@$IDLE.service" || true
+}
+on_exit() {
+  local rc=$?
+  if [[ $PHASE == switched ]]; then
+    if [[ $(cat "$STATE/active" 2>/dev/null) == "$IDLE" ]]; then
+      PHASE=committed # the commit landed just before the interruption
+      rm -f -- "$SNIPPET.prev"
+    else
+      log "interrupted after the switch; restoring nginx to $ACTIVE"
+      rollback_switch
+    fi
+  fi
+  exit "$rc"
+}
+trap on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 fail_idle() { systemctl stop "tenuro@$IDLE.service" || true; die "$*"; }
 sha256_of() { sha256sum -- "$1" | cut -d' ' -f1; }
@@ -61,21 +148,28 @@ REL=$BASE/releases/$SHA
 if [[ ! -d $REL ]]; then
   INC=$BASE/incoming/$SHA
   [[ -d $INC && ! -L $INC ]] || die "no upload found for $SHA"
-  TMP=$BASE/releases/.$SHA.tmp
+  TMP=$STAGE/$SHA
   rm -rf --one-file-system -- "$TMP"
 
-  # Take the tree away from the upload user first, then fix ownership without following
-  # links, then permissions (chmod -R does not follow symlinks), and only then inspect it.
+  # Move the tree into the root-only staging folder, out of the upload user's reach.
   mv -T -- "$INC" "$TMP"
-  chown -hR root:tenuro -- "$TMP"
-  chmod -R u=rwX,g=rX,o= -- "$TMP"
-  bad=$(find "$TMP" \( -type l -o \( ! -type f ! -type d \) -o \( -type f -links +1 \) \) -print -quit)
-  if [[ -n $bad ]]; then
-    rm -rf --one-file-system -- "$TMP"
-    die "upload rejected: symlink, hardlink or special file at ${bad#"$TMP"/}"
+  # The upload user could have swapped the folder for a symlink after the check above;
+  # nothing below may ever be handed a link.
+  if [[ -L $TMP || ! -d $TMP ]]; then
+    rm -f -- "$TMP"
+    die "upload rejected: incoming/$SHA was not a real folder"
   fi
-
   reject() { rm -rf --one-file-system -- "$TMP"; die "upload rejected: $*"; }
+
+  # Ownership first, without following links. Then modes, top-down and one entry at a time
+  # (-exec ... \;): each folder is locked before find reads its contents, so no entry can be
+  # swapped for a link between find's check and chmod. find never follows links itself.
+  chown -hR "$OWNER_USER:$OWNER_GROUP" -- "$TMP"
+  find "$TMP" -xdev \( -type d -exec chmod 0750 -- {} \; \) -o \( -type f -exec chmod 0640 -- {} \; \)
+  bad=$(find "$TMP" -xdev \( -type l -o \( ! -type f ! -type d \) -o \( -type f -links +1 \) \
+          -o ! -user "$OWNER_USER" -o ! -group "$OWNER_GROUP" \) -print -quit)
+  [[ -z $bad ]] || reject "symlink, hardlink, special file or wrong owner at ${bad#"$TMP"/}"
+
   for f in REVISION runtime/bin/node runtime/SHA256 server/index.mjs server/migrate.mjs \
            server/smoke.mjs server/rebuild.mjs ops/smoke-query.json; do
     [[ -f $TMP/$f ]] || reject "missing $f"
@@ -106,7 +200,8 @@ if [[ ! -d $REL ]]; then
   chmod 0750 -- "$TMP/runtime/bin/node"
   # nginx (www-data) serves public/ directly; everything else stays tenuro-only.
   chmod o+x -- "$TMP"
-  chmod -R o+rX -- "$TMP/public"
+  find "$TMP/public" -xdev -type d -exec chmod o+rx -- {} +
+  find "$TMP/public" -xdev -type f -exec chmod o+r -- {} +
   mv -T -- "$TMP" "$REL"
   log "froze release $SHA"
 else
@@ -123,7 +218,7 @@ fi
 ln -sfn -- "$REL" "$BASE/slots/.$IDLE.new"
 mv -Tf -- "$BASE/slots/.$IDLE.new" "$BASE/slots/$IDLE"
 systemctl start "tenuro-migrate@$IDLE.service" || fail_idle "migrations failed"
-systemctl restart "tenuro@$IDLE.service"
+systemctl restart "tenuro@$IDLE.service" || fail_idle "tenuro@$IDLE failed to start"
 
 # ---------------------------------------------------------------- 3. check it directly
 health_ok() { # $1 base url, then extra curl args
@@ -156,14 +251,11 @@ systemctl start "tenuro-smoke@$IDLE.service" || fail_idle "journey checks failed
 
 # ---------------------------------------------------------------- 4. switch
 cp -p -- "$SNIPPET" "$SNIPPET.prev"
-tmp=$(mktemp "$SNIPPET.XXXXXX")
-# shellcheck disable=SC2016  # nginx variables are literal text
-printf 'set $tenuro_slot %s;\nset $tenuro_port %s;\n' "$IDLE" "$IDLE_PORT" >"$tmp"
-chmod 644 -- "$tmp"
-mv -f -- "$tmp" "$SNIPPET"
+PHASE=switched
+write_snippet "$IDLE"
 if ! nginx -t -q; then
-  mv -f -- "$SNIPPET.prev" "$SNIPPET"
-  fail_idle "nginx -t failed; nothing was switched"
+  rollback_switch
+  die "nginx -t failed; nothing was switched"
 fi
 systemctl reload nginx
 
@@ -181,20 +273,26 @@ nginx_ok() {
     --data-binary @"$REL/ops/smoke-query.json" "https://$HOST/graphql" | grep -q '"data"'
 }
 if ! retry "$TRIES_NGINX" nginx_ok; then
-  mv -f -- "$SNIPPET.prev" "$SNIPPET"
-  if nginx -t -q; then systemctl reload nginx; else log "nginx -t failed while restoring the snippet"; fi
-  fail_idle "checks through nginx failed; rolled back to $ACTIVE"
+  rollback_switch
+  die "checks through nginx failed; rolled back to $ACTIVE"
 fi
 
 # ---------------------------------------------------------------- 6. commit
-printf '%s\n' "$IDLE" >"$BASE/state/active.tmp"
-mv -f -- "$BASE/state/active.tmp" "$BASE/state/active"
+printf '%s\n' "$IDLE" >"$STATE/active.tmp"
+mv -f -- "$STATE/active.tmp" "$STATE/active"
+PHASE=committed
 rm -f -- "$SNIPPET.prev"
 ln -sfn -- "$REL" "$BASE/.current.new"
 mv -Tf -- "$BASE/.current.new" "$BASE/current"
+
+# Only the active slot starts at boot. The old slot keeps serving in-flight requests until
+# tenuro-retire stops it.
+systemctl enable --quiet "tenuro@$IDLE.service" || log "warning: could not enable tenuro@$IDLE for boot"
 if [[ $ACTIVE != none ]]; then
+  systemctl disable --quiet "tenuro@$ACTIVE.service" || log "warning: could not disable tenuro@$ACTIVE"
   systemd-run --quiet --collect --on-active="$RETIRE_AFTER" \
-    --unit="tenuro-retire-$(date +%s)" /usr/local/sbin/tenuro-retire
+    --unit="tenuro-retire-$(date +%s)" /usr/local/sbin/tenuro-retire ||
+    log "warning: could not schedule tenuro-retire; stop tenuro@$ACTIVE by hand"
 fi
 
 # Keep the newest $KEEP releases, never one a slot points at; prune assets to match.
@@ -222,7 +320,7 @@ for f in "$BASE"/assets/*; do
   [[ -e $f ]] || continue
   [[ -n ${live[$(basename "$f")]:-} ]] || rm -rf --one-file-system -- "$f"
 done
-find "$BASE/incoming" -mindepth 1 -maxdepth 1 -mtime +2 -exec rm -rf --one-file-system -- {} +
+find "$BASE/incoming" "$STAGE" -mindepth 1 -maxdepth 1 -mtime +2 -exec rm -rf --one-file-system -- {} +
 
 log "OK: $SHA is live on $IDLE (port $IDLE_PORT)"
-echo "OK $SHA $IDLE"
+echo "OK $SHA $IDLE" || true
