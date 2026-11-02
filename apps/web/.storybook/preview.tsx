@@ -7,7 +7,7 @@ import { IntlProvider } from 'react-intl';
 import { MemoryRouter } from 'react-router';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import '@fontsource-variable/newsreader/opsz.css';
+import '@fontsource-variable/newsreader/wght.css';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';
 import '@fontsource/ibm-plex-sans/600.css';
