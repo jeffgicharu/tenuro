@@ -21,6 +21,7 @@ export const sw: Catalogue = {
   'nav.leases': 'Mikataba ya upangishaji',
   'nav.keyDates': 'Tarehe muhimu',
   'nav.accounting': 'Uhasibu',
+  'nav.reports': 'Ripoti',
   'nav.group.portfolio': 'Jalada',
   'nav.group.finance': 'Fedha',
   'nav.newLease': 'Mkataba mpya',

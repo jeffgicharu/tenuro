@@ -26,6 +26,7 @@ export const router = createBrowserRouter([
       { path: 'sign-in', loader: signInLoader, lazy: { Component: async () => (await import('../features/signin/SignInPage.tsx')).SignInPage } },
       { path: 'key-dates', loader: keyDatesLoader, shouldRevalidate: keyDatesShouldRevalidate, lazy: { Component: async () => (await import('../features/keydates/KeyDatesPage.tsx')).KeyDatesPage } },
       { path: 'accounting', loader: accountingLoader, lazy: { Component: async () => (await import('../features/accounting/AccountingPage.tsx')).AccountingPage } },
+      { path: 'reports', lazy: { Component: async () => (await import('../features/reports/ReportsPage.tsx')).ReportsPage } },
       { path: 'leases', loader: registerLoader, shouldRevalidate: registerShouldRevalidate, lazy: { Component: async () => (await import('../features/register/RegisterPage.tsx')).RegisterPage } },
       { path: 'leases/new', loader: leaseFormLoader, lazy: { Component: async () => (await import('../features/lease-form/LeaseFormPage.tsx')).LeaseFormPage } },
       { path: 'leases/:leaseId', loader: leaseLoader, lazy: { Component: async () => (await import('../features/lease/LeasePage.tsx')).LeasePage } },

@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import Skeleton from '@mui/material/Skeleton';
 import { useTheme } from '@mui/material/styles';
-import { ArrowRight, CalendarClock, Landmark, CornerDownLeft, FilePlus2, LayoutDashboard, ScrollText, Search } from 'lucide-react';
+import { ArrowRight, CalendarClock, FileSpreadsheet, Landmark, CornerDownLeft, FilePlus2, LayoutDashboard, ScrollText, Search } from 'lucide-react';
 import type { CommandPaletteSearchQuery } from './__generated__/CommandPaletteSearchQuery.graphql';
 import { StatusChip, type LeaseStatus } from '../components/StatusChip.tsx';
 import { FONT_MONO } from '../theme/theme.ts';
@@ -43,6 +43,7 @@ export default function CommandPalette({ open, onClose, canEdit }: { open: boole
     { id: 'go-overview', group: 'go' as const, label: intl.formatMessage({ id: 'nav.overview' }), icon: <LayoutDashboard size={16} aria-hidden />, run: go('/') },
     { id: 'go-leases', group: 'go' as const, label: intl.formatMessage({ id: 'nav.leases' }), icon: <ScrollText size={16} aria-hidden />, run: go('/leases') },
     { id: 'go-keydates', group: 'go' as const, label: intl.formatMessage({ id: 'nav.keyDates' }), icon: <CalendarClock size={16} aria-hidden />, run: go('/key-dates') },
+    { id: 'go-reports', group: 'go' as const, label: intl.formatMessage({ id: 'nav.reports' }), icon: <FileSpreadsheet size={16} aria-hidden />, run: go('/reports') },
     { id: 'go-accounting', group: 'go' as const, label: intl.formatMessage({ id: 'nav.accounting' }), icon: <Landmark size={16} aria-hidden />, run: go('/accounting') },
     ...(canEdit ? [{ id: 'go-new', group: 'go' as const, label: intl.formatMessage({ id: 'nav.newLease' }), icon: <FilePlus2 size={16} aria-hidden />, run: go('/leases/new') }] : []),
   ], [canEdit, intl]);

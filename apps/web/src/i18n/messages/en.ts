@@ -20,6 +20,7 @@ export const en = {
   'nav.leases': 'Leases',
   'nav.keyDates': 'Key dates',
   'nav.accounting': 'Accounting',
+  'nav.reports': 'Reports',
   'nav.group.portfolio': 'Portfolio',
   'nav.group.finance': 'Finance',
   'nav.newLease': 'New lease',

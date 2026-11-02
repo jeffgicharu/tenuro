@@ -21,6 +21,7 @@ export const ar: Catalogue = {
   'nav.leases': 'عقود الإيجار',
   'nav.keyDates': 'المواعيد المهمة',
   'nav.accounting': 'المحاسبة',
+  'nav.reports': 'التقارير',
   'nav.group.portfolio': 'المحفظة',
   'nav.group.finance': 'المالية',
   'nav.newLease': 'عقد جديد',

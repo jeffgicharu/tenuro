@@ -5,7 +5,8 @@ import { registerSw } from '../../features/register/messages.ts';
 import { dashboardSw } from '../../features/dashboard/messages.ts';
 import { keyDatesSw } from '../../features/keydates/messages.ts';
 import { accountingSw } from '../../features/accounting/messages.ts';
+import { reportsSw } from '../../features/reports/messages.ts';
 
 // Features append their own messages here.
-const catalogue: Record<string, string> = { ...sw, ...leaseSw, ...leaseFormSw, ...registerSw, ...dashboardSw, ...keyDatesSw, ...accountingSw };
+const catalogue: Record<string, string> = { ...sw, ...leaseSw, ...leaseFormSw, ...registerSw, ...dashboardSw, ...keyDatesSw, ...accountingSw, ...reportsSw };
 export default catalogue;

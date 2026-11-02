@@ -150,3 +150,23 @@ test.describe('accounting', () => {
     expect(problems).toEqual([]);
   });
 });
+
+test.describe('reports', () => {
+  test('a viewer downloads the lease register as CSV and rent by location as Excel', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Halvard & Crane Property Partners', 'Read-only viewer', '/reports');
+    await expect(page.getByRole('heading', { level: 1, name: 'Reports' })).toBeVisible();
+    await expectAccessible(page, 'reports');
+    const csv = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'CSV', description: 'Lease register' }).click();
+    const file = await csv;
+    expect(file.suggestedFilename()).toMatch(/^lease-register-\d{4}-\d{2}-\d{2}\.csv$/);
+    const text = await (await file.createReadStream())!.toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'));
+    expect(text.split('\r\n')[0]).toContain('Reference,Status,Property');
+    expect(text.split('\r\n').length).toBeGreaterThan(100);
+    const xlsx = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Excel', description: 'Rent by location' }).click();
+    expect((await xlsx).suggestedFilename()).toMatch(/^rent-by-location-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    expect(problems).toEqual([]);
+  });
+});
