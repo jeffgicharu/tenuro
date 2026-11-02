@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useRevalidator, useSearchParams } from 'react-router';
 import Box from '@mui/material/Box';
@@ -11,15 +11,16 @@ import { useTheme } from '@mui/material/styles';
 import { CalendarDays, CalendarRange, List } from 'lucide-react';
 import type { KeyDatesPageQuery } from './__generated__/KeyDatesPageQuery.graphql';
 import { keyDatesQuery } from './loader.ts';
-import { KeyDateCalendar } from './KeyDateCalendar.tsx';
 import { KeyDateList } from './KeyDateList.tsx';
 import { KeyDateReminders } from './KeyDateReminders.tsx';
-import { KINDS, listFilter, parseKeyDates, toKeyDatesParams, type KeyDatesState, type KeyDatesView } from './urlState.ts';
+import { KINDS, kindColour, listFilter, parseKeyDates, toKeyDatesParams, type KeyDatesState, type KeyDatesView } from './urlState.ts';
 import { useRouteQuery } from '../../app/relayRoute.ts';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { ErrorBoundary } from '../../components/ErrorBoundary.tsx';
 import { SearchField } from '../../components/SearchField.tsx';
-import { kindColour } from './KeyDateCalendar.tsx';
+
+// The calendar view loads when chosen; the list is the default.
+const KeyDateCalendar = lazy(async () => ({ default: (await import('./KeyDateCalendar.tsx')).KeyDateCalendar }));
 
 // Every notice, review, expiry and return across the portfolio: as a list, on a calendar, or the
 // next 90 days. Filters and the view live in the URL.

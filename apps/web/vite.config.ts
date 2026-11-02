@@ -11,6 +11,7 @@ const EARLY_QUERIES = {
   RegisterPageQuery: 'src/features/register/__generated__/RegisterPageQuery.graphql.ts',
   AccountingPageQuery: 'src/features/accounting/__generated__/AccountingPageQuery.graphql.ts',
   LeasePageQuery: 'src/features/lease/__generated__/LeasePageQuery.graphql.ts',
+  KeyDatesPageQuery: 'src/features/keydates/__generated__/KeyDatesPageQuery.graphql.ts',
 };
 // Builds src/early.ts as a chunk of its own and names it in the page ahead of the app, async, so it
 // asks for the page's data while the app downloads. (Vite folds every module script in index.html

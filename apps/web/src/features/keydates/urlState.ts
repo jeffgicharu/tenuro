@@ -77,3 +77,9 @@ export function addDaysIso(iso: string, days: number): string {
 }
 
 export const filterKey = (f: GraphQLKeyDateFilter) => JSON.stringify(f);
+
+// Each kind's colour in the theme's chart palette (the calendar's dots and the kind filters).
+export function kindColour(chart: string[], kind: string): string {
+  const i = Math.max(0, KINDS.indexOf(kind as (typeof KINDS)[number]));
+  return chart[i % chart.length]!;
+}

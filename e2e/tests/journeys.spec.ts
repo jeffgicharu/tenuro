@@ -108,7 +108,7 @@ test.describe('main journeys', () => {
 
   test('a page asks for its data as it loads, and only once', async ({ page }) => {
     await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', null);
-    for (const path of ['/leases', '/', '/accounting']) {
+    for (const path of ['/leases', '/', '/accounting', '/key-dates']) {
       const ids: string[] = [];
       const onRequest = (r: import('@playwright/test').Request) => {
         if (r.url().endsWith('/graphql') && r.method() === 'POST') ids.push((JSON.parse(r.postData() ?? '{}') as { id?: string }).id ?? '');

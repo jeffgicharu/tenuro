@@ -7,7 +7,7 @@ import IconButton from '@mui/material/IconButton';
 import { useTheme } from '@mui/material/styles';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { KeyDateCalendarQuery } from './__generated__/KeyDateCalendarQuery.graphql';
-import { addDaysIso, KINDS, type GraphQLKeyDateFilter } from './urlState.ts';
+import { addDaysIso, KINDS, type GraphQLKeyDateFilter, kindColour } from './urlState.ts';
 
 // A month of key dates: each day shows how many are due and a dot per kind; overdue days are marked.
 // Picking a day lists its dates beneath. The week starts on the locale's first day (Saturday or
@@ -128,10 +128,6 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
   );
 }
 
-export function kindColour(chart: string[], kind: string): string {
-  const i = Math.max(0, KINDS.indexOf(kind as (typeof KINDS)[number]));
-  return chart[i % chart.length]!;
-}
 
 export function shiftMonth(month: string, by: number): string {
   const [y, m] = month.split('-').map(Number) as [number, number];

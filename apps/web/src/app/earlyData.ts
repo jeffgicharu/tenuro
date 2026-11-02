@@ -1,4 +1,5 @@
 import { QUERY_IDS } from 'virtual:query-ids';
+import { listFilter, parseKeyDates } from '../features/keydates/urlState.ts';
 import { isPhone, registerVariables } from '../features/register/registerVariables.ts';
 
 // The page's data used to be asked for only once the app's code had arrived and started (about
@@ -29,6 +30,8 @@ function routeQueries(path: string, search: URLSearchParams): [string, Record<st
   if (path === '/') out.push([QUERY_IDS.DashboardPageQuery, {}]);
   else if (path === '/leases') out.push([QUERY_IDS.RegisterPageQuery, registerVariables(search, isPhone())]);
   else if (path === '/accounting') out.push([QUERY_IDS.AccountingPageQuery, {}]);
+  // As the key dates loader asks (its list view, from the URL).
+  else if (path === '/key-dates') out.push([QUERY_IDS.KeyDatesPageQuery, { filter: listFilter(parseKeyDates(search)) }]);
   else {
     const lease = /^\/leases\/([^/]+)$/.exec(path);
     if (lease && lease[1] !== 'new') out.push([QUERY_IDS.LeasePageQuery, { id: decodeURIComponent(lease[1]!) }]);
