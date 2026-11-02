@@ -1,4 +1,4 @@
-import { startTransition, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, startTransition, Suspense, useEffect, useMemo, useState } from 'react';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -12,7 +12,6 @@ import RadioGroup from '@mui/material/RadioGroup';
 import Skeleton from '@mui/material/Skeleton';
 import TextField from '@mui/material/TextField';
 import { useTheme } from '@mui/material/styles';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import type { FilterBarFacetsQuery } from './__generated__/FilterBarFacetsQuery.graphql';
 import { FilterChip } from '../../components/FilterChip.tsx';
 import { SearchField } from '../../components/SearchField.tsx';
@@ -21,7 +20,9 @@ import {
   activeFilterCount, toGraphQLFilter, type KeyDateKind, type LeaseStatus, type PropertyType, type RegisterFilter,
 } from './urlState.ts';
 
-type FacetKey = 'status' | 'countryCode' | 'city' | 'propertyType' | 'currency';
+const ExpiryRange = lazy(() => import('./ExpiryRange.tsx'));
+
+type FacetKey ='status' | 'countryCode' | 'city' | 'propertyType' | 'currency';
 
 interface Option {
   value: string;
@@ -299,10 +300,9 @@ function ExpiryForm({ filter, onApply }: { filter: RegisterFilter; onApply(next:
         <FormControlLabel value="range" control={<Radio size="small" />} label={intl.formatMessage({ id: 'register.filter.customRange' })} />
       </RadioGroup>
       {mode === 'range' && (
-        <Box sx={{ display: 'grid', gap: 3, mt: 2 }}>
-          <DatePicker label={intl.formatMessage({ id: 'register.filter.from' })} value={from} onChange={setFrom} slotProps={{ textField: { size: 'small' } }} />
-          <DatePicker label={intl.formatMessage({ id: 'register.filter.to' })} value={to} onChange={setTo} {...(from ? { minDate: from } : {})} slotProps={{ textField: { size: 'small' } }} />
-        </Box>
+        <Suspense fallback={<Box sx={{ display: 'grid', gap: 3, mt: 2 }}><Skeleton variant="rounded" height={40} /><Skeleton variant="rounded" height={40} /></Box>}>
+          <ExpiryRange from={from} to={to} onFrom={setFrom} onTo={setTo} />
+        </Suspense>
       )}
       <Divider sx={{ my: 3 }} />
       <Button fullWidth variant="contained" onClick={apply} disabled={!valid}><FormattedMessage id="register.apply" /></Button>
