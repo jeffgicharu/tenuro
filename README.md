@@ -99,24 +99,38 @@ the sign-in page: **49 page states, 0 violations.** Colour tokens are unit-teste
 contrast in both modes. Controls show a visible focus ring, and motion respects
 `prefers-reduced-motion`.
 
-**Performance.** Measured on the live site from Nairobi (round trip to the server about 250 ms),
-on 2 November 2026:
+**Performance.** Measured on the live site from Nairobi (round trip to the server about 250 ms) on
+3 November 2026, as the largest contentful paint (LCP) and cumulative layout shift (CLS) in Chrome:
 
-| Page | LCP, cold, desktop | LCP, warm | LCP, mobile (150 ms RTT, 1.6 Mbps, 4× CPU) | CLS |
+- **Desktop:** a 1440 × 900 window, no throttling. "Cold" has the cache disabled; "warm" is a
+  second visit.
+- **Phone:** a 390 × 844 window at 2× pixel density, cache disabled, throttled through the Chrome
+  DevTools Protocol to 150 ms latency, 1.6 Mbps down and 4× CPU slowdown. Each figure is the median
+  of three runs. This applied throttling is harsher than Lighthouse's simulated throttling.
+
+| Page | LCP, desktop, cold | LCP, desktop, warm | LCP, phone (throttled) | CLS |
 |---|---|---|---|---|
-| Sign-in | 1.5 s | 1.1 s | 3.4 s | 0.000 |
-| Portfolio overview | 1.6 s | 1.2 s | 3.5 s | 0.000 |
-| Lease register | 1.7 s | 1.2 s | 5.5 s | 0.000 |
-| Accounting | 1.5 s | 1.1 s | 3.8 s | 0.000 |
-| Key dates | 1.7 s | 1.2 s | 3.7 s | 0.000 |
+| Sign-in | 1.8–1.9 s | 1.2 s | 3.8 s | 0.001 |
+| Portfolio overview | 1.6 s | 0.9 s | 4.1 s | 0.000 |
+| Lease register | 1.6–1.9 s | 0.9 s | 4.4 s | 0.000 |
+| Accounting | 1.6–1.7 s | 0.9 s | 3.8 s | 0.003 |
+| Key dates | 1.6 s | 0.9 s | 5.4 s | 0.000 |
+
+On the throttled phone, about 400 KB of JavaScript crossing 1.6 Mbps and then the 4× slower CPU
+set the time. A page's data does not: a 0.1 KB script asks for the shell's and the route's data as
+the page loads (overview, register, accounting and lease pages), and the server names each route's
+code in the page it sends. Phones never download the register's data grid; they show a card list
+that starts with 20 leases. Key dates is not yet covered by the early data request.
 
 | JavaScript, gzip | Size | Budget |
 |---|---|---|
-| First page (entry and its static imports) | 305 KB | 320 KB |
-| Lease register route (includes the data grid) | 179 KB | 180 KB |
-| Lease form route | 108 KB | 180 KB |
-| Lease page route | 91 KB | 180 KB |
-| Other routes | 4 to 30 KB each | 180 KB |
+| First page (entry and its static imports) | 284 KB | 295 KB |
+| Message catalogue (one language) | 11.5–13.8 KB | |
+| Lease register route on a phone (card list) | 59 KB | 180 KB |
+| Its data grid, desktop only, on top of the route | 149 KB | 180 KB |
+| Lease form route | 131 KB | 180 KB |
+| Lease page route | 113 KB | 180 KB |
+| Other routes | 8 to 48 KB each | 180 KB |
 
 Server time for the heaviest pages fell from 1.0–1.75 s to 0.3–0.8 s after `Server-Timing`
 showed where it went. Two fixes did most of it. Lookups by a row's view id now use an index that
