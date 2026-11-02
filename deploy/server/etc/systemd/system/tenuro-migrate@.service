@@ -33,7 +33,6 @@ ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
 ProtectProc=invisible
-ProcSubset=pid
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
@@ -45,7 +44,8 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged
 SystemCallErrorNumber=EPERM
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK lets os.networkInterfaces() work; IPAddressDeny still blocks all non-local traffic.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 IPAddressDeny=any
 IPAddressAllow=localhost
 # V8's JIT needs writable and executable memory; every other protection stays on.
