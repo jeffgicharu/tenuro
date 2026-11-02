@@ -493,9 +493,15 @@ CREATE POLICY read_tenant ON app_user FOR SELECT USING (tenant_id = app.tenant()
 CREATE FUNCTION app.resolve_session(p_token_hash text)
 RETURNS TABLE (user_id uuid, tenant_id uuid, role user_role, sandbox_id uuid)
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  -- SKIP LOCKED: never wait on a session row another transaction holds (the nightly rebuild holds
+  -- them all); touching last_seen_at is best effort, the read below still succeeds.
   WITH s AS (
     UPDATE session SET last_seen_at = now()
-    WHERE token_hash = p_token_hash AND expires_at > now() AND last_seen_at < now() - interval '1 minute'
+    WHERE token_hash IN (
+      SELECT token_hash FROM session
+      WHERE token_hash = p_token_hash AND expires_at > now() AND last_seen_at < now() - interval '1 minute'
+      FOR UPDATE SKIP LOCKED
+    )
     RETURNING user_id, sandbox_id
   )
   SELECT u.id, u.tenant_id, u.role, x.sandbox_id
