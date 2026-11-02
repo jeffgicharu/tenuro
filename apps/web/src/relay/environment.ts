@@ -20,7 +20,9 @@ const fetchGraphQL: FetchFunction = async (params, variables) => {
     throw new NetworkError(res.status, res.status === 429 ? 'rate-limited' : `HTTP ${res.status}`);
   }
   const json = (await res.json()) as GraphQLResponse;
-  if ('errors' in json && Array.isArray(json.errors) && json.errors.length && !('data' in json && json.data)) {
+  // Expected failures come back as typed union results, so any GraphQL error is unexpected:
+  // surface it to the error boundary instead of rendering partial nulls as "not found".
+  if ('errors' in json && Array.isArray(json.errors) && json.errors.length) {
     throw new Error(json.errors.map((e) => e.message).join('; '));
   }
   return json;
