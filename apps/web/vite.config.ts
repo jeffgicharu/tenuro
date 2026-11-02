@@ -1,6 +1,55 @@
 import babel from '@rolldown/plugin-babel';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
+
+// The persisted ids of the queries the early data script asks for (src/app/earlyData.ts), taken from
+// the Relay compiler's output so that script need not carry the queries themselves.
+const EARLY_QUERIES = {
+  RootQuery: 'src/app/__generated__/RootQuery.graphql.ts',
+  DashboardPageQuery: 'src/features/dashboard/__generated__/DashboardPageQuery.graphql.ts',
+  RegisterPageQuery: 'src/features/register/__generated__/RegisterPageQuery.graphql.ts',
+  AccountingPageQuery: 'src/features/accounting/__generated__/AccountingPageQuery.graphql.ts',
+  LeasePageQuery: 'src/features/lease/__generated__/LeasePageQuery.graphql.ts',
+};
+// Builds src/early.ts as a chunk of its own and names it in the page ahead of the app, async, so it
+// asks for the page's data while the app downloads. (Vite folds every module script in index.html
+// into one entry, which would have made it wait for the whole app.)
+function earlyData(): Plugin {
+  return {
+    name: 'tenuro:early-data',
+    apply: 'build',
+    buildStart() {
+      this.emitFile({ type: 'chunk', id: new URL('src/early.ts', import.meta.url).pathname, name: 'early' });
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const early = Object.values(ctx.bundle ?? {}).find((c) => c.type === 'chunk' && c.facadeModuleId?.replaceAll('\\', '/').endsWith('/src/early.ts'));
+        if (!early) throw new Error('The early data chunk was not built');
+        return html.replace('<script type="module" crossorigin', `<script type="module" async crossorigin src="/${early.fileName}"></script>\n    <script type="module" crossorigin`);
+      },
+    },
+  };
+}
+
+function queryIds(): Plugin {
+  const id = 'virtual:query-ids';
+  return {
+    name: 'tenuro:query-ids',
+    resolveId: (source) => (source === id ? `\0${id}` : null),
+    load(source) {
+      if (source !== `\0${id}`) return null;
+      const ids = Object.fromEntries(Object.entries(EARLY_QUERIES).map(([name, file]) => {
+        this.addWatchFile(new URL(file, import.meta.url).pathname);
+        const m = /"id": "([0-9a-f]{40,64})"/.exec(readFileSync(new URL(file, import.meta.url), 'utf8'));
+        if (!m) throw new Error(`No persisted id in ${file}; run the Relay compiler`);
+        return [name, m[1]];
+      }));
+      return `export const QUERY_IDS = ${JSON.stringify(ids)};`;
+    },
+  };
+}
 
 // The message catalogue is a dynamic import, so the browser only asked for it once the app had booted
 // and rendered, and the first paint waited behind a second round trip. English, the default, is
@@ -46,6 +95,8 @@ export default defineConfig({
     // Compiles graphql`` tags to imports of the generated Relay artifacts.
     babel({ plugins: [['relay', { eagerEsModules: true }]] }),
     preloadDefaultCatalogue(),
+    queryIds(),
+    earlyData(),
   ],
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),

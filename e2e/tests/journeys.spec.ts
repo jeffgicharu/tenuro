@@ -105,6 +105,24 @@ test.describe('main journeys', () => {
     expect(problems).toEqual([]);
   });
 
+  test('a page asks for its data as it loads, and only once', async ({ page }) => {
+    await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', null);
+    for (const path of ['/leases', '/', '/accounting']) {
+      const ids: string[] = [];
+      const onRequest = (r: import('@playwright/test').Request) => {
+        if (r.url().endsWith('/graphql') && r.method() === 'POST') ids.push((JSON.parse(r.postData() ?? '{}') as { id?: string }).id ?? '');
+      };
+      page.on('request', onRequest);
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      page.off('request', onRequest);
+      // The shell's query and the page's are sent once each: an early answer the app did not use would
+      // show as the same query twice. (The register also prefetches its next page, a different query.)
+      expect(ids.length, `GraphQL requests on ${path}`).toBeGreaterThanOrEqual(2);
+      expect(new Set(ids).size, `repeated queries on ${path}: ${ids.map((i) => i.slice(0, 8)).join(', ')}`).toBe(ids.length);
+    }
+  });
+
   test('each page names its route\'s code up front, and the build manifest is not served', async ({ request }) => {
     const html = await (await request.get('/leases')).text();
     expect(html).toMatch(/<link rel="modulepreload" crossorigin href="\/assets\/RegisterPage-[^"]+\.js">/);

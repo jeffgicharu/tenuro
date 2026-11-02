@@ -12,7 +12,7 @@ const config: StorybookConfig = {
   viteFinal: (cfg) => ({
     ...cfg,
     publicDir: false,
-    plugins: (cfg.plugins ?? []).flat().filter((p) => !(p && typeof p === 'object' && 'name' in p && p.name === 'tenuro:preload-default-catalogue')),
+    plugins: (cfg.plugins ?? []).flat().filter((p) => !(p && typeof p === 'object' && 'name' in p && ['tenuro:preload-default-catalogue', 'tenuro:early-data'].includes(p.name as string))),
   }),
 };
 export default config;
