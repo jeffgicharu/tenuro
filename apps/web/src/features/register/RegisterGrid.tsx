@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react';
 import { graphql, usePaginationFragment } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useNavigate } from 'react-router';
@@ -15,6 +15,10 @@ import { cspNonce } from '../../app/nonce.ts';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { GRID_FIELD, sortModelToOrder, useRegisterColumns, type RegisterRow } from './columns.tsx';
 import { RegisterCards } from './RegisterCards.tsx';
+import { usePreviewAnnouncement } from './previewAnnouncement.ts';
+
+// The preview card loads on first use, so the register's own code stays within its budget.
+const LeasePreview = lazy(async () => ({ default: (await import('./LeasePreview.tsx')).LeasePreview }));
 import { DEFAULT_ORDER, stateKey, toGraphQLFilter, type RegisterOrder, type RegisterState } from './urlState.ts';
 
 const PAGE = 100;
@@ -112,6 +116,46 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
   useEffect(() => {
     if (!narrow && hasNext && !isLoadingNext && !isPending && page >= loadedPages - 1) loadNext(PAGE);
   }, [narrow, hasNext, isLoadingNext, isPending, page, loadedPages, loadNext]);
+  // The lease preview: after a short hover on a row (pointers that hover), or Space on the focused row.
+  const rowById = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
+  const [preview, setPreview] = useState<{ id: string; anchor: HTMLElement; byKeyboard: boolean } | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const announce = usePreviewAnnouncement();
+  const hoverTimer = useRef<number | undefined>(undefined);
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)', { noSsr: true });
+  useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
+  const anchorFor = (rowEl: HTMLElement) => rowEl.querySelector<HTMLElement>('[data-field="reference"]') ?? rowEl;
+  const rowSlot = canHover ? {
+    onMouseEnter: (e: ReactMouseEvent<HTMLElement>) => {
+      const el = e.currentTarget;
+      const id = el.getAttribute('data-id');
+      window.clearTimeout(hoverTimer.current);
+      if (!id) return;
+      hoverTimer.current = window.setTimeout(() => setPreview({ id, anchor: anchorFor(el), byKeyboard: false }), 550);
+    },
+    onMouseLeave: () => {
+      window.clearTimeout(hoverTimer.current);
+      setPreview((p) => (p && !p.byKeyboard ? null : p));
+    },
+  } : {};
+
+  // "/" moves to the register's search, as in most data-heavy tools.
+  useEffect(() => {
+    if (narrow) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      const search = document.querySelector<HTMLInputElement>('main input[type="search"]');
+      if (!search) return;
+      e.preventDefault();
+      search.focus();
+      search.select();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [narrow]);
+
   const goTo = (next: number) => {
     const target = Math.max(0, Math.min(next, pageCount - 1));
     if (target < loadedPages) setPage(target);
@@ -179,6 +223,16 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
           </Box>
         )}
       </Box>
+      {!narrow && (
+        <Box
+          sx={{
+            display: { xs: 'none', lg: 'flex' }, alignItems: 'center', gap: 1, color: t.inkSecondary, fontSize: '0.75rem',
+            '& kbd': { fontFamily: 'inherit', fontSize: '0.6875rem', lineHeight: 1, px: 1, py: 0.5, borderRadius: 0.75, border: `1px solid ${t.ruleStrong}`, backgroundColor: t.surface, color: t.ink, boxShadow: `0 1px 0 ${t.ruleStrong}` },
+          }}
+        >
+          <FormattedMessage id="register.keys" values={{ k: (chunks) => <kbd>{chunks}</kbd> }} />
+        </Box>
+      )}
       {!narrow && pageCount > 1 && (
         <Box component="nav" aria-label={intl.formatMessage({ id: 'register.pages' })} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Box component="span" data-num sx={{ marginInlineEnd: 2 }}>
@@ -257,8 +311,29 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
             if (event.key === 'Enter') {
               event.preventDefault();
               navigate(`/leases/${encodeURIComponent(String(params.id))}`);
+              return;
+            }
+            const id = String(params.id);
+            if (event.key === ' ') {
+              // Space previews the lease instead of selecting the row.
+              event.preventDefault();
+              (event as unknown as { defaultMuiPrevented?: boolean }).defaultMuiPrevented = true;
+              if (preview?.id === id) { setPreview(null); setAnnouncement(''); return; }
+              const rowEl = apiRef.current?.getRowElement(params.id);
+              const row = rowById.get(id);
+              if (rowEl && row) {
+                setPreview({ id, anchor: anchorFor(rowEl), byKeyboard: true });
+                setAnnouncement(announce(row));
+              }
+              return;
+            }
+            if (preview && (event.key === 'Escape' || event.key.startsWith('Arrow') || event.key === 'Tab')) {
+              if (event.key === 'Escape') event.preventDefault();
+              setPreview(null);
+              setAnnouncement('');
             }
           }}
+          slotProps={{ row: rowSlot }}
           aria-label={intl.formatMessage({ id: 'register.gridLabel' })}
           localeText={{ noRowsLabel: intl.formatMessage({ id: 'register.empty.title' }) }}
           sx={{
@@ -285,6 +360,12 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
         />
       </Box>
       {footer}
+      <Box role="status" aria-live="polite" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>{announcement}</Box>
+      {preview && (
+        <Suspense fallback={null}>
+          <LeasePreview row={rowById.get(preview.id) ?? null} anchor={preview.anchor} />
+        </Suspense>
+      )}
     </Box>
   );
 }

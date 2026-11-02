@@ -37,7 +37,20 @@ test.describe('main journeys', () => {
     await expect(grid.getByRole('row').nth(1)).toBeVisible();
     await expectAccessible(page, 'register');
 
-    await page.getByRole('searchbox', { name: 'Search leases' }).or(page.getByLabel('Search leases')).first().fill('Nairobi');
+    // The keyboard: Space previews the focused lease (announced), Escape closes it, "/" goes to search.
+    const firstRow = grid.getByRole('row').nth(1);
+    const reference = (await firstRow.locator('[data-field="reference"]').innerText()).trim();
+    await firstRow.locator('[data-field="landlord"]').focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('status').filter({ hasText: 'Press Enter to open' })).toContainText(reference);
+    await expect(page.getByText('Click or press Enter to open the lease')).toBeVisible();
+    await expectAccessible(page, 'register with a lease preview');
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('Click or press Enter to open the lease')).toBeHidden();
+    await page.keyboard.press('/');
+    const search = page.getByRole('searchbox', { name: 'Search leases' }).or(page.getByLabel('Search leases')).first();
+    await expect(search).toBeFocused();
+    await search.fill('Nairobi');
     await expect(grid.getByRole('row').nth(1)).toContainText(/Nairobi/);
 
     await grid.getByRole('row').nth(1).getByRole('link').first().click();
