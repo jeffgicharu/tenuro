@@ -1,0 +1,3 @@
+#!/bin/bash
+# Unprivileged tests can't chown to root; record the call instead.
+printf 'chown %s\n' "$*" >>"$STUB_LOG"

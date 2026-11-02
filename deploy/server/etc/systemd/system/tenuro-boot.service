@@ -1,0 +1,18 @@
+[Unit]
+Description=Start the active Tenuro slot and point nginx at it
+Documentation=https://github.com/jeffgicharu/tenuro/blob/main/deploy/README.md
+After=network.target postgresql.service nginx.service
+Wants=postgresql.service
+ConditionPathExists=/srv/tenuro/state/active
+
+[Service]
+Type=oneshot
+# Root: it runs systemctl, rewrites /etc/nginx/tenuro/active-slot.conf and runs nginx -t.
+ExecStart=/usr/local/sbin/tenuro-boot
+TimeoutStartSec=120
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
