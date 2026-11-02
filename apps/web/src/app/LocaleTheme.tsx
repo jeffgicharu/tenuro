@@ -15,6 +15,7 @@ import { loadCatalogue, type Messages } from '../i18n/catalogue.ts';
 import { intlLocale, LANGUAGES, type Language } from '../i18n/locale.ts';
 import { createAppTheme } from '../theme/theme.ts';
 import type { Density } from '../theme/tokens.ts';
+import { cspNonce } from './nonce.ts';
 import { usePreferences } from './preferences.tsx';
 
 export interface TenantLook {
@@ -28,13 +29,11 @@ export interface TenantLook {
 // Tenuro's own screens (sign-in): graphite and paper with a vermilion accent.
 export const TENURO_LOOK: TenantLook = { brandHue: 32, accentHue: 32, density: 'standard', locale: 'en-GB', languages: ['en', 'ar', 'sw'] };
 
-const nonce = typeof document !== 'undefined'
-  ? document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content
-  : undefined;
-
-const caches = {
-  ltr: createCache({ key: 'mui', prepend: true, ...(nonce ? { nonce } : {}) }),
-  rtl: createCache({ key: 'mui-rtl', prepend: true, stylisPlugins: [prefixer, rtlPlugin], ...(nonce ? { nonce } : {}) }),
+// The RTL cache's prefixer must come from the same stylis version @emotion/cache compiles with
+// (pinned in package.json); a newer prefixer crashes on rules such as ::placeholder.
+export const caches = {
+  ltr: createCache({ key: 'mui', prepend: true, ...(cspNonce ? { nonce: cspNonce } : {}) }),
+  rtl: createCache({ key: 'mui-rtl', prepend: true, stylisPlugins: [prefixer, rtlPlugin], ...(cspNonce ? { nonce: cspNonce } : {}) }),
 };
 
 const catalogues = new Map<Language, Promise<Messages>>();

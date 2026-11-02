@@ -14,6 +14,11 @@ export class ErrorBoundary extends Component<Props, { error: Error | null }> {
     return { error };
   }
 
+  // A caught error is still a bug: log it so it shows in the console and in CI's browser checks.
+  override componentDidCatch(error: Error) {
+    console.error('Section failed to render:', error);
+  }
+
   retry = () => {
     this.props.onRetry?.();
     this.setState({ error: null });

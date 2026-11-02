@@ -30,9 +30,10 @@ export default defineConfig({
             // splitting, so a component used only by a lazy page (the form's Autocomplete, say)
             // ships with that page instead of weighing down the first one.
             { name: 'mui', test: /node_modules[\\/](@mui[\\/](system|utils|styled-engine|private-theming)|@emotion|stylis)[\\/]/ },
-            // Only the grid itself: by default a group also pulls in its dependencies, which took MUI X
-            // internals that the first page needs (date-picker localisation) into this lazy chunk.
-            { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/, includeDependenciesRecursively: false },
+            // The data grid has no group of its own. Pinning it alone (without its dependencies) left
+            // it in an import cycle with the Material chunks it styles, so in production it ran
+            // styled(undefined) and the register could not load. Left to normal splitting, it ships
+            // with the register route, the only page that uses it.
             { name: 'intl', test: /node_modules[\\/](react-intl|@formatjs|intl-messageformat)[\\/]/ },
           ],
         },

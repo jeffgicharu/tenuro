@@ -1,28 +1,38 @@
+import { useEffect, type CSSProperties } from 'react';
 import { isRouteErrorResponse, useRouteError } from 'react-router';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 
-// Last-resort boundary. It may render outside the theme and translations (if they failed), so it
-// uses plain styles and English with Arabic and Swahili alongside.
+// Last-resort boundary. It renders outside the theme, the translations and emotion's nonce-carrying
+// style cache, so it uses no MUI: React applies `style` props through the CSSOM, which the strict
+// CSP allows, whereas an emotion <style> tag without the nonce would be blocked and leave the page
+// unstyled. It shows English with Arabic and Swahili alongside.
+const ink = '#1C1A16';
+const muted = '#55504A';
+const s: Record<string, CSSProperties> = {
+  page: { minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 24, background: '#F4F0E7', color: ink, fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
+  card: { maxWidth: 460 },
+  title: { fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 500, fontSize: '1.75rem', lineHeight: 1.2, margin: '0 0 8px' },
+  text: { margin: '0 0 4px', color: muted, lineHeight: 1.5 },
+  last: { margin: '0 0 20px', color: muted, lineHeight: 1.5 },
+  button: { font: 'inherit', fontWeight: 600, color: '#FBF9F4', background: ink, border: 0, borderRadius: 4, padding: '9px 16px', cursor: 'pointer', minHeight: 40 },
+};
+
 export function RouteError() {
   const error = useRouteError();
   const notFound = isRouteErrorResponse(error) && error.status === 404;
-  if (import.meta.env.DEV) console.error(error);
+  useEffect(() => {
+    if (!notFound) console.error(error);
+  }, [error, notFound]);
   return (
-    <Box role="alert" sx={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', p: 6, bgcolor: '#F4F0E7', color: '#1C1A16', fontFamily: 'system-ui, sans-serif' }}>
-      <Box sx={{ maxWidth: 460 }}>
-        <Box component="h1" sx={{ fontFamily: 'Georgia, serif', fontWeight: 500, fontSize: '1.75rem', m: 0, mb: 2 }}>
-          {notFound ? 'This page does not exist.' : 'Something went wrong.'}
-        </Box>
-        <Box component="p" sx={{ m: 0, mb: 1, color: '#55504A' }}>
-          {notFound ? 'The link may be out of date.' : 'Your work is saved. Reload the page to continue.'}
-        </Box>
-        <Box component="p" lang="ar" dir="rtl" sx={{ m: 0, mb: 1, color: '#55504A' }}>حدث خطأ. أعد تحميل الصفحة للمتابعة.</Box>
-        <Box component="p" lang="sw" sx={{ m: 0, mb: 4, color: '#55504A' }}>Hitilafu imetokea. Pakia upya ukurasa ili kuendelea.</Box>
-        <Button variant="contained" onClick={() => window.location.assign(notFound ? '/leases' : window.location.href)} sx={{ bgcolor: '#1C1A16' }}>
+    <div role="alert" style={s.page}>
+      <div style={s.card}>
+        <h1 style={s.title}>{notFound ? 'This page does not exist.' : 'Something went wrong.'}</h1>
+        <p style={s.text}>{notFound ? 'The link may be out of date.' : 'Your work is saved. Reload the page to continue.'}</p>
+        <p lang="ar" dir="rtl" style={s.text}>{notFound ? 'قد يكون الرابط قديماً.' : 'حدث خطأ. أعد تحميل الصفحة للمتابعة.'}</p>
+        <p lang="sw" style={s.last}>{notFound ? 'Huenda kiungo kimepitwa na wakati.' : 'Hitilafu imetokea. Pakia upya ukurasa ili kuendelea.'}</p>
+        <button type="button" style={s.button} onClick={() => window.location.assign(notFound ? '/leases' : window.location.href)}>
           {notFound ? 'Go to the lease register' : 'Reload'}
-        </Button>
-      </Box>
-    </Box>
+        </button>
+      </div>
+    </div>
   );
 }

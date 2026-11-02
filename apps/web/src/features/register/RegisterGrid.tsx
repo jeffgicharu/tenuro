@@ -11,6 +11,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { DataGrid, useGridApiRef, type GridColumnVisibilityModel, type GridSortModel } from '@mui/x-data-grid';
 import type { RegisterGrid_viewer$key } from './__generated__/RegisterGrid_viewer.graphql';
+import { cspNonce } from '../../app/nonce.ts';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { GRID_FIELD, sortModelToOrder, useRegisterColumns, type RegisterRow } from './columns.tsx';
 import { RegisterCards } from './RegisterCards.tsx';
@@ -192,6 +193,8 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
       <Box sx={{ flex: 1, minHeight: 0, opacity: isPending ? 0.55 : 1, transition: 'opacity 150ms ease' }}>
         <DataGrid<RegisterRow>
           apiRef={apiRef}
+          // The grid writes its CSS variables into its own <style> tag, which the CSP refuses without the nonce.
+          {...(cspNonce ? { nonce: cspNonce } : {})}
           rows={rows}
           columns={gridColumns}
           rowHeight={t.rowHeight + 14}

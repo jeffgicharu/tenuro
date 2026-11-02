@@ -168,6 +168,14 @@ jobs:
           rss=$(curl -fsS http://127.0.0.1:9000/api/health | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).rssMb))')
           echo "server memory after the smoke run: ${rss} MB (unit cap 224 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$rss" -lt 200 ]
+      - name: Boot the production bundle in a browser
+        run: |
+          # The server-side smoke run never evaluates the browser bundle; this catches chunk
+          # evaluation failures and CSP violations that only show up in a real browser.
+          node apps/web/e2e/serve.mjs release/public 8080 > e2e-serve.log 2>&1 &
+          for _ in $(seq 20); do curl -fsS http://localhost:8080/api/health >/dev/null && break; sleep 1; done
+          pnpm --filter @tenuro/web exec playwright install --with-deps chromium
+          E2E_BASE_URL=http://localhost:8080 pnpm --filter @tenuro/web exec playwright test --config e2e/playwright.config.ts
       - name: Server log
         if: always()
         run: cat release/server.log 2>/dev/null || true
