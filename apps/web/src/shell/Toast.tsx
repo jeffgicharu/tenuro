@@ -1,17 +1,25 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Snackbar from '@mui/material/Snackbar';
 
 type Tone = 'success' | 'info' | 'warning' | 'error';
+
+export interface ToastAction {
+  label: string;
+  onClick(): void;
+}
 
 interface Toast {
   id: number;
   message: string;
   tone: Tone;
+  action?: ToastAction | undefined;
 }
 
 interface ToastApi {
-  show(message: string, tone?: Tone): void;
+  // An action (e.g. Undo) keeps the toast up a little longer, so there is time to use it.
+  show(message: string, tone?: Tone, action?: ToastAction): void;
 }
 
 const Ctx = createContext<ToastApi>({ show: () => undefined });
@@ -41,7 +49,7 @@ function takePending(): Toast | null {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [current, setCurrent] = useState<Toast | null>(takePending);
-  const show = useCallback((message: string, tone: Tone = 'success') => setCurrent({ id: Date.now(), message, tone }), []);
+  const show = useCallback((message: string, tone: Tone = 'success', action?: ToastAction) => setCurrent({ id: Date.now(), message, tone, action }), []);
   const api = useMemo(() => ({ show }), [show]);
   return (
     <Ctx.Provider value={api}>
@@ -49,12 +57,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <Snackbar
         key={current?.id}
         open={current !== null}
-        autoHideDuration={current?.tone === 'error' ? 8000 : 5000}
+        autoHideDuration={current?.tone === 'error' || current?.action ? 8000 : 5000}
         onClose={(_e, reason) => reason !== 'clickaway' && setCurrent(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         {current ? (
-          <Alert severity={current.tone} variant="filled" onClose={() => setCurrent(null)} role={current.tone === 'error' ? 'alert' : 'status'} sx={{ minWidth: 280 }}>
+          <Alert
+            severity={current.tone}
+            variant="filled"
+            onClose={() => setCurrent(null)}
+            role={current.tone === 'error' ? 'alert' : 'status'}
+            sx={{ minWidth: 280, alignItems: 'center' }}
+            {...(current.action ? {
+              action: (
+                <>
+                  <Button color="inherit" size="small" sx={{ fontWeight: 700 }} onClick={() => { current.action!.onClick(); setCurrent(null); }}>{current.action.label}</Button>
+                </>
+              ),
+            } : {})}
+          >
             {current.message}
           </Alert>
         ) : undefined}

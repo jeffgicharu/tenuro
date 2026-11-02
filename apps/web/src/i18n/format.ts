@@ -71,7 +71,9 @@ export function makeFormatters(locale: string): Formatters {
       return rtf.format(Math.round((days / 365.25) * 10) / 10, 'year');
     },
     area(sqm) {
-      return `${nf('a', () => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })).format(sqm as unknown as number)} m²`;
+      // Arabic writes the unit as م², which reads after the number in right-to-left text; elsewhere m².
+      const unit = locale.startsWith('ar') ? 'م²' : 'm²';
+      return `${nf('a', () => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })).format(sqm as unknown as number)} ${unit}`;
     },
   };
 }

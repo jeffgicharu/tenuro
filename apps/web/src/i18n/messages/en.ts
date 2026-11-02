@@ -141,6 +141,7 @@ export const en = {
   'common.close': 'Close',
   'common.save': 'Save',
   'common.retry': 'Try again',
+  'common.undo': 'Undo',
   'common.reload': 'Reload',
   'common.back': 'Back',
   'common.next': 'Next',

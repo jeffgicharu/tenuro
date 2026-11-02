@@ -359,6 +359,8 @@ describe('portfolio dashboard', () => {
     rentByType { propertyType rent { leases share } }
     upcomingKeyDates(first: 5) { dueOn daysUntil lease { reference } }
     keyDateWeeks { start count }
+    attentionBuckets { withinDays count rentAtStake { amount } }
+    attention(first: 6) { hasOpenTask rentAtStake { amount } keyDate { kind dueOn status } }
     recentActivity(first: 5) { createdAt summary lease { reference } }
   } } }`;
   type P = {
@@ -370,6 +372,8 @@ describe('portfolio dashboard', () => {
       rentByType: { propertyType: string; rent: { leases: number; share: string } }[];
       upcomingKeyDates: { dueOn: string; daysUntil: number; lease: { reference: string } }[];
       keyDateWeeks: { start: string; count: number }[];
+      attentionBuckets: { withinDays: number; count: number; rentAtStake: { amount: string } }[];
+      attention: { hasOpenTask: boolean; rentAtStake: { amount: string }; keyDate: { kind: string; dueOn: string; status: string } }[];
       recentActivity: { createdAt: string; summary: string; lease: { reference: string } | null }[];
     } };
   };
@@ -381,7 +385,7 @@ describe('portfolio dashboard', () => {
     expect(r.errors).toBeUndefined();
     const p = r.data!.viewer.portfolio;
     expect(p.passingRent.currency).toBe(r.data!.viewer.tenant.reportingCurrency);
-    expect(p.expiryProfile).toHaveLength(6);
+    expect(p.expiryProfile).toHaveLength(11);
     expect(p.expiryProfile.at(-1)!.year).toBeNull();
     expect(p.expiryProfile.reduce((n, b) => n + b.leases, 0)).toBe(p.liveLeases);
     expect(p.rentByCountry.reduce((n, c) => n + c.rent.leases, 0)).toBe(p.liveLeases);
@@ -398,6 +402,14 @@ describe('portfolio dashboard', () => {
     // The 13 weekly columns cover the same 91 days as the 90-day count.
     expect(p.keyDateWeeks).toHaveLength(13);
     expect(p.keyDateWeeks.reduce((n, w) => n + w.count, 0)).toBe(p.keyDatesDue);
+    // Needs attention: overdue first, then 30/60/90-day windows that only grow; items are open decisions by deadline.
+    expect(p.attentionBuckets.map((b) => b.withinDays)).toEqual([0, 30, 60, 90]);
+    const [, d30, d60, d90] = p.attentionBuckets;
+    expect(d30!.count).toBeLessThanOrEqual(d60!.count);
+    expect(d60!.count).toBeLessThanOrEqual(d90!.count);
+    expect(p.attention.every((a) => a.keyDate.status === 'UPCOMING' && ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'EXPIRY'].includes(a.keyDate.kind))).toBe(true);
+    const deadlines = p.attention.map((a) => a.keyDate.dueOn);
+    expect(deadlines).toEqual([...deadlines].sort());
     // Nothing from the future shows as recent activity.
     expect(p.recentActivity.every((a) => Date.parse(a.createdAt) <= Date.now() + 60_000)).toBe(true);
   });

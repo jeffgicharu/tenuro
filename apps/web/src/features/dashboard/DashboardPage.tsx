@@ -13,6 +13,7 @@ import { ExpiryProfile } from './ExpiryProfile.tsx';
 import { PortfolioFigures } from './PortfolioFigures.tsx';
 import { RecentActivity } from './RecentActivity.tsx';
 import { RentMix } from './RentMix.tsx';
+import { NeedsAttention } from './NeedsAttention.tsx';
 import { useRouteQuery } from '../../app/relayRoute.ts';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { ErrorBoundary } from '../../components/ErrorBoundary.tsx';
@@ -69,6 +70,9 @@ function DashboardContent() {
       <Box sx={{ borderTop: `2px solid ${t.ink}`, borderBottom: `1px solid ${t.rule}`, mb: { xs: 5, md: 7 } }}>
         <PortfolioFigures portfolio={viewer.portfolio} />
       </Box>
+      <Box sx={{ mb: { xs: 4, md: 5 } }}>
+        <NeedsAttention portfolio={viewer.portfolio} canEdit={viewer.canEdit} userId={viewer.user.id} />
+      </Box>
       <Box sx={{ display: 'grid', gap: { xs: 4, md: 5 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.7fr) minmax(0, 1fr)' }, mb: { xs: 4, md: 5 } }}>
         <ExpiryProfile portfolio={viewer.portfolio} />
         <RentMix portfolio={viewer.portfolio} />
@@ -96,6 +100,7 @@ function DashboardSkeleton() {
       <Box sx={{ borderTop: `2px solid ${t.ink}`, borderBottom: `1px solid ${t.rule}`, mb: { xs: 5, md: 7 }, py: 5, display: 'grid', gap: 4, gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: '1.5fr repeat(4, 1fr)' } }}>
         {[0, 1, 2, 3, 4].map((i) => <Box key={i}><Skeleton width="60%" /><Skeleton width="80%" height={44} /><Skeleton width="50%" /></Box>)}
       </Box>
+      <Box sx={{ mb: 5 }}>{panel(300)}</Box>
       <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: '1fr', lg: '1.7fr 1fr' }, mb: 5 }}>{panel(260)}{panel(260)}</Box>
       <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: '1fr', lg: '1.25fr 1fr' } }}>{panel(320)}{panel(320)}</Box>
     </Box>

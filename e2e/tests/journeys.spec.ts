@@ -18,7 +18,7 @@ test.describe('main journeys', () => {
     await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', null);
     await expect(page.getByRole('heading', { level: 1, name: 'Portfolio' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
-    for (const name of ['Expiry profile', 'Rent by country', 'Critical dates', 'Recent activity']) {
+    for (const name of ['Needs attention', 'Expiry profile', 'Rent by country', 'Critical dates', 'Recent activity']) {
       await expect(page.getByRole('region', { name })).toBeVisible();
     }
     await expectAccessible(page, 'portfolio overview');

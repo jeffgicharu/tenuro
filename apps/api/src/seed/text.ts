@@ -30,6 +30,10 @@ const TEXT = {
       holding: 'Lease is holding over past its expiry date',
       expired: 'Lease expired',
       terminated: 'Lease terminated by agreement',
+      renewalServed: 'Renewal notice served on the landlord',
+      breakDeclined: 'Decided not to exercise the break option',
+      insuranceUploaded: 'Insurance certificate for the year uploaded',
+      reviewAgreed: 'Rent review agreed with the landlord',
     },
   },
   ar: {
@@ -57,6 +61,10 @@ const TEXT = {
       holding: 'العقد ممتد بعد تاريخ انتهائه',
       expired: 'انتهى العقد',
       terminated: 'فُسخ العقد بالاتفاق',
+      renewalServed: 'أُرسل إشعار التجديد إلى المؤجر',
+      breakDeclined: 'تقرّر عدم ممارسة حق الإنهاء المبكر',
+      insuranceUploaded: 'رُفعت شهادة التأمين للسنة',
+      reviewAgreed: 'اتُّفق مع المؤجر على مراجعة الإيجار',
     },
   },
 } as const;

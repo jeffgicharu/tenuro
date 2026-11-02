@@ -142,6 +142,7 @@ export const ar: Catalogue = {
   'common.close': 'إغلاق',
   'common.save': 'حفظ',
   'common.retry': 'حاول مجدداً',
+  'common.undo': 'تراجع',
   'common.reload': 'إعادة التحميل',
   'common.back': 'السابق',
   'common.next': 'التالي',

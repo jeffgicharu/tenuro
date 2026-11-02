@@ -48,6 +48,22 @@ enum Asc842Class {
   OPERATING
 }
 
+"""Decisions due within a number of days (0 means already overdue)."""
+type AttentionBucket {
+  count: Int!
+  rentAtStake: Money!
+  withinDays: Int!
+}
+
+type AttentionItem {
+  """Someone already has a task open for this date."""
+  hasOpenTask: Boolean!
+  keyDate: KeyDate!
+
+  """The lease’s passing rent a year, in the reporting currency."""
+  rentAtStake: Money!
+}
+
 """An ISO 3166-1 alpha-2 country code."""
 scalar CountryCode
 
@@ -254,6 +270,15 @@ enum KeyDateKind {
   INSURANCE
   RENEWAL_NOTICE
   RENT_REVIEW
+}
+
+"""
+One kind of key date: how many are open in the next 90 days, and the soonest.
+"""
+type KeyDateKindSummary {
+  count: Int!
+  kind: KeyDateKind!
+  next: KeyDate!
 }
 
 enum KeyDateStatus {
@@ -718,15 +743,30 @@ Headline figures for the company’s portfolio, in its reporting currency.
 """
 type Portfolio {
   areaSqm: Decimal!
+
+  """
+  The decisions to make first: overdue ones, then by deadline, larger rents first on the same day.
+  """
+  attention(first: Int = 6): [AttentionItem!]!
+
+  """
+  Overdue decisions, then those due within 30, 60 and 90 days (cumulative).
+  """
+  attentionBuckets: [AttentionBucket!]!
   expiringIn12Months: Int!
   expiringIn12MonthsRent: Money!
 
   """
-  Expiries by year, from this year: five single years, then everything later.
+  Expiries by year, from this year: ten single years, then everything later.
   """
   expiryProfile: [ExpiryBucket!]!
   holdingOver: Int!
   holdingOverRent: Money!
+
+  """
+  Per kind of key date, the open ones due in the next 90 days and the soonest of them; soonest kind first.
+  """
+  keyDateKinds: [KeyDateKindSummary!]!
 
   """
   Open key dates per week for the next 13 weeks, starting today: the 90-day view at a glance.

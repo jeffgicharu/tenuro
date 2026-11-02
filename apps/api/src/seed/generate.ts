@@ -58,7 +58,9 @@ const ts = (iso: IsoDate, hour = 9, minute = 0) => `${iso}T${String(hour).padSta
 // Unit sizes per type, drawn log-uniformly: most shops are small units, with the odd anchor store;
 // offices run from a single floor plate up to several floors.
 const AREA: Record<PropertyType, [number, number]> = {
-  OFFICE: [110, 2200], RETAIL: [35, 650], MIXED_USE: [150, 1200], WAREHOUSE: [1200, 18000], INDUSTRIAL: [700, 6500],
+  // Sized for an occupier's estate (a branch, a regional office, a depot), not a landlord's
+  // buildings: the whole portfolio must pass a sanity check against the market it sits in.
+  OFFICE: [70, 700], RETAIL: [25, 300], MIXED_USE: [80, 500], WAREHOUSE: [300, 2400], INDUSTRIAL: [250, 1600],
 };
 const drawArea = (rng: Rng, type: PropertyType) => {
   const [lo, hi] = AREA[type];
@@ -318,7 +320,8 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           out.key_date.push({
             id: kdId, tenant_id: tenantId, sandbox_id: null, origin_id: null, deleted_at: null, lease_id: leaseId,
             kind: k.kind, due_on: k.due, title: k.title,
-            status: past ? (r.chance(0.92) ? 'ACTIONED' : 'DISMISSED') : 'UPCOMING',
+            // A few recent dates are still open past their due date: every real portfolio has some.
+            status: past ? (daysBetween(k.due, today) <= 75 && r.chance(0.06) ? 'UPCOMING' : r.chance(0.92) ? 'ACTIONED' : 'DISMISSED') : 'UPCOMING',
             owner_id: owner, generated: true,
           });
           if (!past && (!nextKey || k.due < nextKey.due)) nextKey = { due: k.due, kind: k.kind };
@@ -431,8 +434,13 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
         });
 
         // Activity
-        const act = (key: string, on: IsoDate, verb: string, summary: string, actor: string, diff: unknown = null) => {
+        // Events in the last 45 days are thinned in proportion to the portfolio, so the overview's
+        // recent activity reads as a few weeks of a team's work rather than one busy morning.
+        // System events (indexation, holding over, expiry) have no person as actor.
+        const recentKeep = Math.min(1, 60 / leaseTarget);
+        const act = (key: string, on: IsoDate, verb: string, summary: string, actor: string | null, diff: unknown = null) => {
           if (on > today) return;
+          if (daysBetween(on, today) <= 45 && !r.chance(recentKeep)) return;
           out.activity.push({
             id: stableId('activity', leaseId, key), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, actor_id: actor,
             verb, summary, diff: diff ? JSON.stringify(diff) : null, created_at: ts(on, r.int(7, 17), r.int(0, 59)),
@@ -440,11 +448,17 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
         };
         act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', tx.activity.created(lesseeRow.reference), listedAdmin.id);
         act('signed', commencement, 'DOCUMENT_ADDED', tx.activity.signed, owner);
-        steps.forEach((s, i) => act(`step${i}`, s.startsOn, 'RENT_CHANGED',
-          escKind === 'CPI' ? tx.activity.indexation : tx.activity.review,
-          owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }]));
-        if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.holding, owner, [{ field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' }]);
-        if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.expired, owner, [{ field: 'status', from: 'ACTIVE', to: 'EXPIRED' }]);
+        steps.forEach((s, i) => act(`step${i}`, escKind === 'CPI' ? s.startsOn : addDays(s.startsOn, r.int(5, 40)), 'RENT_CHANGED',
+          escKind === 'CPI' ? tx.activity.indexation : r.chance(0.5) ? tx.activity.review : tx.activity.reviewAgreed,
+          escKind === 'CPI' ? null : owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }]));
+        for (const o of options) {
+          if (!o.notice_by || o.notice_by >= today) continue;
+          if (o.kind === 'RENEWAL' && o.status === 'EXERCISED') act('renewal-served', addDays(o.notice_by, -r.int(3, 40)), 'NOTICE_SERVED', tx.activity.renewalServed, owner);
+          if (o.kind === 'BREAK' && o.status === 'LAPSED') act('break-declined', addDays(o.notice_by, -r.int(1, 25)), 'DECISION_RECORDED', tx.activity.breakDeclined, owner);
+        }
+        for (const k of keyDates) if (k.kind === 'INSURANCE' && k.due < today) act('insurance', addDays(k.due, -r.int(0, 12)), 'DOCUMENT_ADDED', tx.activity.insuranceUploaded, owner);
+        if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.holding, null, [{ field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' }]);
+        if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.expired, null, [{ field: 'status', from: 'ACTIVE', to: 'EXPIRED' }]);
         // Terminated some time between commencement and today (not clamped to today, which piled
         // every recent termination onto the day of the rebuild).
         const terminatedOn = addMonths(commencement, r.int(12, 40));

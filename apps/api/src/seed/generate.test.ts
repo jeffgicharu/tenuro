@@ -55,4 +55,27 @@ describe('seed realism', () => {
     expect(past.length).toBeGreaterThan(100);
     expect(onToday / past.length).toBeLessThan(0.02);
   });
+
+  // 10,000 leases once added up to 9.65 million m² and KES 133 billion a year: more than the region's
+  // grade-A office stock. An occupier's estate is branches, offices and depots.
+  it('keeps the whole estate to an occupier’s scale', () => {
+    const live = data.lease.filter((l) => l.status === 'ACTIVE' || l.status === 'HOLDING_OVER');
+    const meanArea = live.reduce((n, l) => n + Number(l.area_sqm), 0) / live.length;
+    expect(meanArea).toBeGreaterThan(120);
+    expect(meanArea).toBeLessThan(450);
+  });
+
+  it('leaves a small share of recent key dates open past their due date', () => {
+    const today = '2026-11-02';
+    const open = data.key_date.filter((k) => k.status === 'UPCOMING');
+    const overdue = open.filter((k) => String(k.due_on) < today);
+    expect(overdue.length).toBeGreaterThan(0);
+    expect(overdue.length / open.length).toBeLessThan(0.06);
+  });
+
+  it('records system events without a person, and a mix of what people did', () => {
+    const verbs = new Set(data.activity.map((a) => a.verb));
+    for (const v of ['NOTICE_SERVED', 'DECISION_RECORDED', 'DOCUMENT_ADDED', 'RENT_CHANGED', 'STATUS_CHANGED']) expect(verbs).toContain(v);
+    expect(data.activity.filter((a) => a.verb === 'STATUS_CHANGED' && a.actor_id === null).length).toBeGreaterThan(0);
+  });
 });

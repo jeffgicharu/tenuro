@@ -5,8 +5,11 @@ import type { DashboardPageQuery } from './__generated__/DashboardPageQuery.grap
 export const dashboardQuery = graphql`
   query DashboardPageQuery {
     viewer {
+      canEdit
+      user { id }
       tenant { name nameLocal }
       portfolio {
+        ...NeedsAttention_portfolio
         ...PortfolioFigures_portfolio
         ...ExpiryProfile_portfolio
         ...RentMix_portfolio

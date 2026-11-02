@@ -23,7 +23,8 @@ export function RecentActivity({ portfolio: ref }: { portfolio: RecentActivity_p
     `,
     ref,
   );
-  const t = useTheme().tokens;
+  const theme = useTheme();
+  const t = theme.tokens;
   const f = useFormat();
   const today = Date.parse(new Date().toISOString().slice(0, 10));
 
@@ -40,11 +41,14 @@ export function RecentActivity({ portfolio: ref }: { portfolio: RecentActivity_p
                 {i < p.recentActivity.length - 1 && (
                   <Box aria-hidden sx={{ position: 'absolute', insetInlineStart: 15.5, top: 34, bottom: 2, width: '1px', backgroundColor: t.rule }} />
                 )}
-                {a.actor ? <Initials text={a.actor.initials} /> : <Box aria-hidden sx={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: t.sunken }} />}
+                {/* Events Tenuro records itself (indexation, holding over, expiry) carry its mark, not a person's initials. */}
+                {a.actor ? <Initials text={a.actor.initials} /> : (
+                  <Box aria-hidden sx={{ width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center', backgroundColor: t.ink, color: t.paper, fontFamily: theme.typography.h1.fontFamily, fontSize: '1rem', fontWeight: 600 }}>T</Box>
+                )}
                 <Box sx={{ minWidth: 0, pt: 0.25 }}>
                   <Box sx={{ fontSize: '0.875rem', lineHeight: 1.45 }}>{a.summary}</Box>
                   <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mt: 0.5, display: 'flex', flexWrap: 'wrap', columnGap: 2 }}>
-                    {a.actor && <span>{a.actor.displayName}</span>}
+                    <span>{a.actor ? a.actor.displayName : <FormattedMessage id="dashboard.activity.system" />}</span>
                     {a.lease && (
                       <Box
                         component={RouterLink}

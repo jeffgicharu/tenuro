@@ -65,7 +65,7 @@ const Secondary = ({ children }: { children: React.ReactNode }) => {
 function Ellipsis({ children }: { children: string }) {
   const [clipped, setClipped] = useState(false);
   return (
-    <Tooltip title={clipped ? children : ''} placement="top-start" enterDelay={300} disableInteractive>
+    <Tooltip title={clipped ? children : ''} placement="top-start" enterDelay={300} disableInteractive describeChild>
       <Box
         component="span"
         onMouseEnter={(e: React.MouseEvent<HTMLElement>) => setClipped(e.currentTarget.scrollWidth > e.currentTarget.clientWidth)}

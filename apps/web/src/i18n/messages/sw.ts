@@ -142,6 +142,7 @@ export const sw: Catalogue = {
   'common.close': 'Funga',
   'common.save': 'Hifadhi',
   'common.retry': 'Jaribu tena',
+  'common.undo': 'Tendua',
   'common.reload': 'Pakia upya',
   'common.back': 'Nyuma',
   'common.next': 'Endelea',
