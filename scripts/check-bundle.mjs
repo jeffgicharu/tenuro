@@ -31,6 +31,10 @@ const sizeOf = (keys) => {
 const entryKey = Object.keys(manifest).find((k) => manifest[k].isEntry);
 const initial = closure(entryKey);
 const initialKb = sizeOf(initial) / 1024;
+console.log('first page is made of:');
+for (const k of [...initial].sort((a, b) => sizeOf([b]) - sizeOf([a]))) {
+  console.log(`  ${(sizeOf([k]) / 1024).toFixed(1).padStart(7)} KB  ${manifest[k].file}`);
+}
 const rows = [['first page (entry and its static imports)', initialKb, BUDGET_INITIAL_KB]];
 
 const routes = new Set(Object.values(manifest).flatMap((e) => e.dynamicImports ?? []));
