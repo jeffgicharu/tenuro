@@ -7,7 +7,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import { useTheme } from '@mui/material/styles';
-import { Download, FileText, Image as ImageIcon, X } from 'lucide-react';
+import { Download, ExternalLink, FileText, Image as ImageIcon, X } from 'lucide-react';
 import type { LeaseDocuments_lease$data, LeaseDocuments_lease$key } from './__generated__/LeaseDocuments_lease.graphql';
 import type { LeaseDocumentsPaginationQuery } from './__generated__/LeaseDocumentsPaginationQuery.graphql';
 import { EmptyNote } from '../../components/DefinitionList.tsx';
@@ -50,7 +50,8 @@ export function LeaseDocuments({ lease: ref }: { lease: LeaseDocuments_lease$key
         {docs.map((d) => {
           const isImage = d.mimeType.startsWith('image/');
           const Icon = isImage ? ImageIcon : FileText;
-          const previewable = isImage;
+          // Images and the documents rendered from the lease (agreement as HTML, plan as SVG) preview here.
+          const previewable = isImage || d.mimeType === 'text/html';
           const body = (
             <>
               <Box sx={{ width: 36, height: 44, borderRadius: 0.75, border: `1px solid ${t.rule}`, backgroundColor: t.sunken, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
@@ -77,7 +78,7 @@ export function LeaseDocuments({ lease: ref }: { lease: LeaseDocuments_lease$key
               {previewable ? (
                 <ButtonBase
                   onClick={() => setOpen(d)}
-                  aria-label={intl.formatMessage({ id: 'lease.documents.open' }, { title: d.title })}
+                  // Named by its visible text (title, kind, size, date), as WCAG 2.5.3 asks.
                   sx={{ width: '100%', display: 'flex', gap: 4, py: 3, px: 2, borderRadius: 1, '&:hover': { backgroundColor: t.brandTint }, '&.Mui-focusVisible': { outline: `2px solid ${t.focus}` } }}
                 >
                   {body}
@@ -98,18 +99,24 @@ export function LeaseDocuments({ lease: ref }: { lease: LeaseDocuments_lease$key
         anchor={theme.direction === 'rtl' ? 'left' : 'right'}
         open={open !== null}
         onClose={() => setOpen(null)}
-        slotProps={{ paper: { sx: { width: { xs: '100%', md: 640 } } } }}
+        slotProps={{ paper: { sx: { width: { xs: '100%', md: 760 } } } }}
       >
         {open && (
           <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 5, py: 3, borderBottom: `1px solid ${t.rule}` }}>
               <Box component="h2" sx={{ ...theme.typography.h4, m: 0, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{open.title}</Box>
+              <IconButton component="a" href={open.url} target="_blank" rel="noopener" aria-label={intl.formatMessage({ id: 'lease.documents.openTab' })}><ExternalLink size={18} /></IconButton>
               <IconButton component="a" href={`${open.url}?download=1`} aria-label={intl.formatMessage({ id: 'lease.documents.download' })}><Download size={18} /></IconButton>
               <IconButton onClick={() => setOpen(null)} aria-label={intl.formatMessage({ id: 'common.close' })}><X size={18} /></IconButton>
             </Box>
-            <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: t.sunken, p: 5, display: 'grid', placeItems: 'center' }}>
-              <Box component="img" src={open.url} alt={open.title} sx={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 1, boxShadow: '0 8px 24px -12px rgba(0,0,0,0.4)' }} />
-            </Box>
+            {open.mimeType === 'text/html' ? (
+              // The rendered agreement in a sandboxed frame (the server also serves it with a sandbox CSP).
+              <Box component="iframe" src={open.url} title={open.title} sandbox="" sx={{ flex: 1, width: '100%', border: 0, backgroundColor: t.sunken }} />
+            ) : (
+              <Box sx={{ flex: 1, overflow: 'auto', backgroundColor: t.sunken, p: 5, display: 'grid', placeItems: 'center' }}>
+                <Box component="img" src={open.url} alt={open.title} sx={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 1, backgroundColor: '#fffdf8', boxShadow: '0 8px 24px -12px rgba(0,0,0,0.4)' }} />
+              </Box>
+            )}
           </Box>
         )}
       </Drawer>

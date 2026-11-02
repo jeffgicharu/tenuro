@@ -608,3 +608,29 @@ describe('portfolio accounting', () => {
     expect(Math.abs((await liability(other)) - before)).toBeLessThan(0.01);
   });
 });
+
+describe('rendered documents', () => {
+  it('renders the lease agreement as sandboxed HTML and the plan as SVG, for the signed-in company only', async () => {
+    const v = new Visitor(app, '198.51.100.70');
+    await v.signIn('sunbula', 'VIEWER');
+    const lease = await firstLease(v);
+    const docs = await v.gql<{ node: { reference: string; documents: { edges: { node: { id: string; url: string; mimeType: string; generated: boolean } }[] } } }>(
+      'query($id: ID!) { node(id: $id) { ... on Lease { reference documents(first: 10) { edges { node { id url mimeType generated } } } } } }', { id: lease.id });
+    const all = docs.data!.node.documents.edges.map((e) => e.node);
+    const agreement = all.find((d) => d.mimeType === 'text/html')!;
+    const plan = all.find((d) => d.mimeType === 'image/svg+xml')!;
+    const html = await fetch(`${app.url}${agreement.url}`, { headers: { cookie: v.cookie } });
+    expect(html.status).toBe(200);
+    expect(html.headers.get('content-security-policy')).toMatch(/^sandbox/);
+    const body = await html.text();
+    expect(body).toContain(lease.reference);
+    expect(body).toContain('dir="rtl"');
+    expect(body).not.toContain('<script');
+    const svg = await fetch(`${app.url}${plan.url}`, { headers: { cookie: v.cookie } });
+    expect(svg.headers.get('content-type')).toContain('image/svg+xml');
+    expect(await svg.text()).toContain('m²');
+    const other = new Visitor(app, '198.51.100.71');
+    await other.signIn('mbuyu-court', 'VIEWER');
+    expect((await fetch(`${app.url}${agreement.url}`, { headers: { cookie: other.cookie } })).status).toBe(404);
+  });
+});

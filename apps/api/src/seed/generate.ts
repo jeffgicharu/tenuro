@@ -444,20 +444,21 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
         // Documents
         out.document.push({
           id: stableId('doc', leaseId, 'lease'), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, kind: 'LEASE',
-          title: t.region === 'GULF' ? 'عقد الإيجار الموقع' : 'Signed lease agreement',
-          filename: `${lesseeRow.reference}-lease.pdf`, mime_type: 'application/pdf', size_bytes: r.int(180_000, 420_000),
+          title: t.region === 'GULF' ? 'عقد الإيجار' : 'Lease agreement',
+          filename: `${lesseeRow.reference}-lease.html`, mime_type: 'text/html', size_bytes: r.int(9_000, 14_000),
           page_count: null, template: 'lease-agreement', content: null, uploaded_by: listedAdmin.id, created_at: ts(commencement, 10),
         });
         if (steps.length && r.chance(0.6)) out.document.push({
           id: stableId('doc', leaseId, 'memo'), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, kind: 'AMENDMENT',
           title: t.region === 'GULF' ? 'مذكرة مراجعة الإيجار' : 'Rent review memorandum',
-          filename: `${lesseeRow.reference}-rent-review.pdf`, mime_type: 'application/pdf', size_bytes: r.int(60_000, 140_000),
+          filename: `${lesseeRow.reference}-rent-review.html`, mime_type: 'text/html', size_bytes: r.int(4_000, 6_000),
           page_count: null, template: 'rent-review-memo', content: null, uploaded_by: owner, created_at: ts(steps.at(-1)!.startsOn, 11),
         });
-        if (r.chance(0.4)) out.document.push({
+        // Every lease has its demise plan attached.
+        out.document.push({
           id: stableId('doc', leaseId, 'plan'), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, kind: 'FLOOR_PLAN',
           title: t.region === 'GULF' ? 'مخطط المساحة المؤجرة' : 'Demise plan',
-          filename: `${lesseeRow.reference}-plan.pdf`, mime_type: 'application/pdf', size_bytes: r.int(90_000, 260_000),
+          filename: `${lesseeRow.reference}-plan.svg`, mime_type: 'image/svg+xml', size_bytes: r.int(2_000, 3_000),
           page_count: 1, template: 'floor-plan', content: null, uploaded_by: owner, created_at: ts(commencement, 12),
         });
         if (r.chance(0.3)) out.document.push({

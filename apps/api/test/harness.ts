@@ -60,7 +60,7 @@ export async function startApp(): Promise<TestApp> {
 let ipCounter = 0;
 
 export class Visitor {
-  private cookie = '';
+  cookie = '';
   private readonly app: TestApp;
   readonly ip: string;
 

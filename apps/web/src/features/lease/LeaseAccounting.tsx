@@ -142,7 +142,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
 
       {chart && (
         <Box component="section" aria-labelledby="acc-chart">
-          <Box component="h3" id="acc-chart" sx={{ ...theme.typography.h3, m: 0, mb: 1 }}><FormattedMessage id="lease.accounting.chartTitle" /></Box>
+          <Box component="h2" id="acc-chart" sx={{ ...theme.typography.h3, m: 0, mb: 1 }}><FormattedMessage id="lease.accounting.chartTitle" /></Box>
           <Box sx={{ display: 'flex', gap: 4, fontSize: '0.75rem', color: t.inkSecondary, mb: 2 }}>
             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 14, height: 3, backgroundColor: t.brand }} /><FormattedMessage id="lease.accounting.liability" /></Box>
             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 14, height: 0, borderTop: `2px dashed ${t.accent}` }} /><FormattedMessage id="lease.accounting.rou" /></Box>
@@ -192,7 +192,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
 
       <Box sx={{ display: 'grid', gap: 6, gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1fr)' } }}>
         <Box component="section" aria-labelledby="acc-maturity">
-          <Box component="h3" id="acc-maturity" sx={{ ...theme.typography.h3, m: 0, mb: 1 }}><FormattedMessage id="lease.accounting.maturityTitle" /></Box>
+          <Box component="h2" id="acc-maturity" sx={{ ...theme.typography.h3, m: 0, mb: 1 }}><FormattedMessage id="lease.accounting.maturityTitle" /></Box>
           <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mb: 2 }}><FormattedMessage id="lease.accounting.maturityLede" /></Box>
           <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
@@ -206,7 +206,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
           </Box>
         </Box>
         <Box component="section" aria-labelledby="acc-remeasure">
-          <Box component="h3" id="acc-remeasure" sx={{ ...theme.typography.h3, m: 0, mb: 1 }}><FormattedMessage id="lease.accounting.remeasureTitle" /></Box>
+          <Box component="h2" id="acc-remeasure" sx={{ ...theme.typography.h3, m: 0, mb: 1 }}><FormattedMessage id="lease.accounting.remeasureTitle" /></Box>
           <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mb: 2 }}><FormattedMessage id="lease.accounting.remeasureLede" /></Box>
           {a.remeasurements.length === 0 ? (
             <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary }}><FormattedMessage id="lease.accounting.noRemeasure" /></Box>
@@ -233,11 +233,11 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
 
       <Box component="section" aria-labelledby="acc-schedule">
         <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 3, mb: 2 }}>
-          <Box component="h3" id="acc-schedule" sx={{ ...theme.typography.h3, m: 0, flex: 1 }}><FormattedMessage id="lease.accounting.scheduleTitle" /></Box>
+          <Box component="h2" id="acc-schedule" sx={{ ...theme.typography.h3, m: 0, flex: 1 }}><FormattedMessage id="lease.accounting.scheduleTitle" /></Box>
           <Button size="small" onClick={() => setShowAll((v) => !v)}><FormattedMessage id={showAll ? 'lease.accounting.showUpcoming' : 'lease.accounting.showAll'} values={{ count: a.schedule.length }} /></Button>
           <Button size="small" variant="outlined" startIcon={<Download size={14} aria-hidden />} onClick={exportSchedule}><FormattedMessage id="lease.accounting.exportCsv" /></Button>
         </Box>
-        <Box tabIndex={0} role="region" aria-labelledby="acc-schedule" sx={{ overflow: 'auto', maxHeight: 480, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, '&:focus-visible': { outline: `2px solid ${t.focus}` } }}>
+        <Box tabIndex={0} role="region" aria-label={intl.formatMessage({ id: 'lease.accounting.scheduleTable' })} sx={{ overflow: 'auto', maxHeight: 480, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, '&:focus-visible': { outline: `2px solid ${t.focus}` } }}>
           <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -269,7 +269,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
 
       <Box component="section" aria-labelledby="acc-journals">
         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3, mb: 1 }}>
-          <Box component="h3" id="acc-journals" sx={{ ...theme.typography.h3, m: 0, flex: 1 }}><FormattedMessage id="lease.accounting.journalsTitle" values={{ year: a.thisYear.year }} /></Box>
+          <Box component="h2" id="acc-journals" sx={{ ...theme.typography.h3, m: 0, flex: 1 }}><FormattedMessage id="lease.accounting.journalsTitle" values={{ year: a.thisYear.year }} /></Box>
           <Button size="small" variant="outlined" startIcon={<Download size={14} aria-hidden />} onClick={exportJournals} disabled={a.journals.length === 0}><FormattedMessage id="lease.accounting.exportJournals" /></Button>
         </Box>
         <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mb: 3 }}><FormattedMessage id="lease.accounting.journalsLede" /></Box>

@@ -262,6 +262,10 @@ type Document implements Node {
   generated: Boolean!
   id: ID!
   kind: DocumentKind!
+
+  """
+  Rendered documents are served as HTML (the agreement) or SVG (the plan).
+  """
   mimeType: String!
   pageCount: Int
   sizeBytes: Int!

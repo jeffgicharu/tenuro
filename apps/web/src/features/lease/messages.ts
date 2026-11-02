@@ -82,6 +82,7 @@ export const leaseEn = {
   "lease.accounting.journal.REMEASUREMENT": "Remeasurement",
   "lease.accounting.noJournals": "No journals fall in this year.",
   "lease.accounting.exportJournals": "Export journals",
+  "lease.accounting.scheduleTable": "Period schedule table, scrollable",
   "lease.accounting.journalsLede": "Totals by account for each month; open a month for its entries",
   "lease.accounting.col.month": "Month",
   "lease.accounting.col.account": "Account",
@@ -171,6 +172,7 @@ export const leaseEn = {
   'lease.documents.uploadedBy': 'Added by {name}',
   'lease.documents.open': 'Open {title}',
   'lease.documents.download': 'Download',
+  'lease.documents.openTab': 'Open in a new tab to print or save as PDF',
 
   'lease.tasks.none': 'No open tasks for this lease.',
   'lease.tasks.showDone': 'Show completed tasks',
@@ -288,6 +290,7 @@ export const leaseAr: Record<LeaseKey, string> = {
   "lease.accounting.journal.REMEASUREMENT": "إعادة القياس",
   "lease.accounting.noJournals": "لا قيود في هذه السنة.",
   "lease.accounting.exportJournals": "تصدير القيود",
+  "lease.accounting.scheduleTable": "جدول الفترات، قابل للتمرير",
   "lease.accounting.journalsLede": "المجاميع حسب الحساب لكل شهر؛ افتح الشهر لعرض قيوده",
   "lease.accounting.col.month": "الشهر",
   "lease.accounting.col.account": "الحساب",
@@ -377,6 +380,7 @@ export const leaseAr: Record<LeaseKey, string> = {
   'lease.documents.uploadedBy': 'أضافه {name}',
   'lease.documents.open': 'فتح {title}',
   'lease.documents.download': 'تنزيل',
+  'lease.documents.openTab': 'فتح في علامة تبويب جديدة للطباعة أو الحفظ بصيغة PDF',
 
   'lease.tasks.none': 'لا توجد مهام مفتوحة لهذا العقد.',
   'lease.tasks.showDone': 'عرض المهام المنجزة',
@@ -492,6 +496,7 @@ export const leaseSw: Record<LeaseKey, string> = {
   "lease.accounting.journal.REMEASUREMENT": "Upimaji upya",
   "lease.accounting.noJournals": "Hakuna maingizo katika mwaka huu.",
   "lease.accounting.exportJournals": "Hamisha maingizo",
+  "lease.accounting.scheduleTable": "Jedwali la ratiba ya vipindi, linasogezwa",
   "lease.accounting.journalsLede": "Jumla kwa akaunti kwa kila mwezi; fungua mwezi kuona maingizo yake",
   "lease.accounting.col.month": "Mwezi",
   "lease.accounting.col.account": "Akaunti",
@@ -581,6 +586,7 @@ export const leaseSw: Record<LeaseKey, string> = {
   'lease.documents.uploadedBy': 'Imeongezwa na {name}',
   'lease.documents.open': 'Fungua {title}',
   'lease.documents.download': 'Pakua',
+  'lease.documents.openTab': 'Fungua kwenye kichupo kipya ili kuchapisha au kuhifadhi kama PDF',
 
   'lease.tasks.none': 'Hakuna kazi zilizo wazi kwa mkataba huu.',
   'lease.tasks.showDone': 'Onyesha kazi zilizokamilika',

@@ -34,6 +34,8 @@ export async function signIn(page: Page, company: Company, role: Role, then: str
 
 // WCAG 2.1 A and AA rules across the whole page; failures name each offending element.
 export async function expectAccessible(page: Page, label: string) {
+  // Not for pages showing a sandboxed document frame: axe cannot inject into a frame that allows no
+  // scripts and waits for it. The documents journey checks the tab before opening a preview.
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   const summary = results.violations.flatMap((v) =>
     v.nodes.map((n) => `${v.id} (${v.impact}): ${n.target.join(' ')} — ${n.failureSummary?.split('\n')[1]?.trim() ?? v.help}`));

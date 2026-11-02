@@ -170,3 +170,30 @@ test.describe('reports', () => {
     expect(problems).toEqual([]);
   });
 });
+
+test.describe('documents', () => {
+  test('the lease agreement and demise plan preview from the lease page', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', '/leases?status=ACTIVE');
+    await page.getByRole('grid').getByRole('row').nth(1).getByRole('link').first().click();
+    await page.getByRole('tab', { name: 'Documents' }).click();
+    await expect(page.getByRole('button', { name: /^Lease agreement/ })).toBeVisible();
+    await expectAccessible(page, 'lease documents');
+    await page.getByRole('button', { name: /^Lease agreement/ }).click();
+    // The frame allows no scripts, so its content is checked over HTTP rather than by reaching into it
+    // (Playwright's own injected script would be blocked and logged).
+    const src = await page.locator('iframe[title="Lease agreement"]').getAttribute('src');
+    const doc = await page.request.get(src!);
+    expect(doc.headers()['content-security-policy']).toMatch(/^sandbox/);
+    expect(await doc.text()).toMatch(/<h1>Lease agreement<\/h1>/);
+    await expect(page.getByRole('link', { name: /Open in a new tab/ })).toHaveAttribute('href', /\/api\/documents\//);
+    await expect(page.locator('iframe[title="Lease agreement"]')).toHaveAttribute('sandbox', '');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: /^Demise plan/ }).click();
+    await expect(page.getByRole('img', { name: 'Demise plan' })).toBeVisible();
+    // Chrome reports the sandbox refusing Playwright's own injected script in the document frame; that refusal
+    // is the sandbox doing its job (the documents themselves carry no scripts), so only that one message is set aside.
+    const sandboxNotice = /^console: Blocked script execution in '[^']*\/api\/documents\/[^']+' because the document's frame is sandboxed/;
+    expect(problems.filter((p) => !sandboxNotice.test(p))).toEqual([]);
+  });
+});
