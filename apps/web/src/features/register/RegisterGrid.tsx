@@ -174,7 +174,7 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
           ? <FormattedMessage id="register.showing" values={{ shown: rows.length, total }} />
           : <FormattedMessage id="register.rows" values={{ from: page * PAGE + 1, to: Math.min((page + 1) * PAGE, total), total }} />}
         {(isLoadingNext || isPending) && (
-          <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+          <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
             <FormattedMessage id={isPending ? 'register.updating' : 'register.loadingMore'} />
           </Box>
         )}

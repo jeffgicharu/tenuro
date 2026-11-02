@@ -445,7 +445,10 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }]));
         if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.holding, owner, [{ field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' }]);
         if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.expired, owner, [{ field: 'status', from: 'ACTIVE', to: 'EXPIRED' }]);
-        if (status === 'TERMINATED') act('terminated', minIso(addMonths(commencement, r.int(12, 40)), today), 'STATUS_CHANGED', tx.activity.terminated, listedAdmin.id, [{ field: 'status', from: 'ACTIVE', to: 'TERMINATED' }]);
+        // Terminated some time between commencement and today (not clamped to today, which piled
+        // every recent termination onto the day of the rebuild).
+        const terminatedOn = addMonths(commencement, r.int(12, 40));
+        if (status === 'TERMINATED') act('terminated', terminatedOn < today ? terminatedOn : addDays(commencement, r.int(1, Math.max(1, daysBetween(commencement, today) - 1))), 'STATUS_CHANGED', tx.activity.terminated, listedAdmin.id, [{ field: 'status', from: 'ACTIVE', to: 'TERMINATED' }]);
 
         tenantLeases.push({ id: leaseId, reference: lesseeRow.reference, property_name: lesseeRow.property_name, city: lesseeRow.city });
         for (const k of keyDates) {

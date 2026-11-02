@@ -11,3 +11,16 @@ test('on a phone the register is a card list and the page never scrolls sideways
   await expectAccessible(page, 'register on a phone');
   expect(problems).toEqual([]);
 });
+
+// Regression: visually hidden labels used `width: 1`, which MUI reads as 100%, so each expiry bar's
+// label stretched the overview 319 px past a phone's edge.
+test('on a phone the portfolio overview never scrolls sideways', async ({ page }) => {
+  const problems = watchPage(page);
+  await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', null);
+  await expect(page.getByRole('heading', { level: 1, name: 'Portfolio' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Critical dates' })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, 'horizontal overflow in px').toBeLessThanOrEqual(0);
+  await expectAccessible(page, 'overview on a phone');
+  expect(problems).toEqual([]);
+});

@@ -112,7 +112,7 @@ function Figure({ label, value, detail, tone, to, lead }: {
   };
   if (!to) return <Box component="li" sx={frame}>{body}</Box>;
   return (
-    <Box component="li" sx={{ ...frame, p: 0 }}>
+    <Box component="li" sx={{ ...frame, py: 0, px: 0 }}>
       <Box
         component={RouterLink}
         to={to}

@@ -50,7 +50,7 @@ export function ExpiryProfile({ portfolio: ref }: { portfolio: ExpiryProfile_por
                 }}
               >
                 {/* The link's name is this sentence; the drawn figures below are hidden from assistive technology. */}
-                <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+                <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
                   {intl.formatMessage({ id: 'dashboard.expiry.bar' }, {
                     year: label, rent: f.money(b.passingRent.amount, b.passingRent.currency, { compact: true }), count: b.leases,
                   })}

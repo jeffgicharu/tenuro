@@ -109,7 +109,7 @@ export function FormStepper({ items, current, onSelect, label, compact }: FormSt
                   <Box sx={{ fontSize: '0.75rem', color: hasIssues ? t.danger : t.inkTertiary, mt: 0.25 }}>
                     {hasIssues || done ? status(item) : item.hint}
                   </Box>
-                  <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+                  <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
                     {!hasIssues && !done ? `, ${status(item)}` : ''}
                   </Box>
                 </Box>

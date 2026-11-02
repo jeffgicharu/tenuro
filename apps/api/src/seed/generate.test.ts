@@ -46,4 +46,13 @@ describe('seed realism', () => {
     expect(median(perSqmMonth)).toBeGreaterThan(6);
     expect(median(perSqmMonth)).toBeLessThan(20);
   });
+
+  // Terminations were clamped to the rebuild day, so recent activity read "terminated, today" seven times over.
+  it('spreads recent activity across past days instead of piling it on the rebuild day', () => {
+    const today = '2026-11-02';
+    const past = data.activity.filter((a) => String(a.created_at).slice(0, 10) <= today);
+    const onToday = past.filter((a) => String(a.created_at).startsWith(today)).length;
+    expect(past.length).toBeGreaterThan(100);
+    expect(onToday / past.length).toBeLessThan(0.02);
+  });
 });

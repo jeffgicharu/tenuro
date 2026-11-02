@@ -83,6 +83,12 @@ test.describe('main journeys', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', /^ar/);
     await expect(page.getByRole('heading', { level: 1, name: 'عقود الإيجار' })).toBeVisible();
     await expectAccessible(page, 'register in Arabic');
+    // The overview, right to left: nothing pushes the page sideways (hidden labels once did).
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1, name: 'المحفظة' })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, 'overview overflow in Arabic').toBeLessThanOrEqual(0);
+    await expectAccessible(page, 'overview in Arabic');
     expect(problems).toEqual([]);
   });
 

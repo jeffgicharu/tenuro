@@ -79,14 +79,14 @@ export function CriticalDates({ portfolio: ref }: { portfolio: CriticalDates_por
                     <Box sx={{ fontSize: '0.875rem', fontWeight: 600 }}><FormattedMessage id={`keyDate.${k.kind}`} /></Box>
                     <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <Box component="span" sx={{ fontFamily: FONT_MONO, fontSize: '0.75rem', direction: 'ltr', unicodeBidi: 'isolate' }}>{k.lease.reference}</Box>
-                      {' · '}{k.lease.propertyName}{k.lease.city ? `, ${k.lease.city}` : ''}
+                      {' · '}{k.lease.propertyName}{k.lease.city ? ` · ${k.lease.city}` : ''}
                     </Box>
                   </Box>
                   <Box sx={{ textAlign: 'end' }}>
                     <Box data-num sx={{ fontSize: '0.8125rem', fontWeight: 600, color: tone, whiteSpace: 'nowrap' }}>
                       {overdue ? <FormattedMessage id="dashboard.dates.overdue" /> : f.relativeDays(k.daysUntil)}
                     </Box>
-                    <Box sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{f.date(k.dueOn, 'long')}</Box>
+                    <Box sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{f.date(k.dueOn, 'long')}</Box>
                   </Box>
                 </Box>
               </Box>
@@ -110,7 +110,7 @@ function WeekStrip({ weeks }: { weeks: readonly { start: string; count: number }
       <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))`, gap: '3px', alignItems: 'end', height: 56 }}>
         {weeks.map((w, i) => (
           <Box component="li" key={w.start} sx={{ height: '100%', display: 'flex', alignItems: 'flex-end', position: 'relative' }}>
-            <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+            <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
               {intl.formatMessage({ id: 'dashboard.dates.week' }, { date: f.date(w.start), count: w.count })}
             </Box>
             <Box
