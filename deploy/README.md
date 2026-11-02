@@ -1,6 +1,6 @@
 # Tenuro server install guide
 
-Everything Tenuro needs on the shared host (Ubuntu 22.04). It runs as two app
+Everything Tenuro needs on the shared host (Ubuntu 22.04; its address is kept out of the repository, and CI reads it from the `TENURO_DEPLOY_HOST` secret). It runs as two app
 slots behind nginx, with nightly jobs for the data reset, backups and a weekly restore
 test. The files under `deploy/server/` mirror their target paths. `deploy/install.sh`
 installs them, and running it again is safe.
@@ -40,9 +40,9 @@ sudo deploy/install.sh --upload-key tenuro-upload.pub --activate-key tenuro-acti
 
 # 3. Read the host key on the server itself (not over the network) for the CI secret
 #    TENURO_KNOWN_HOSTS, and send the line to Website-7:
-awk -v host="$TENURO_DEPLOY_HOST" '{print host, $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub
+awk -v host="$SERVER_ADDRESS" '{print host, $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub
 
-# 4. DNS: tenuro.jeffgicharu.com, A record to the origin server, proxied. Add it to the zone rule
+# 4. DNS: tenuro.jeffgicharu.com, A record to the server's address, proxied. Add it to the zone rule
 #    that turns off Web Analytics injection, because the app's nonce-based CSP blocks the
 #    injected script and we won't weaken the CSP for it.
 ```

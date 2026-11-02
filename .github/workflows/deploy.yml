@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEPLOY_HOST: ${{ secrets.TENURO_DEPLOY_HOST }}
   DEPLOY_USER: tenuro-ci
 
 jobs:
@@ -76,6 +75,9 @@ jobs:
     environment:
       name: production
       url: https://tenuro.jeffgicharu.com
+    env:
+      # The origin's address stays out of the repository: the site is reached only through Cloudflare.
+      DEPLOY_HOST: ${{ secrets.TENURO_DEPLOY_HOST }}
     steps:
       - name: Choose the release
         id: rel
@@ -111,6 +113,7 @@ jobs:
           printf '%s\n' "$UPLOAD_KEY" >"$HOME/.ssh/tenuro_upload"
           printf '%s\n' "$ACTIVATE_KEY" >"$HOME/.ssh/tenuro_activate"
           printf '%s\n' "$KNOWN_HOSTS" >"$HOME/.ssh/tenuro_known_hosts"
+          [ -n "$DEPLOY_HOST" ] || { echo "The TENURO_DEPLOY_HOST secret is not set" >&2; exit 1; }
           grep -q "^$DEPLOY_HOST " "$HOME/.ssh/tenuro_known_hosts" || { echo "TENURO_KNOWN_HOSTS has no entry for $DEPLOY_HOST" >&2; exit 1; }
 
       - name: Upload (write-only rrsync into incoming/)
