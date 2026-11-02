@@ -1,8 +1,7 @@
 import { sql } from 'kysely';
 import type { Db } from '../db/client.ts';
 import type { Database } from '../db/types.ts';
-import { generate, type SeedData, type SeedOptions } from './generate.ts';
-import { TENANTS } from './tenants.ts';
+import { generateBatches, type SeedData, type SeedOptions } from './generate.ts';
 
 const DELETE_ORDER: (keyof Database)[] = [
   'sandbox', 'session', 'notification', 'activity', 'document', 'task', 'key_date', 'lease_draft', 'lease_modification',
@@ -21,8 +20,8 @@ export interface RebuildReport {
 }
 
 // Replaces all base data in one transaction, so readers see the old portfolio until the commit and
-// never a half-built one. Visitor sandboxes and sessions go with it. Companies are built and
-// written one at a time to keep peak memory low on the shared server. Runs as the owner role,
+// never a half-built one. Visitor sandboxes and sessions go with it. Data is built and
+// written in batches of a few hundred leases to keep peak memory low on the shared server. Runs as the owner role,
 // which row-level security does not apply to.
 export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Promise<RebuildReport> {
   const rows: Record<string, number> = {};
@@ -31,25 +30,33 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
   await db.transaction().execute(async (tx) => {
     await sql`SET LOCAL statement_timeout = 0`.execute(tx);
     for (const table of DELETE_ORDER) await tx.deleteFrom(table).execute();
-    const slugs = TENANTS.map((t) => t.slug).filter((s) => !opts.only || opts.only.includes(s));
-    for (const [i, slug] of slugs.entries()) {
+    const batches = generateBatches(opts, 200);
+    let batchCount = 0;
+    for (;;) {
       const g0 = performance.now();
-      const data = generate({ ...opts, only: [slug] });
+      const next = batches.next();
       generateMs += performance.now() - g0;
-      if (i > 0) data.fx_rate = [];
+      if (next.done) break;
+      const data = next.value;
       for (const table of INSERT_ORDER) {
         const list = data[table] as Record<string, unknown>[];
         rows[table] = (rows[table] ?? 0) + list.length;
         if (!list.length) continue;
+        // Small statements keep the SQL text and parameter arrays small as well.
         const columns = Object.keys(list[0]!).length;
-        const chunk = Math.max(1, Math.floor(60_000 / columns));
+        const chunk = Math.max(1, Math.floor(4_000 / columns));
         for (let j = 0; j < list.length; j += chunk) {
           await tx.insertInto(table).values(list.slice(j, j + chunk) as never).execute();
         }
-        (data[table] as unknown[]).length = 0;
+        list.length = 0;
       }
-      log(`  ${slug} written`);
+      batchCount += 1;
+      if (process.env.SEED_DEBUG && batchCount % 5 === 0) {
+        const m = process.memoryUsage();
+        log(`  batch ${batchCount}: heap ${Math.round(m.heapUsed / 1048576)}/${Math.round(m.heapTotal / 1048576)} MB, rss ${Math.round(m.rss / 1048576)} MB`);
+      }
     }
+    log(`  ${batchCount} batches written`);
   });
   await sql`ANALYZE`.execute(db);
   return { rows, generateMs, writeMs: performance.now() - t0 - generateMs };

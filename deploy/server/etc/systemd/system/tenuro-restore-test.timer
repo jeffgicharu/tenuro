@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Tenuro restore test
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 Africa/Nairobi
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target
