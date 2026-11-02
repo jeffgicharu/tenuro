@@ -52,7 +52,19 @@ export default function PortfolioMap({ portfolio: ref }: { portfolio: PortfolioM
   const href = (city: string) => `/leases?city=${encodeURIComponent(city)}&status=ACTIVE&status=HOLDING_OVER`;
   // Smaller bubbles drawn last, so they stay clickable on top of large ones.
   const drawn = [...p.rentByCity].sort((a, b) => Number(b.rent.share) - Number(a.rent.share));
-  const labelled = new Set(drawn.slice(0, 5).map((c) => c.city));
+  // Up to five labels, largest city first, skipping any that would collide with one already placed
+  // (Dubai, Sharjah and Abu Dhabi sit within a few millimetres of each other at this scale).
+  const labelled = new Set<string>();
+  const placed: { x: number; y: number; w: number }[] = [];
+  for (const c of drawn) {
+    if (labelled.size >= 5) break;
+    const lx = x(Number(c.longitude));
+    const ly = y(Number(c.latitude)) - radius(Number(c.rent.share)) - 8;
+    const lw = c.city.length * font * 0.6;
+    if (placed.some((q) => Math.abs(q.x - lx) < (q.w + lw) / 2 + font * 0.4 && Math.abs(q.y - ly) < font * 1.3)) continue;
+    placed.push({ x: lx, y: ly, w: lw });
+    labelled.add(c.city);
+  }
 
   return (
     <Panel title={<FormattedMessage id="dashboard.map.title" />} lede={<FormattedMessage id="dashboard.map.lede" />}>
@@ -75,8 +87,8 @@ export default function PortfolioMap({ portfolio: ref }: { portfolio: PortfolioM
             <path
               key={`${c.code}-${i}`}
               d={c.d}
-              fill={own.has(c.code) ? t.brandSoft : t.paper}
-              stroke={own.has(c.code) ? t.brand : t.ruleStrong}
+              fill={own.has(c.code) ? t.brandSoft : t.sunken}
+              stroke={own.has(c.code) ? t.brand : t.rule}
               strokeWidth={own.has(c.code) ? 1.6 : 1}
               strokeLinejoin="round"
             />
