@@ -114,13 +114,13 @@ contrast in both modes. Controls show a visible focus ring, and motion respects
 | Portfolio overview | 1.6 s | 0.9 s | 4.1 s | 0.000 |
 | Lease register | 1.6–1.9 s | 0.9 s | 4.4 s | 0.000 |
 | Accounting | 1.6–1.7 s | 0.9 s | 3.8 s | 0.003 |
-| Key dates | 1.6 s | 0.9 s | 5.4 s | 0.000 |
+| Key dates | 1.6 s | 0.8 s | 4.9 s | 0.000 |
 
 On the throttled phone, about 400 KB of JavaScript crossing 1.6 Mbps and then the 4× slower CPU
 set the time. A page's data does not: a 0.1 KB script asks for the shell's and the route's data as
-the page loads (overview, register, accounting and lease pages), and the server names each route's
-code in the page it sends. Phones never download the register's data grid; they show a card list
-that starts with 20 leases. Key dates is not yet covered by the early data request.
+the page loads (overview, register, accounting, key dates and lease pages), and the server names
+each route's code in the page it sends. Phones never download the register's data grid; they show a
+card list that starts with 20 leases. The key dates calendar loads only when that view is chosen.
 
 | JavaScript, gzip | Size | Budget |
 |---|---|---|
