@@ -350,3 +350,82 @@ describe('query limits', () => {
     expect(r.errors?.[0]?.message).toMatch(/depth|complex/i);
   });
 });
+
+describe('portfolio dashboard', () => {
+  const PORTFOLIO = `{ viewer { tenant { reportingCurrency } portfolio {
+    liveLeases passingRent { amount currency } wault holdingOver expiringIn12Months keyDatesDue overdueKeyDates
+    expiryProfile { year from leases passingRent { amount } }
+    rentByCountry { countryCode rent { leases share passingRent { amount } } }
+    rentByType { propertyType rent { leases share } }
+    upcomingKeyDates(first: 5) { dueOn daysUntil lease { reference } }
+    keyDateWeeks { start count }
+    recentActivity(first: 5) { createdAt summary lease { reference } }
+  } } }`;
+  type P = {
+    viewer: { tenant: { reportingCurrency: string }; portfolio: {
+      liveLeases: number; passingRent: { amount: string; currency: string }; wault: string | null; holdingOver: number;
+      expiringIn12Months: number; keyDatesDue: number; overdueKeyDates: number;
+      expiryProfile: { year: number | null; from: number; leases: number; passingRent: { amount: string } }[];
+      rentByCountry: { countryCode: string; rent: { leases: number; share: string; passingRent: { amount: string } } }[];
+      rentByType: { propertyType: string; rent: { leases: number; share: string } }[];
+      upcomingKeyDates: { dueOn: string; daysUntil: number; lease: { reference: string } }[];
+      keyDateWeeks: { start: string; count: number }[];
+      recentActivity: { createdAt: string; summary: string; lease: { reference: string } | null }[];
+    } };
+  };
+
+  it('adds up: the profile, the country split and the register agree with the headline figures', async () => {
+    const v = new Visitor(app);
+    await v.signIn('mbuyu-court', 'VIEWER');
+    const r = await v.gql<P>(PORTFOLIO);
+    expect(r.errors).toBeUndefined();
+    const p = r.data!.viewer.portfolio;
+    expect(p.passingRent.currency).toBe(r.data!.viewer.tenant.reportingCurrency);
+    expect(p.expiryProfile).toHaveLength(6);
+    expect(p.expiryProfile.at(-1)!.year).toBeNull();
+    expect(p.expiryProfile.reduce((n, b) => n + b.leases, 0)).toBe(p.liveLeases);
+    expect(p.rentByCountry.reduce((n, c) => n + c.rent.leases, 0)).toBe(p.liveLeases);
+    expect(p.rentByType.reduce((n, c) => n + c.rent.leases, 0)).toBe(p.liveLeases);
+    const shares = p.rentByCountry.reduce((n, c) => n + Number(c.rent.share), 0);
+    expect(Math.abs(shares - 1)).toBeLessThan(0.01);
+    const register = await v.gql<{ viewer: { leases: { totalCount: number } } }>('{ viewer { leases(first: 1, filter: { status: [ACTIVE, HOLDING_OVER] }) { totalCount } } }');
+    expect(register.data!.viewer.leases.totalCount).toBe(p.liveLeases);
+    expect(Number(p.wault)).toBeGreaterThan(0);
+    // Soonest first, and never a date further out than the window.
+    const due = p.upcomingKeyDates.map((k) => k.dueOn);
+    expect(due).toEqual([...due].sort());
+    expect(p.upcomingKeyDates.every((k) => k.daysUntil <= 90)).toBe(true);
+    // The 13 weekly columns cover the same 91 days as the 90-day count.
+    expect(p.keyDateWeeks).toHaveLength(13);
+    expect(p.keyDateWeeks.reduce((n, w) => n + w.count, 0)).toBe(p.keyDatesDue);
+    // Nothing from the future shows as recent activity.
+    expect(p.recentActivity.every((a) => Date.parse(a.createdAt) <= Date.now() + 60_000)).toBe(true);
+  });
+
+  it('counts only the signed-in company', async () => {
+    const a = new Visitor(app, '198.51.100.20');
+    const b = new Visitor(app, '198.51.100.21');
+    await a.signIn('mbuyu-court', 'VIEWER');
+    await b.signIn('sunbula', 'VIEWER');
+    const [pa, pb] = await Promise.all([a.gql<P>(PORTFOLIO), b.gql<P>(PORTFOLIO)]);
+    const ca = new Set(pa.data!.viewer.portfolio.rentByCountry.map((c) => c.countryCode));
+    const cb = new Set(pb.data!.viewer.portfolio.rentByCountry.map((c) => c.countryCode));
+    expect([...ca].some((c) => cb.has(c))).toBe(false);
+  });
+
+  it('follows the person’s own changes: a rent they raise counts in their figures only', async () => {
+    const editor = new Visitor(app, '198.51.100.22');
+    const other = new Visitor(app, '198.51.100.23');
+    await editor.signIn('mbuyu-court', 'MANAGER');
+    await other.signIn('mbuyu-court', 'VIEWER');
+    const rent = async (v: Visitor) => Number((await v.gql<P>(PORTFOLIO)).data!.viewer.portfolio.passingRent.amount);
+    const before = await rent(editor);
+    const lease = await firstLease(editor);
+    const r = await editor.gql<{ amendLease: { __typename: string } }>(AMEND, {
+      input: { id: lease.id, version: lease.version, lease: toInput(lease.formData, (f) => { f.rent.rentPerPeriod = String(Number(f.rent.rentPerPeriod) * 3); f.rent.steps = []; }) },
+    });
+    expect(r.data!.amendLease.__typename).toBe('MutationAmendLeaseSuccess');
+    expect(await rent(editor)).toBeGreaterThan(before);
+    expect(await rent(other)).toBe(before);
+  });
+});

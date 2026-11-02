@@ -23,11 +23,13 @@ const SHORT_ROLE: Record<Role, string> = { 'Portfolio admin': 'Admin', 'Lease ma
 // Finds the button the way a screen-reader user meets it: the group named after the company, then
 // the role named on the button (each company's buttons are a labelled group, so "Admin" is never
 // announced without its company).
-export async function signIn(page: Page, company: Company, role: Role) {
+// Signing in lands on the portfolio overview; most journeys then go on to the register.
+export async function signIn(page: Page, company: Company, role: Role, then: string | null = '/leases') {
   await page.goto('/sign-in');
   const section = page.getByRole('group', { name: company });
   await section.getByRole('button', { name: new RegExp(`^${SHORT_ROLE[role]}\\b`) }).click();
-  await page.waitForURL('**/leases');
+  await page.waitForURL((url) => url.pathname === '/');
+  if (then) await page.goto(then);
 }
 
 // WCAG 2.1 A and AA rules across the whole page; failures name each offending element.

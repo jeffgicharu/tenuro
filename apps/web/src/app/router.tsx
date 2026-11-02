@@ -1,9 +1,10 @@
-import { createBrowserRouter, redirect } from 'react-router';
+import { createBrowserRouter } from 'react-router';
 import { Root, rootLoader } from './Root.tsx';
 import { RouteError } from '../shell/RouteError.tsx';
 import { NotFound } from '../shell/NotFound.tsx';
 import { BootShell } from '../shell/BootShell.tsx';
 import { signInLoader } from '../features/signin/loader.ts';
+import { dashboardLoader } from '../features/dashboard/loader.ts';
 import { registerLoader, registerShouldRevalidate } from '../features/register/loader.ts';
 import { leaseLoader } from '../features/lease/loader.ts';
 import { leaseFormLoader } from '../features/lease-form/loader.ts';
@@ -19,7 +20,7 @@ export const router = createBrowserRouter([
     ErrorBoundary: RouteError,
     HydrateFallback: BootShell,
     children: [
-      { index: true, loader: () => redirect('/leases') },
+      { index: true, loader: dashboardLoader, lazy: { Component: async () => (await import('../features/dashboard/DashboardPage.tsx')).DashboardPage } },
       { path: 'sign-in', loader: signInLoader, lazy: { Component: async () => (await import('../features/signin/SignInPage.tsx')).SignInPage } },
       { path: 'leases', loader: registerLoader, shouldRevalidate: registerShouldRevalidate, lazy: { Component: async () => (await import('../features/register/RegisterPage.tsx')).RegisterPage } },
       { path: 'leases/new', loader: leaseFormLoader, lazy: { Component: async () => (await import('../features/lease-form/LeaseFormPage.tsx')).LeaseFormPage } },

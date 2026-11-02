@@ -13,6 +13,21 @@ test.describe('main journeys', () => {
     expect(problems).toEqual([]);
   });
 
+  test('signing in lands on the portfolio overview, whose figures lead into the register', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', null);
+    await expect(page.getByRole('heading', { level: 1, name: 'Portfolio' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+    for (const name of ['Expiry profile', 'Rent by country', 'Critical dates', 'Recent activity']) {
+      await expect(page.getByRole('region', { name })).toBeVisible();
+    }
+    await expectAccessible(page, 'portfolio overview');
+    await page.getByRole('link', { name: /Holding over/ }).first().click();
+    await expect(page).toHaveURL(/\/leases\?status=HOLDING_OVER/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Leases' })).toBeVisible();
+    expect(problems).toEqual([]);
+  });
+
   test('a manager signs in, uses the register and opens a lease', async ({ page }) => {
     const problems = watchPage(page);
     await signIn(page, 'Mbuyu Court Holdings', 'Lease manager');

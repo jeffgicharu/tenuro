@@ -130,7 +130,7 @@ export function SignInPage() {
                 <Button size="small" variant="text" startIcon={<LogOut size={14} aria-hidden />} onClick={() => void signOut()}>
                   <FormattedMessage id="shell.signOut" />
                 </Button>
-                <Button size="small" variant="contained" href="/leases" endIcon={<ArrowRight size={14} aria-hidden style={rtl ? { transform: 'scaleX(-1)' } : undefined} />}>
+                <Button size="small" variant="contained" href="/" endIcon={<ArrowRight size={14} aria-hidden style={rtl ? { transform: 'scaleX(-1)' } : undefined} />}>
                   <FormattedMessage id="signin.continue" />
                 </Button>
               </Box>
@@ -171,7 +171,7 @@ export function SignInPage() {
                           key={a.id}
                           variant="outlined"
                           aria-current={current ? 'true' : undefined}
-                          onClick={() => (current ? window.location.assign('/leases') : void go(a))}
+                          onClick={() => (current ? window.location.assign('/') : void go(a))}
                           loading={pending === a.id}
                           disabled={pending !== null && pending !== a.id}
                           // The accessible name is the visible text (role and person), as WCAG 2.5.3 asks;

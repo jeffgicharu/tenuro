@@ -25,6 +25,7 @@ type Activity implements Node {
   """JSON list of field changes, when the activity changed fields."""
   diff: String
   id: ID!
+  lease: Lease
   summary: String!
   verb: String!
 }
@@ -49,6 +50,11 @@ enum Asc842Class {
 
 """An ISO 3166-1 alpha-2 country code."""
 scalar CountryCode
+
+type CountryRent {
+  countryCode: CountryCode!
+  rent: RentShare!
+}
 
 input CreateTaskInput {
   assigneeId: ID
@@ -198,6 +204,19 @@ enum EscalationKind {
   MARKET_REVIEW
 }
 
+"""
+Leases (active or holding over) whose expiry falls in one calendar year; the last bucket holds every later year.
+"""
+type ExpiryBucket {
+  """First year in the bucket."""
+  from: Int!
+  leases: Int!
+  passingRent: Money!
+
+  """Null for the open-ended last bucket."""
+  year: Int
+}
+
 type FacetCount {
   count: Int!
   value: String!
@@ -241,6 +260,12 @@ enum KeyDateStatus {
   ACTIONED
   DISMISSED
   UPCOMING
+}
+
+"""Open key dates falling due in one week (seven days from start)."""
+type KeyDateWeek {
+  count: Int!
+  start: Date!
 }
 
 """
@@ -688,6 +713,52 @@ type PermissionDenied implements DomainError {
   requiredRole: String!
 }
 
+"""
+Headline figures for the company’s portfolio, in its reporting currency.
+"""
+type Portfolio {
+  areaSqm: Decimal!
+  expiringIn12Months: Int!
+  expiringIn12MonthsRent: Money!
+
+  """
+  Expiries by year, from this year: five single years, then everything later.
+  """
+  expiryProfile: [ExpiryBucket!]!
+  holdingOver: Int!
+  holdingOverRent: Money!
+
+  """
+  Open key dates per week for the next 13 weeks, starting today: the 90-day view at a glance.
+  """
+  keyDateWeeks: [KeyDateWeek!]!
+
+  """Upcoming key dates due from today within the given days."""
+  keyDatesDue(withinDays: Int = 90): Int!
+
+  """Leases active or holding over."""
+  liveLeases: Int!
+
+  """Key dates still open after their due date."""
+  overdueKeyDates: Int!
+
+  """Annual passing rent of live leases."""
+  passingRent: Money!
+
+  """The latest changes across the portfolio, newest first."""
+  recentActivity(first: Int = 8): [Activity!]!
+  rentByCountry: [CountryRent!]!
+  rentByType: [TypeRent!]!
+
+  """The soonest open key dates, overdue first."""
+  upcomingKeyDates(first: Int = 8, withinDays: Int = 90): [KeyDate!]!
+
+  """
+  Weighted average unexpired lease term in years, weighted by passing rent (active leases).
+  """
+  wault: Decimal
+}
+
 type Property implements Node {
   addressLine: String!
   areaSqm: Decimal!
@@ -739,6 +810,17 @@ type RentPeriod {
   isCurrent: Boolean!
   rent: Money!
   start: Date!
+}
+
+"""
+Passing rent (in the reporting currency) for one country or property type, with its share of the whole.
+"""
+type RentShare {
+  leases: Int!
+  passingRent: Money!
+
+  """Fraction of total passing rent, 0 to 1."""
+  share: Decimal!
 }
 
 """
@@ -900,6 +982,11 @@ type TenantTheme {
   mark: String!
 }
 
+type TypeRent {
+  propertyType: PropertyType!
+  rent: RentShare!
+}
+
 input UpdateTaskInput {
   assigneeId: ID
   clearAssignee: Boolean
@@ -954,6 +1041,7 @@ type Viewer {
 
   """Empty form data (JSON) with this company’s defaults filled in."""
   newLeaseTemplate: String!
+  portfolio: Portfolio!
   properties(after: String, before: String, first: Int, last: Int, search: String): ViewerPropertiesConnection!
   sandbox: Sandbox
   savedViews(after: String, before: String, first: Int, last: Int, scope: ViewScope!): ViewerSavedViewsConnection!

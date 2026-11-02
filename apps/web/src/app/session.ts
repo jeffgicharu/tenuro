@@ -14,7 +14,7 @@ export function localId(globalId: string): string {
 }
 
 // Signs in and reloads, so no data from a previous account stays in memory.
-export async function signInAs(userGlobalId: string, then = '/leases'): Promise<void> {
+export async function signInAs(userGlobalId: string, then = '/'): Promise<void> {
   const res = await fetch('/api/session', {
     method: 'POST', credentials: 'same-origin', headers, body: JSON.stringify({ accountId: localId(userGlobalId) }),
   });

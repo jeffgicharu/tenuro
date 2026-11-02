@@ -5,6 +5,7 @@ import './types/tenant.ts';
 import './types/lease.ts';
 import './types/workflow.ts';
 import './types/viewer.ts';
+import './types/portfolio.ts';
 import './mutations/drafts.ts';
 import './mutations/leases.ts';
 import './mutations/tasks.ts';
