@@ -137,7 +137,7 @@ rollback_switch() {
   [[ $PHASE == switched ]] || return 0
   PHASE=rolling-back
   if [[ -e $SNIPPET.prev ]]; then
-    cp -p -- "$SNIPPET.prev" "$SNIPPET.restore" && mv -f -- "$SNIPPET.restore" "$SNIPPET" || true
+    if cp -p -- "$SNIPPET.prev" "$SNIPPET.restore"; then mv -f -- "$SNIPPET.restore" "$SNIPPET" || true; fi
   fi
   if nginx -t -q && systemctl reload nginx; then
     rm -f -- "$SNIPPET.prev"
