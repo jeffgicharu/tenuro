@@ -1,6 +1,6 @@
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { useRevalidator } from 'react-router';
+import { Link as RouterLink, useRevalidator } from 'react-router';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Skeleton from '@mui/material/Skeleton';
@@ -15,6 +15,7 @@ import { EmptyState } from '../../components/EmptyState.tsx';
 import { ErrorBoundary } from '../../components/ErrorBoundary.tsx';
 import { Money } from '../../components/Money.tsx';
 import { useFormat } from '../../i18n/format.ts';
+import { FONT_MONO } from '../../theme/theme.ts';
 
 // The portfolio's lease accounting at today, the way a finance team reports it: the liability split
 // into current and non-current, right-of-use assets, this year's charges, the maturity of remaining
@@ -45,6 +46,7 @@ function AccountingContent() {
   const t = theme.tokens;
   const f = useFormat();
   const intl = useIntl();
+  const countryName = useMemo(() => new Intl.DisplayNames([intl.locale], { type: 'region' }), [intl.locale]);
   if (!viewer) return null;
   const s = viewer.accountingSummary;
   const liability = Number(s.liability.amount);
@@ -69,16 +71,26 @@ function AccountingContent() {
     [],
     ['Lease currency', 'Leases', 'Liability (lease currency)'],
     ...s.byCurrency.map((c) => [c.liability.currency, c.leases, c.liability.amount]),
+    [],
+    [`Liability roll-forward ${s.year} (year to date)`, 'Amount', 'Currency'],
+    ...(['opening', 'additions', 'interest', 'payments', 'remeasurements', 'fx', 'closing'] as const).map((k) => [k, k === 'payments' ? `-${s.rollForward[k].amount}` : s.rollForward[k].amount, cur]),
+    [],
+    ['Month', 'Interest', 'Depreciation', 'Expensed lease cost', 'Currency'],
+    ...s.monthly.map((m) => [m.month, m.interest.amount, m.depreciation.amount, m.leaseCost.amount, cur]),
+    [],
+    ['Largest leases', 'Property', 'Liability (lease currency)', 'Lease currency', `Liability (${cur})`],
+    ...s.largest.map((l) => [l.reference, `${l.propertyName}, ${l.city}`, l.liabilityLocal.amount, l.liabilityLocal.currency, l.liability.amount]),
   ]);
 
   const Figure = ({ label, value, hint, lead }: { label: string; value: React.ReactNode; hint?: React.ReactNode; lead?: boolean }) => (
     <Box component="li" sx={{ minWidth: 0, py: { xs: 3, md: 5 }, px: { xs: 0, md: 5 }, gridColumn: lead ? { xs: '1 / -1', md: 'auto' } : undefined, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } }, borderTop: { xs: `1px solid ${t.rule}`, md: 'none' } }}>
       <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1.5 }}>{label}</Box>
-      <Box data-num sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: lead ? { xs: '1.9rem', md: '2.4rem' } : { xs: '1.4rem', md: '1.7rem' }, lineHeight: 1.1, '& bdi': { whiteSpace: 'nowrap' } }}>{value}</Box>
+      <Box data-num sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: lead ? { xs: '1.5rem', md: '1.9rem' } : { xs: '1.1rem', md: '1.3rem' }, lineHeight: 1.1, '& bdi': { whiteSpace: 'nowrap' } }}>{value}</Box>
       {hint && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 1 }}>{hint}</Box>}
     </Box>
   );
-  const compact = (m: { amount: string; currency: string }) => <bdi title={f.money(m.amount, m.currency)}>{f.money(m.amount, m.currency, { compact: true })}</bdi>;
+  // Accounting figures show the minor unit, as journals and exports do.
+  const exact = (m: { amount: string; currency: string }) => <bdi>{f.money(m.amount, m.currency)}</bdi>;
 
   return (
     <>
@@ -93,13 +105,83 @@ function AccountingContent() {
       </Box>
 
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, mb: 7, display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'minmax(0, 1.4fr) repeat(3, minmax(0, 1fr))' }, borderTop: `2px solid ${t.ink}`, borderBottom: `1px solid ${t.rule}` }}>
-        <Figure lead label={intl.formatMessage({ id: 'accounting.liability' })} value={compact(s.liability)}
-          hint={<FormattedMessage id="accounting.split" values={{ current: f.money(String(current), cur, { compact: true }), nonCurrent: f.money(String(liability - current), cur, { compact: true }) }} />} />
-        <Figure label={intl.formatMessage({ id: 'accounting.rou' })} value={compact(s.rou)} hint={<FormattedMessage id="accounting.measured" values={{ count: s.leasesMeasured }} />} />
-        <Figure label={intl.formatMessage({ id: 'accounting.interest' }, { year: s.year })} value={compact(s.interestThisYear)}
-          hint={<FormattedMessage id="accounting.depreciation" values={{ amount: f.money(s.depreciationThisYear.amount, cur, { compact: true }) }} />} />
-        <Figure label={intl.formatMessage({ id: 'accounting.cash' }, { year: s.year })} value={compact(s.cashThisYear)}
-          hint={Number(s.leaseCostThisYear.amount) > 0 ? <FormattedMessage id="accounting.operatingCost" values={{ amount: f.money(s.leaseCostThisYear.amount, cur, { compact: true }) }} /> : undefined} />
+        <Figure lead label={intl.formatMessage({ id: 'accounting.liability' })} value={exact(s.liability)}
+          hint={<FormattedMessage id="accounting.split" values={{ current: f.money(current.toFixed(2), cur), nonCurrent: f.money((liability - current).toFixed(2), cur) }} />} />
+        <Figure label={intl.formatMessage({ id: 'accounting.rou' })} value={exact(s.rou)} hint={<FormattedMessage id="accounting.measured" values={{ count: s.leasesMeasured }} />} />
+        <Figure label={intl.formatMessage({ id: 'accounting.interest' }, { year: s.year })} value={exact(s.interestThisYear)}
+          hint={<FormattedMessage id="accounting.depreciation" values={{ amount: f.money(s.depreciationThisYear.amount, cur) }} />} />
+        <Figure label={intl.formatMessage({ id: 'accounting.cash' }, { year: s.year })} value={exact(s.cashThisYear)}
+          hint={Number(s.leaseCostThisYear.amount) > 0 ? <FormattedMessage id="accounting.expensed" values={{ amount: f.money(s.leaseCostThisYear.amount, cur) }} /> : undefined} />
+      </Box>
+
+      <Box sx={{ display: 'grid', gap: 5, mb: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) minmax(0, 1.3fr)' } }}>
+        <Panel id="acc-roll" title={<FormattedMessage id="accounting.rollTitle" values={{ year: s.year }} />} lede={<FormattedMessage id="accounting.rollLede" />}>
+          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+            <tbody>
+              {([
+                ['opening', s.rollForward.opening, false], ['additions', s.rollForward.additions, false], ['interest', s.rollForward.interest, false],
+                ['payments', s.rollForward.payments, true], ['remeasurements', s.rollForward.remeasurements, false], ['fx', s.rollForward.fx, false], ['closing', s.rollForward.closing, false],
+              ] as const).map(([k, m, negative]) => {
+                const total = k === 'closing' || k === 'opening';
+                return (
+                  <tr key={k}>
+                    <Box component="th" scope="row" sx={{ textAlign: 'start', fontWeight: total ? 600 : 400, py: 1.25, borderTop: k === 'closing' ? `2px solid ${t.ink}` : 'none', borderBottom: `1px solid ${t.rule}` }}>
+                      <FormattedMessage id={`accounting.roll.${k}`} />
+                    </Box>
+                    <Box component="td" data-num sx={{ textAlign: 'end', fontWeight: total ? 600 : 400, py: 1.25, borderTop: k === 'closing' ? `2px solid ${t.ink}` : 'none', borderBottom: `1px solid ${t.rule}`, whiteSpace: 'nowrap' }}>
+                      {negative && Number(m.amount) !== 0 ? <bdi>({f.money(m.amount, m.currency)})</bdi> : <bdi>{f.money(m.amount, m.currency)}</bdi>}
+                    </Box>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Box>
+          <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mt: 2 }}><FormattedMessage id="accounting.rollNote" /></Box>
+        </Panel>
+        <Panel id="acc-monthly" title={<FormattedMessage id="accounting.monthlyTitle" values={{ year: s.year }} />} lede={<FormattedMessage id="accounting.monthlyLede" />}>
+          <MonthlyChart months={s.monthly} />
+        </Panel>
+      </Box>
+
+      <Box sx={{ display: 'grid', gap: 5, mb: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.5fr) minmax(0, 1fr)' } }}>
+        <Panel id="acc-largest" title={<FormattedMessage id="accounting.largestTitle" />} lede={<FormattedMessage id="accounting.largestLede" />}>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+              <thead><tr>
+                {['lease', 'property', 'local', 'reporting'].map((c) => (
+                  <Box key={c} component="th" scope="col" sx={{ textAlign: c === 'lease' || c === 'property' ? 'start' : 'end', color: t.inkSecondary, fontWeight: 600, pb: 1.5, borderBottom: `1px solid ${t.ruleStrong}`, whiteSpace: 'nowrap', px: 1.5 }}>
+                    <FormattedMessage id={`accounting.col.${c}`} values={{ currency: cur }} />
+                  </Box>
+                ))}
+              </tr></thead>
+              <tbody>
+                {s.largest.map((l) => (
+                  <tr key={l.reference}>
+                    <Box component="td" sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, whiteSpace: 'nowrap' }}>
+                      {l.lease ? <Box component={RouterLink} to={`/leases/${encodeURIComponent(l.lease.id)}#accounting`} sx={{ fontFamily: FONT_MONO, color: t.brand, textDecoration: 'none', direction: 'ltr', unicodeBidi: 'isolate', '&:hover': { textDecoration: 'underline' } }}>{l.reference}</Box> : l.reference}
+                    </Box>
+                    <Box component="td" sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, color: t.inkSecondary, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.propertyName} · {l.city}</Box>
+                    <Box component="td" data-num sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, textAlign: 'end', whiteSpace: 'nowrap' }}><Money value={l.liabilityLocal} /></Box>
+                    <Box component="td" data-num sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, textAlign: 'end', whiteSpace: 'nowrap', fontWeight: 600 }}><Money value={l.liability} showCode={false} /></Box>
+                  </tr>
+                ))}
+              </tbody>
+            </Box>
+          </Box>
+        </Panel>
+        <Panel id="acc-country" title={<FormattedMessage id="accounting.byCountry" />} lede={<FormattedMessage id="accounting.byCountryLede" />}>
+          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+            <tbody>
+              {s.byCountry.map((c) => (
+                <tr key={c.countryCode}>
+                  <Box component="th" scope="row" sx={{ textAlign: 'start', fontWeight: 500, py: 1.25, borderBottom: `1px solid ${t.rule}` }}>{countryName.of(c.countryCode) ?? c.countryCode}</Box>
+                  <Box component="td" data-num sx={{ textAlign: 'end', color: t.inkSecondary, py: 1.25, px: 2, borderBottom: `1px solid ${t.rule}` }}><FormattedMessage id="dashboard.expiry.leases" values={{ count: c.leases }} /></Box>
+                  <Box component="td" data-num sx={{ textAlign: 'end', fontWeight: 600, py: 1.25, borderBottom: `1px solid ${t.rule}`, whiteSpace: 'nowrap' }}><Money value={c.liability} /></Box>
+                </tr>
+              ))}
+            </tbody>
+          </Box>
+        </Panel>
       </Box>
 
       <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.5fr) minmax(0, 1fr)' } }}>
@@ -118,7 +200,7 @@ function AccountingContent() {
                         '@media (prefers-reduced-motion: no-preference)': { animation: 'grow 520ms cubic-bezier(0.2, 0, 0, 1) both', animationDelay: `${i * 50}ms`, '@keyframes grow': { from: { transform: 'scaleX(0)' } } } }} />
                     </Box>
                   </Box>
-                  <Box component="td" data-num sx={{ textAlign: 'end', fontSize: '0.8125rem', fontWeight: 600, py: 1.5, pl: 3, whiteSpace: 'nowrap' }}><Money value={b.amount} compact /></Box>
+                  <Box component="td" data-num sx={{ textAlign: 'end', fontSize: '0.8125rem', fontWeight: 600, py: 1.5, pl: 3, whiteSpace: 'nowrap' }}><Money value={b.amount} /></Box>
                 </tr>
               ))}
             </tbody>
@@ -152,6 +234,56 @@ function AccountingContent() {
             {s.leasesUnmeasured > 0 && <Box sx={{ color: t.warning }}><FormattedMessage id="accounting.unmeasured" values={{ count: s.leasesUnmeasured }} /></Box>}
           </Box>
         </Box>
+      </Box>
+    </>
+  );
+}
+
+function Panel({ id, title, lede, children }: { id: string; title: React.ReactNode; lede?: React.ReactNode; children: React.ReactNode }) {
+  const theme = useTheme();
+  const t = theme.tokens;
+  return (
+    <Box component="section" aria-labelledby={id} sx={{ minWidth: 0, border: `1px solid ${t.rule}`, borderRadius: 1.5, backgroundColor: t.surface, p: { xs: 4, md: 6 } }}>
+      <Box component="h2" id={id} sx={{ ...theme.typography.h3, m: 0 }}>{title}</Box>
+      {lede && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 0.5, mb: 4 }}>{lede}</Box>}
+      {children}
+    </Box>
+  );
+}
+
+// Interest and depreciation (with any expensed lease cost) stacked month by month.
+function MonthlyChart({ months }: { months: readonly { month: number; interest: { amount: string; currency: string }; depreciation: { amount: string }; leaseCost: { amount: string } }[] }) {
+  const theme = useTheme();
+  const t = theme.tokens;
+  const f = useFormat();
+  const intl = useIntl();
+  const label = new Intl.DateTimeFormat(intl.locale, { month: 'short', timeZone: 'UTC' });
+  const totals = months.map((m) => Number(m.interest.amount) + Number(m.depreciation.amount) + Number(m.leaseCost.amount));
+  const max = Math.max(1, ...totals);
+  const cur = months[0]?.interest.currency ?? '';
+  const anyCost = months.some((m) => Number(m.leaseCost.amount) > 0);
+  const seg = (v: string, colour: string) => <Box sx={{ height: `${(Number(v) / max) * 100}%`, backgroundColor: colour }} />;
+  return (
+    <>
+      <Box component="ol" aria-label={intl.formatMessage({ id: 'accounting.monthlyAlt' })} sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: { xs: 0.5, md: 1.5 }, alignItems: 'end', height: 200 }}>
+        {months.map((m, i) => (
+          <Box component="li" key={m.month} sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minWidth: 0 }}>
+            <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+              {label.format(new Date(Date.UTC(2024, m.month - 1, 1)))}: {f.money(totals[i]!.toFixed(2), cur)}
+            </Box>
+            <Box aria-hidden title={f.money(totals[i]!.toFixed(2), cur)} sx={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', borderRadius: '2px 2px 0 0', overflow: 'hidden' }}>
+              {seg(m.interest.amount, t.brand)}
+              {seg(m.depreciation.amount, t.accent)}
+              {anyCost && seg(m.leaseCost.amount, t.warning)}
+            </Box>
+            <Box aria-hidden sx={{ textAlign: 'center', fontSize: '0.625rem', color: t.inkTertiary, pt: 0.75, borderTop: `1px solid ${t.ruleStrong}` }}>{label.format(new Date(Date.UTC(2024, m.month - 1, 1)))}</Box>
+          </Box>
+        ))}
+      </Box>
+      <Box aria-hidden sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mt: 3, fontSize: '0.75rem', color: t.inkSecondary }}>
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.brand }} /><FormattedMessage id="lease.accounting.col.interest" /></Box>
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.accent }} /><FormattedMessage id="lease.accounting.col.depreciation" /></Box>
+        {anyCost && <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.warning }} /><FormattedMessage id="accounting.expensedShort" /></Box>}
       </Box>
     </>
   );

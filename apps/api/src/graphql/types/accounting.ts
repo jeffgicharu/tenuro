@@ -1,5 +1,5 @@
 import { scheduleJournals, type JournalEntry, type ScheduleRow } from '@tenuro/ledger';
-import { leaseAccounting, figuresAt, yearTotals, type LeaseAccountingResult } from '../../domain/accounting.ts';
+import { leaseAccounting, figuresAt, rollForward, yearTotals, type LeaseAccountingResult } from '../../domain/accounting.ts';
 import { builder } from '../builder.ts';
 import type { Context } from '../context.ts';
 import { Money, money, decimalString } from './common.ts';
@@ -152,15 +152,22 @@ builder.objectFields(Lease, (t) => ({
 
 // The portfolio's accounting at today, in the reporting currency: stored figures for shared leases,
 // and leases the person has changed privately measured live in their place.
-interface Totals {
-  measured: number; unmeasured: number;
+interface Figures {
   liability: number; rou: number; interest: number; depreciation: number; leaseCost: number; cash: number;
   bands: Record<string, number>;
+  open: number; additions: number; interestYtd: number; payments: number; remeasure: number; close: number;
+  monthlyInterest: number[]; monthlyDepreciation: number[]; monthlyCost: number[];
+}
+interface Totals extends Figures {
+  measured: number; unmeasured: number;
   byCurrency: Map<string, { liability: number; leases: number }>;
   byStandard: Map<string, number>;
+  byCountry: Map<string, { liability: number; leases: number }>;
+  leases: { leaseId: string; reference: string; property: string; city: string; liability: number; local: number; currency: string }[];
 }
 const BAND_KEYS = ['WITHIN_1_YEAR', 'YEAR_1_TO_2', 'YEAR_2_TO_3', 'YEAR_3_TO_4', 'YEAR_4_TO_5', 'AFTER_5_YEARS'] as const;
 const BAND_COLUMNS = { WITHIN_1_YEAR: 'within_1_year', YEAR_1_TO_2: 'year_1_to_2', YEAR_2_TO_3: 'year_2_to_3', YEAR_3_TO_4: 'year_3_to_4', YEAR_4_TO_5: 'year_4_to_5', AFTER_5_YEARS: 'after_5_years' } as const;
+const zeros = () => Array<number>(12).fill(0);
 
 interface SummaryShape { totals: Totals; currency: string; year: number }
 
@@ -168,32 +175,50 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
   const tenant = (await ctx.loaders.tenant.load(tenantId))!;
   const reporting = tenant.reporting_currency;
   const rates = new Map((await ctx.tx.selectFrom('fx_rate').select(['currency', 'per_usd']).orderBy('on_date', 'desc').execute()).reverse().map((r) => [r.currency, Number(r.per_usd)]));
-  const toReporting = (amount: number, cur: string) => (amount / (rates.get(cur) ?? 1)) * (rates.get(reporting) ?? 1);
+  const fx = (amount: number, cur: string) => (amount / (rates.get(cur) ?? 1)) * (rates.get(reporting) ?? 1);
   const year = Number(ctx.today.slice(0, 4));
-  const totals: Totals = { measured: 0, unmeasured: 0, liability: 0, rou: 0, interest: 0, depreciation: 0, leaseCost: 0, cash: 0,
-    bands: Object.fromEntries(BAND_KEYS.map((k) => [k, 0])), byCurrency: new Map(), byStandard: new Map() };
-  const add = (cur: string, standard: string, f: { liability: number; rou: number; interest: number; depreciation: number; leaseCost: number; cash: number; bands: Record<string, number> }) => {
+  const totals: Totals = {
+    measured: 0, unmeasured: 0, liability: 0, rou: 0, interest: 0, depreciation: 0, leaseCost: 0, cash: 0,
+    bands: Object.fromEntries(BAND_KEYS.map((k) => [k, 0])), open: 0, additions: 0, interestYtd: 0, payments: 0, remeasure: 0, close: 0,
+    monthlyInterest: zeros(), monthlyDepreciation: zeros(), monthlyCost: zeros(),
+    byCurrency: new Map(), byStandard: new Map(), byCountry: new Map(), leases: [],
+  };
+  const add = (l: { lease_id: string; reference: string; property_name: string; city: string; country_code: string }, cur: string, standard: string, f: Figures) => {
     totals.measured += 1;
-    totals.liability += toReporting(f.liability, cur); totals.rou += toReporting(f.rou, cur);
-    totals.interest += toReporting(f.interest, cur); totals.depreciation += toReporting(f.depreciation, cur);
-    totals.leaseCost += toReporting(f.leaseCost, cur); totals.cash += toReporting(f.cash, cur);
-    for (const k of BAND_KEYS) totals.bands[k]! += toReporting(f.bands[k] ?? 0, cur);
+    for (const k of ['liability', 'rou', 'interest', 'depreciation', 'leaseCost', 'cash', 'open', 'additions', 'interestYtd', 'payments', 'remeasure', 'close'] as const) totals[k] += fx(f[k], cur);
+    for (const k of BAND_KEYS) totals.bands[k]! += fx(f.bands[k] ?? 0, cur);
+    for (let m = 0; m < 12; m++) {
+      totals.monthlyInterest[m]! += fx(f.monthlyInterest[m] ?? 0, cur);
+      totals.monthlyDepreciation[m]! += fx(f.monthlyDepreciation[m] ?? 0, cur);
+      totals.monthlyCost[m]! += fx(f.monthlyCost[m] ?? 0, cur);
+    }
     const c = totals.byCurrency.get(cur) ?? { liability: 0, leases: 0 };
     c.liability += f.liability; c.leases += 1; totals.byCurrency.set(cur, c);
+    const k = totals.byCountry.get(l.country_code) ?? { liability: 0, leases: 0 };
+    k.liability += fx(f.liability, cur); k.leases += 1; totals.byCountry.set(l.country_code, k);
     totals.byStandard.set(standard, (totals.byStandard.get(standard) ?? 0) + 1);
+    totals.leases.push({ leaseId: l.lease_id, reference: l.reference, property: l.property_name, city: l.city, liability: fx(f.liability, cur), local: f.liability, currency: cur });
+    if (totals.leases.length > 40) { totals.leases.sort((a, b) => b.liability - a.liability); totals.leases.length = 10; }
   };
 
   // Shared leases: their stored figures (only rows the person sees unchanged).
   const stored = await ctx.tx.selectFrom('v_lease as l').innerJoin('lease_accounting as a', 'a.lease_row_id', 'l.id')
     .where('l.status', 'in', ['ACTIVE', 'HOLDING_OVER'])
-    .select(['a.currency', 'a.measured_as', 'a.liability', 'a.rou', 'a.interest_year', 'a.depreciation_year', 'a.lease_cost_year', 'a.cash_year',
-      'a.within_1_year', 'a.year_1_to_2', 'a.year_2_to_3', 'a.year_3_to_4', 'a.year_4_to_5', 'a.after_5_years'])
+    .select(['l.lease_id', 'l.reference', 'l.property_name', 'l.city', 'l.country_code',
+      'a.currency', 'a.measured_as', 'a.liability', 'a.rou', 'a.interest_year', 'a.depreciation_year', 'a.lease_cost_year', 'a.cash_year',
+      'a.within_1_year', 'a.year_1_to_2', 'a.year_2_to_3', 'a.year_3_to_4', 'a.year_4_to_5', 'a.after_5_years',
+      'a.liability_open', 'a.additions_ytd', 'a.interest_ytd', 'a.payments_ytd', 'a.remeasure_ytd', 'a.liability_close',
+      'a.monthly_interest', 'a.monthly_depreciation', 'a.monthly_cost'])
     .execute();
+  const arr = (xs: readonly (string | number)[] | null) => Array.from({ length: 12 }, (_, i) => Number(xs?.[i] ?? 0));
   for (const r of stored) {
-    add(r.currency, r.measured_as, {
+    add(r, r.currency, r.measured_as, {
       liability: Number(r.liability), rou: Number(r.rou), interest: Number(r.interest_year), depreciation: Number(r.depreciation_year),
       leaseCost: Number(r.lease_cost_year), cash: Number(r.cash_year),
       bands: Object.fromEntries(BAND_KEYS.map((k) => [k, Number(r[BAND_COLUMNS[k]])])),
+      open: Number(r.liability_open), additions: Number(r.additions_ytd), interestYtd: Number(r.interest_ytd), payments: Number(r.payments_ytd),
+      remeasure: Number(r.remeasure_ytd), close: Number(r.liability_close),
+      monthlyInterest: arr(r.monthly_interest), monthlyDepreciation: arr(r.monthly_depreciation), monthlyCost: arr(r.monthly_cost),
     });
   }
   // Leases with no stored figures (changed or added in the person's session): measured live.
@@ -204,12 +229,19 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
     if (!s) { totals.unmeasured += 1; continue; }
     const at = figuresAt(s.result.schedule, ctx.today);
     const y = yearTotals(s.result.schedule, year);
-    add(s.result.schedule.currency, s.result.schedule.input.standard, {
+    const rf = rollForward(s.result.schedule, ctx.today);
+    const expensed = s.result.schedule.input.standard === 'ASC842_OPERATING' || l.exemption !== 'NONE';
+    add(l, s.result.schedule.currency, s.result.schedule.input.standard, {
       liability: Number(at.liability), rou: Number(at.rou), interest: Number(y.interest), depreciation: Number(y.depreciation),
-      leaseCost: Number(y.leaseCost), cash: Number(y.cashPaid),
+      leaseCost: expensed ? Number(y.leaseCost) : 0, cash: Number(y.cashPaid),
       bands: Object.fromEntries(at.maturity.bands.map((b) => [b.key, Number(b.amount)])),
+      open: Number(rf.open), additions: Number(rf.additions), interestYtd: Number(rf.interest), payments: Number(rf.payments),
+      remeasure: Number(rf.remeasure), close: Number(rf.close),
+      monthlyInterest: rf.monthlyInterest.map(Number), monthlyDepreciation: rf.monthlyDepreciation.map(Number), monthlyCost: expensed ? rf.monthlyCost.map(Number) : zeros(),
     });
   }
+  totals.leases.sort((a, b) => b.liability - a.liability);
+  totals.leases.length = Math.min(totals.leases.length, 10);
   return { totals, currency: reporting, year };
 }
 
@@ -220,6 +252,48 @@ const CurrencyLiability = builder.objectRef<{ currency: string; liability: numbe
   fields: (t) => ({
     leases: t.exposeInt('leases'),
     liability: t.field({ type: Money, resolve: (c) => amount(c.liability, c.currency) }),
+  }),
+});
+
+const CountryLiability = builder.objectRef<{ country: string; liability: number; leases: number; currency: string }>('CountryLiability').implement({
+  fields: (t) => ({
+    countryCode: t.field({ type: 'CountryCode', resolve: (c) => c.country }),
+    leases: t.exposeInt('leases'),
+    liability: t.field({ type: Money, resolve: (c) => amount(c.liability, c.currency) }),
+  }),
+});
+
+const LargestLease = builder.objectRef<{ leaseId: string; reference: string; property: string; city: string; liability: number; local: number; currency: string; reporting: string }>('LeaseLiability').implement({
+  fields: (t) => ({
+    lease: t.field({ type: Lease, nullable: true, resolve: (l, _a, ctx) => ctx.loaders.lease.load(l.leaseId) }),
+    reference: t.exposeString('reference'),
+    propertyName: t.exposeString('property'),
+    city: t.exposeString('city'),
+    liability: t.field({ type: Money, description: 'In the reporting currency.', resolve: (l) => amount(l.liability, l.reporting) }),
+    liabilityLocal: t.field({ type: Money, description: 'In the lease currency.', resolve: (l) => amount(l.local, l.currency) }),
+  }),
+});
+
+const Month = builder.objectRef<{ month: number; interest: number; depreciation: number; cost: number; currency: string }>('AccountingMonth').implement({
+  description: 'The lease charge in one month of the year (periods ending in it).',
+  fields: (t) => ({
+    month: t.exposeInt('month', { description: '1 to 12.' }),
+    interest: t.field({ type: Money, resolve: (m) => amount(m.interest, m.currency) }),
+    depreciation: t.field({ type: Money, resolve: (m) => amount(m.depreciation, m.currency) }),
+    leaseCost: t.field({ type: Money, description: 'Operating and exempt lease expense.', resolve: (m) => amount(m.cost, m.currency) }),
+  }),
+});
+
+const RollForwardType = builder.objectRef<SummaryShape>('LiabilityRollForward').implement({
+  description: 'The lease liability year to date, in whole periods ended by today: opening + additions + interest - payments + remeasurements + FX = closing.',
+  fields: (t) => ({
+    opening: t.field({ type: Money, resolve: (s) => amount(s.totals.open, s.currency) }),
+    additions: t.field({ type: Money, resolve: (s) => amount(s.totals.additions, s.currency) }),
+    interest: t.field({ type: Money, resolve: (s) => amount(s.totals.interestYtd, s.currency) }),
+    payments: t.field({ type: Money, resolve: (s) => amount(s.totals.payments, s.currency) }),
+    remeasurements: t.field({ type: Money, resolve: (s) => amount(s.totals.remeasure, s.currency) }),
+    fx: t.field({ type: Money, description: 'Translation difference; nil while the company’s rates are held for the year.', resolve: (s) => amount(0, s.currency) }),
+    closing: t.field({ type: Money, resolve: (s) => amount(s.totals.close, s.currency) }),
   }),
 });
 
@@ -240,11 +314,15 @@ const AccountingSummary = builder.objectRef<SummaryShape>('AccountingSummary').i
     rou: t.field({ type: Money, resolve: (s) => amount(s.totals.rou, s.currency) }),
     interestThisYear: t.field({ type: Money, resolve: (s) => amount(s.totals.interest, s.currency) }),
     depreciationThisYear: t.field({ type: Money, resolve: (s) => amount(s.totals.depreciation, s.currency) }),
-    leaseCostThisYear: t.field({ type: Money, resolve: (s) => amount(s.totals.leaseCost, s.currency) }),
+    leaseCostThisYear: t.field({ type: Money, description: 'Expense of ASC 842 operating leases and of short-term or low-value exempt leases; nil for leases on the balance sheet.', resolve: (s) => amount(s.totals.leaseCost, s.currency) }),
     cashThisYear: t.field({ type: Money, resolve: (s) => amount(s.totals.cash, s.currency) }),
     currentLiability: t.field({ type: Money, description: 'Due within a year (undiscounted payments in the first band, capped at the liability).',
       resolve: (s) => amount(Math.min(s.totals.bands.WITHIN_1_YEAR ?? 0, s.totals.liability), s.currency) }),
     maturity: t.field({ type: [PortfolioBand], resolve: (s) => BAND_KEYS.map((k) => ({ key: k, amount: s.totals.bands[k] ?? 0, currency: s.currency })) }),
+    rollForward: t.field({ type: RollForwardType, resolve: (s) => s }),
+    monthly: t.field({ type: [Month], resolve: (s) => s.totals.monthlyInterest.map((interest, i) => ({ month: i + 1, interest, depreciation: s.totals.monthlyDepreciation[i]!, cost: s.totals.monthlyCost[i]!, currency: s.currency })) }),
+    largest: t.field({ type: [LargestLease], resolve: (s) => s.totals.leases.map((l) => ({ ...l, reporting: s.currency })) }),
+    byCountry: t.field({ type: [CountryLiability], resolve: (s) => [...s.totals.byCountry.entries()].map(([country, v]) => ({ country, ...v, currency: s.currency })).sort((a, b) => b.liability - a.liability) }),
     byCurrency: t.field({ type: [CurrencyLiability], resolve: (s) => [...s.totals.byCurrency.entries()].map(([currency, v]) => ({ currency, ...v })).sort((a, b) => b.leases - a.leases) }),
     byStandard: t.field({
       type: [builder.objectRef<{ standard: string; leases: number }>('StandardCount').implement({ fields: (u) => ({ standard: u.exposeString('standard'), leases: u.exposeInt('leases') }) })],

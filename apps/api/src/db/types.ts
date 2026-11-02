@@ -318,6 +318,16 @@ export interface LeaseAccountingTable {
   year_3_to_4: Numeric;
   year_4_to_5: Numeric;
   after_5_years: Numeric;
+  exempt: Generated<boolean>;
+  liability_open: NumericDefault;
+  additions_ytd: NumericDefault;
+  interest_ytd: NumericDefault;
+  payments_ytd: NumericDefault;
+  remeasure_ytd: NumericDefault;
+  liability_close: NumericDefault;
+  monthly_interest: ColumnType<string[], string[] | undefined, string[]>;
+  monthly_depreciation: ColumnType<string[], string[] | undefined, string[]>;
+  monthly_cost: ColumnType<string[], string[] | undefined, string[]>;
 }
 
 export interface FxRateTable {

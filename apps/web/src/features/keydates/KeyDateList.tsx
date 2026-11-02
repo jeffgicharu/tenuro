@@ -29,7 +29,7 @@ export const REMINDER_CHOICES = [180, 90, 60, 30, 14, 7, 1];
 // Open key dates as a ledger grouped by month: a calendar leaf, what it is, the lease, the owner and
 // how far off it is. Managers mark a date done or dismissed in one move (with Undo) and set its
 // reminders.
-export function KeyDateList({ viewer: ref, filter, canEdit }: { viewer: KeyDateList_viewer$key; filter: GraphQLKeyDateFilter; canEdit: boolean }) {
+export function KeyDateList({ viewer: ref, filter, canEdit, compact = false }: { viewer: KeyDateList_viewer$key; filter: GraphQLKeyDateFilter; canEdit: boolean; compact?: boolean }) {
   const { data, loadNext, hasNext, isLoadingNext, refetch } = usePaginationFragment(
     graphql`
       fragment KeyDateList_viewer on Viewer
@@ -56,7 +56,9 @@ export function KeyDateList({ viewer: ref, filter, canEdit }: { viewer: KeyDateL
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
   const key = filterKey(filter);
-  const last = useRef(key);
+  // Null on mount: the list may mount (in another view) after the filter changed, so it always
+  // fetches its filter once; store-or-network answers from the store when the data is already there.
+  const last = useRef<string | null>(null);
   useEffect(() => {
     if (key === last.current) return;
     last.current = key;
@@ -141,7 +143,7 @@ export function KeyDateList({ viewer: ref, filter, canEdit }: { viewer: KeyDateL
               <Box
                 sx={{
                   display: 'grid', alignItems: 'center', columnGap: 4, rowGap: 1, px: { xs: 4, md: 5 }, py: 2.5, borderBottom: `1px solid ${t.rule}`,
-                  gridTemplateColumns: { xs: '44px minmax(0, 1fr) auto', md: '44px minmax(0, 1.2fr) minmax(0, 1fr) 160px 120px auto' },
+                  gridTemplateColumns: compact ? '44px minmax(0, 1fr) auto' : { xs: '44px minmax(0, 1fr) auto', md: '44px minmax(0, 0.8fr) minmax(0, 1.5fr) 150px 110px auto' },
                   borderInlineStart: `3px solid ${late ? t.danger : soon ? t.warning : 'transparent'}`,
                   opacity: open ? 1 : 0.6, transition: 'opacity 160ms ease, background-color 120ms ease', '&:hover': { backgroundColor: t.brandTint },
                 }}
@@ -155,23 +157,26 @@ export function KeyDateList({ viewer: ref, filter, canEdit }: { viewer: KeyDateL
                   <Box data-num sx={{ fontSize: '0.8125rem', color: late ? t.danger : soon ? t.warning : t.inkSecondary, fontWeight: late || soon ? 600 : 400 }}>
                     {!open ? <FormattedMessage id={k.status === 'ACTIONED' ? 'keyDates.status.ACTIONED' : 'keyDates.status.DISMISSED'} />
                       : late ? <FormattedMessage id="dashboard.attention.lateBy" values={{ days: -k.daysUntil }} />
-                        : <>{f.date(k.dueOn, 'long')} · {f.relativeDays(k.daysUntil)}</>}
+                        : f.relativeDays(k.daysUntil)}
                   </Box>
                 </Box>
-                <Box sx={{ minWidth: 0, fontSize: '0.8125rem', gridColumn: { xs: '2', md: 'auto' } }}>
-                  <Box component={RouterLink} to={`/leases/${encodeURIComponent(k.lease.id)}`} sx={{ fontFamily: FONT_MONO, color: t.brand, textDecoration: 'none', direction: 'ltr', unicodeBidi: 'isolate', '&:hover': { textDecoration: 'underline' } }}>
-                    {k.lease.reference}
+                <Box sx={{ minWidth: 0, fontSize: '0.8125rem', gridColumn: compact ? '2' : { xs: '2', md: 'auto' } }}>
+                  <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <Box component={RouterLink} to={`/leases/${encodeURIComponent(k.lease.id)}`} sx={{ fontFamily: FONT_MONO, color: t.brand, textDecoration: 'none', direction: 'ltr', unicodeBidi: 'isolate', '&:hover': { textDecoration: 'underline' } }}>
+                      {k.lease.reference}
+                    </Box>
+                    <Box component="span" sx={{ color: t.inkSecondary }}> · {k.lease.city}</Box>
                   </Box>
-                  <Box sx={{ color: t.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.lease.propertyName} · {k.lease.city}</Box>
+                  <Box sx={{ color: t.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={k.lease.propertyName}>{k.lease.propertyName}</Box>
                 </Box>
-                <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 2, minWidth: 0, fontSize: '0.8125rem' }}>
+                <Box sx={{ display: compact ? 'none' : { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 2, minWidth: 0, fontSize: '0.8125rem' }}>
                   {k.owner ? <><Initials text={k.owner.initials} size={26} /><Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.owner.displayName}</Box></> : <Box component="span" sx={{ color: t.inkTertiary }}><FormattedMessage id="keyDates.unowned" /></Box>}
                 </Box>
-                <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, fontSize: '0.75rem', color: t.inkSecondary }} data-num>
+                <Box sx={{ display: compact ? 'none' : { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, fontSize: '0.75rem', color: t.inkSecondary }} data-num>
                   <BellRing size={13} aria-hidden />
                   {k.remindDays.length ? intl.formatList(k.remindDays.map((d) => intl.formatMessage({ id: 'keyDates.daysShort' }, { days: d })), { type: 'unit', style: 'narrow' }) : '—'}
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, gridColumn: { xs: '3', md: 'auto' }, gridRow: { xs: '1', md: 'auto' } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, gridColumn: compact ? '3' : { xs: '3', md: 'auto' }, gridRow: compact ? '1 / span 2' : { xs: '1', md: 'auto' } }}>
                   {canEdit && open && (
                     <Button size="small" variant="outlined" startIcon={<Check size={14} aria-hidden />} onClick={() => setStatus(k, 'ACTIONED')} aria-describedby={`kd-${k.id}`}>
                       <FormattedMessage id="keyDates.done" />

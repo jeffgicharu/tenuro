@@ -556,12 +556,18 @@ describe('lease accounting', () => {
 describe('portfolio accounting', () => {
   const SUMMARY = `{ viewer { portfolio { liveLeases } accountingSummary {
     leasesMeasured leasesUnmeasured liability { amount currency } rou { amount } interestThisYear { amount } currentLiability { amount }
+    rollForward { opening { amount } additions { amount } interest { amount } payments { amount } remeasurements { amount } fx { amount } closing { amount } }
+    monthly { month interest { amount } depreciation { amount } }
+    largest { reference liability { amount } }
+    byCountry { countryCode leases liability { amount } }
     maturity { key amount { amount } } byCurrency { leases liability { amount currency } } byStandard { standard leases }
   } } }`;
   type S = { viewer: { portfolio: { liveLeases: number }; accountingSummary: {
     leasesMeasured: number; leasesUnmeasured: number; liability: { amount: string; currency: string }; rou: { amount: string };
     interestThisYear: { amount: string }; currentLiability: { amount: string };
     maturity: { key: string; amount: { amount: string } }[]; byCurrency: { leases: number }[]; byStandard: { standard: string; leases: number }[];
+    rollForward: Record<'opening' | 'additions' | 'interest' | 'payments' | 'remeasurements' | 'fx' | 'closing', { amount: string }>;
+    monthly: { month: number }[]; largest: { reference: string; liability: { amount: string } }[]; byCountry: { leases: number }[];
   } } };
 
   it('covers every live lease, and the breakdowns add up', async () => {
@@ -576,6 +582,14 @@ describe('portfolio accounting', () => {
     expect(Number(s.liability.amount)).toBeGreaterThan(0);
     expect(Number(s.currentLiability.amount)).toBeLessThanOrEqual(Number(s.liability.amount));
     expect(s.maturity.map((b) => b.key)).toEqual(['WITHIN_1_YEAR', 'YEAR_1_TO_2', 'YEAR_2_TO_3', 'YEAR_3_TO_4', 'YEAR_4_TO_5', 'AFTER_5_YEARS']);
+    const rf = s.rollForward;
+    const n = (k: keyof typeof rf) => Number(rf[k].amount);
+    expect(Math.abs(n('opening') + n('additions') + n('interest') - n('payments') + n('remeasurements') + n('fx') - n('closing'))).toBeLessThan(1);
+    expect(s.monthly.map((m) => m.month)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(s.largest.length).toBeLessThanOrEqual(10);
+    const largest = s.largest.map((l) => Number(l.liability.amount));
+    expect(largest).toEqual([...largest].sort((x, y) => y - x));
+    expect(s.byCountry.reduce((n, c) => n + c.leases, 0)).toBe(s.leasesMeasured);
   });
 
   it('measures a lease a person amends live, in their figures only', async () => {

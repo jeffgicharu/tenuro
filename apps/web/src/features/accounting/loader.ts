@@ -13,6 +13,10 @@ export const accountingQuery = graphql`
         maturity { key amount { amount currency } }
         byCurrency { leases liability { amount currency } }
         byStandard { standard leases }
+        rollForward { opening { amount currency } additions { amount currency } interest { amount currency } payments { amount currency } remeasurements { amount currency } fx { amount currency } closing { amount currency } }
+        monthly { month interest { amount currency } depreciation { amount currency } leaseCost { amount currency } }
+        largest { reference propertyName city lease { id } liability { amount currency } liabilityLocal { amount currency } }
+        byCountry { countryCode leases liability { amount currency } }
       }
     }
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { figuresAt, leaseAccounting, type AccountingLease } from './accounting.ts';
+import { figuresAt, leaseAccounting, rollForward, type AccountingLease } from './accounting.ts';
 
 const lease: AccountingLease = {
   commencement_date: '2027-01-01', expiry_date: '2031-12-31', currency: 'KES', payment_frequency: 'QUARTERLY', payment_timing: 'ADVANCE',
@@ -26,5 +26,22 @@ describe('lease accounting', () => {
     const { remeasurements } = leaseAccounting(started, [{ starts_on: '2024-01-01', rent_per_period: '630000' }], [{ kind: 'CPI', rate: null, every_months: 12 }], '2026-11-02');
     expect(remeasurements).toHaveLength(1);
     expect(Number(remeasurements[0]!.adjustments.liability)).toBeGreaterThan(0);
+  });
+
+  // The roll-forward is built row by row, so it reconciles to the penny, remeasurements included.
+  it('rolls the liability forward exactly: opening + additions + interest - payments + remeasurements = closing', () => {
+    const started = { ...lease, commencement_date: '2023-01-01', expiry_date: '2029-12-31' };
+    const { schedule } = leaseAccounting(started, [{ starts_on: '2026-04-01', rent_per_period: '660000' }], [{ kind: 'CPI', rate: null, every_months: 12 }], '2026-11-02');
+    const r = rollForward(schedule, '2026-11-02');
+    const sum = Number(r.open) + Number(r.additions) + Number(r.interest) - Number(r.payments) + Number(r.remeasure);
+    expect(Math.abs(sum - Number(r.close))).toBeLessThan(0.01);
+    expect(Number(r.remeasure)).toBeGreaterThan(0);
+    expect(r.monthlyInterest).toHaveLength(12);
+  });
+
+  it('opens a lease commencing this year at nothing and adds its first balance', () => {
+    const r = rollForward(leaseAccounting({ ...lease, commencement_date: '2026-02-01', expiry_date: '2030-01-31' }, [], [], '2026-11-02').schedule, '2026-11-02');
+    expect(r.open).toBe('0.00');
+    expect(Number(r.additions)).toBeGreaterThan(0);
   });
 });

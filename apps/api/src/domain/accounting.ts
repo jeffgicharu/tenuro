@@ -117,3 +117,49 @@ export function yearTotals(schedule: Schedule, year: number): { interest: string
   const dp = schedule.minorUnits;
   return { interest: interest.toFixed(dp), depreciation: depreciation.toFixed(dp), leaseCost: leaseCost.toFixed(dp), cashPaid: cashPaid.toFixed(dp) };
 }
+
+export interface RollForward {
+  open: string; additions: string; interest: string; payments: string; remeasure: string; close: string;
+  monthlyInterest: string[]; monthlyDepreciation: string[]; monthlyCost: string[];
+}
+
+// The year to date in whole periods: every row whose period ends between 1 January and the date.
+// Row by row, closing = opening + interest - payment, and a jump between one row's closing and the
+// next row's opening is a remeasurement, so open + additions + interest - payments + remeasure =
+// close exactly. A lease commencing this year opens at nothing and adds its first opening balance.
+// The monthly charge puts each row's interest, depreciation and lease cost in the month its period ends.
+export function rollForward(schedule: Schedule, date: IsoDate): RollForward {
+  const year = date.slice(0, 4);
+  const from = `${year}-01-01`;
+  const dp = schedule.minorUnits;
+  const rows = schedule.rows;
+  const inYear = rows.filter((r) => r.endDate >= from && r.endDate <= date);
+  const mi = Array<number>(12).fill(0); const md = Array<number>(12).fill(0); const mc = Array<number>(12).fill(0);
+  let interest = 0; let payments = 0; let remeasure = 0; let additions = 0; let open = 0; let close = 0;
+  if (inYear.length) {
+    const first = inYear[0]!;
+    const idx = rows.indexOf(first);
+    if (idx === 0) additions = Number(first.openingLiability);
+    else open = Number(rows[idx - 1]!.closingLiability);
+    let prevClose = idx === 0 ? Number(first.openingLiability) : open;
+    for (const r of inYear) {
+      remeasure += Number(r.openingLiability) - prevClose;
+      interest += Number(r.interest); payments += Number(r.payment);
+      prevClose = Number(r.closingLiability);
+    }
+    close = prevClose;
+  } else {
+    // No period has ended this year yet: the liability stands where the last period left it.
+    const before = rows.filter((r) => r.endDate < from);
+    open = before.length ? Number(before[before.length - 1]!.closingLiability) : 0;
+    close = open;
+  }
+  for (const r of rows) {
+    if (!r.endDate.startsWith(year)) continue;
+    const m = Number(r.endDate.slice(5, 7)) - 1;
+    mi[m]! += Number(r.interest); md[m]! += Number(r.depreciation); mc[m]! += Number(r.leaseCost);
+  }
+  const f = (n: number) => n.toFixed(dp);
+  return { open: f(open), additions: f(additions), interest: f(interest), payments: f(payments), remeasure: f(remeasure), close: f(close),
+    monthlyInterest: mi.map(f), monthlyDepreciation: md.map(f), monthlyCost: mc.map(f) };
+}

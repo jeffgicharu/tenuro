@@ -91,23 +91,34 @@ function KeyDatesContent() {
         </Button>
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 300px' }, alignItems: 'start' }}>
-        <Box sx={{ display: 'grid', gap: 5, minWidth: 0 }}>
-          {state.view === 'calendar' && (
-            <Suspense fallback={<Skeleton variant="rounded" height={520} />}>
-              <KeyDateCalendar month={state.month} day={state.day} filter={filter} onMonth={(m) => set({ month: m, day: null })} onDay={(d) => set({ day: d })} />
-            </Suspense>
-          )}
-          {state.view === 'calendar' && !state.day && (
-            <Box sx={{ fontSize: '0.875rem', color: t.inkSecondary }}><FormattedMessage id="keyDates.pickDay" /></Box>
-          )}
-          {/* Kept mounted (hidden until a day is picked in the calendar) so it refetches whenever the filter changes. */}
-          <Box hidden={state.view === 'calendar' && !state.day}>
-            <KeyDateList viewer={viewer} filter={filter} canEdit={viewer.canEdit} />
+      {state.view === 'calendar' ? (
+        // The calendar beside the picked day's dates, so nothing needs scrolling; reminders below them.
+        <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 380px' }, alignItems: 'start' }}>
+          <Suspense fallback={<Skeleton variant="rounded" height={520} />}>
+            <KeyDateCalendar month={state.month} day={state.day} filter={filter} onMonth={(m) => set({ month: m, day: null })} onDay={(d) => set({ day: d })} />
+          </Suspense>
+          <Box sx={{ display: 'grid', gap: 4, minWidth: 0 }}>
+            <Box component="section" aria-labelledby="day-panel" sx={{ border: `1px solid ${t.rule}`, borderRadius: 1.5, backgroundColor: t.surface, p: 4 }}>
+              <Box component="h2" id="day-panel" sx={{ m: 0, mb: 3, fontSize: '0.9375rem', fontWeight: 600 }}>
+                {state.day ? intl.formatDate(`${state.day}T00:00:00Z`, { dateStyle: 'full', timeZone: 'UTC' }) : <FormattedMessage id="keyDates.dayPanel" />}
+              </Box>
+              {!state.day && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary }}><FormattedMessage id="keyDates.pickDay" /></Box>}
+              {/* Kept mounted (hidden until a day is picked) so it refetches whenever the filter changes. */}
+              <Box hidden={!state.day} sx={{ maxHeight: 560, overflowY: 'auto' }}>
+                <KeyDateList viewer={viewer} filter={filter} canEdit={viewer.canEdit} compact />
+              </Box>
+            </Box>
+            <KeyDateReminders viewer={viewer} />
           </Box>
         </Box>
-        <KeyDateReminders viewer={viewer} />
-      </Box>
+      ) : (
+        <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 300px' }, alignItems: 'start' }}>
+          <Box sx={{ minWidth: 0 }}>
+            <KeyDateList viewer={viewer} filter={filter} canEdit={viewer.canEdit} />
+          </Box>
+          <KeyDateReminders viewer={viewer} />
+        </Box>
+      )}
     </>
   );
 }

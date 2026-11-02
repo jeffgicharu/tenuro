@@ -34,6 +34,7 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
   );
   const byDay = useMemo(() => new Map((data.viewer?.keyDateCalendar ?? []).map((d) => [d.date, d])), [data]);
   const firstDay = weekStart(intl.locale);
+  const weekendDays = weekend(intl.locale);
   const lead = (new Date(`${first}T00:00:00Z`).getUTCDay() - firstDay + 7) % 7;
   const days = Number(last.slice(8));
   const cells: (string | null)[] = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)];
@@ -68,6 +69,7 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
               const info = byDay.get(d);
               const picked = day === d;
               const isToday = d === today;
+              const weekend = weekendDays.includes(new Date(`${d}T00:00:00Z`).getUTCDay());
               const label = intl.formatMessage({ id: 'keyDates.dayLabel' }, { date: intl.formatDate(`${d}T00:00:00Z`, { dateStyle: 'full', timeZone: 'UTC' }), count: info?.total ?? 0 });
               return (
                 <Box key={d}>
@@ -76,7 +78,9 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
                     aria-pressed={picked}
                     sx={{
                       width: '100%', minHeight: { xs: 48, md: 84 }, borderRadius: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', p: { xs: 0.75, md: 1.5 },
-                      border: `1px solid ${picked ? t.brand : isToday ? t.ink : t.rule}`, backgroundColor: picked ? t.brandSoft : info ? `color-mix(in srgb, ${t.brand} ${Math.round(4 + (info.total / max) * 16)}%, ${t.surface})` : t.surface,
+                      // The company colour, stronger with the count; weekends sit on the sunken tone.
+                      border: `1px solid ${picked ? t.brand : isToday ? t.ink : t.rule}`,
+                      backgroundColor: picked ? t.brandSoft : info ? `color-mix(in srgb, ${t.brand} ${Math.round(10 + (info.total / max) * 32)}%, ${weekend ? t.sunken : t.surface})` : weekend ? t.sunken : t.surface,
                       transition: 'background-color 120ms ease, border-color 120ms ease', '&:hover': { borderColor: t.brand },
                       '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: 1 },
                     }}
@@ -121,6 +125,16 @@ export function shiftMonth(month: string, by: number): string {
   const [y, m] = month.split('-').map(Number) as [number, number];
   const d = new Date(Date.UTC(y, m - 1 + by, 1));
   return d.toISOString().slice(0, 7);
+}
+
+// The locale's weekend days (0 = Sunday): Friday and Saturday in the Gulf, else Saturday and Sunday.
+function weekend(locale: string): number[] {
+  try {
+    const l = new Intl.Locale(locale) as Intl.Locale & { getWeekInfo?: () => { weekend: number[] }; weekInfo?: { weekend: number[] } };
+    const info = l.getWeekInfo?.() ?? l.weekInfo;
+    if (info) return info.weekend.map((d) => d % 7);
+  } catch { /* fall through */ }
+  return locale.startsWith('ar') ? [5, 6] : [6, 0];
 }
 
 // The locale's first day of the week (0 = Sunday), where the browser knows it; Monday otherwise.

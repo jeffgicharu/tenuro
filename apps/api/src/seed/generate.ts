@@ -5,7 +5,7 @@ import type {
   LeasePartyTable, LeaseTable, NotificationTable, PropertyTable, PropertyType, RentStepTable, SavedViewTable,
   TaskTable, TenantTable, FxRateTable, LeaseAccountingTable, KeyDateKind, TaskPriority, TaskStatus,
 } from '../db/types.ts';
-import { leaseAccounting, figuresAt, yearTotals, type AccountingLease } from '../domain/accounting.ts';
+import { leaseAccounting, figuresAt, rollForward, yearTotals, type AccountingLease } from '../domain/accounting.ts';
 import { addDays, addMonths, addYears, daysBetween, type IsoDate } from '../domain/dates.ts';
 import { annualRent, MONTHS_PER_PERIOD, nextReviewOn, type RentTerms } from '../domain/rent.ts';
 import { MINOR_UNITS, PER_USD, type Market } from './markets.ts';
@@ -390,10 +390,17 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
             const at = figuresAt(acc.schedule, today);
             const year = yearTotals(acc.schedule, Number(today.slice(0, 4)));
             const band = (k: string) => at.maturity.bands.find((b) => b.key === k)?.amount ?? '0';
+            const rf = rollForward(acc.schedule, today);
+            // Under IFRS 16 there is no operating lease cost: only exempt leases (and ASC 842 operating leases) have one.
+            const expensed = acc.schedule.input.standard === 'ASC842_OPERATING' || lesseeRow.exemption !== 'NONE';
             out.lease_accounting.push({
               lease_row_id: leaseId, tenant_id: tenantId, measured_as: acc.schedule.input.standard, currency, as_of: today,
               liability: at.liability, rou: at.rou, interest_year: year.interest, depreciation_year: year.depreciation,
-              lease_cost_year: year.leaseCost, cash_year: year.cashPaid,
+              lease_cost_year: expensed ? year.leaseCost : '0', cash_year: year.cashPaid,
+              exempt: lesseeRow.exemption !== 'NONE',
+              liability_open: rf.open, additions_ytd: rf.additions, interest_ytd: rf.interest, payments_ytd: rf.payments,
+              remeasure_ytd: rf.remeasure, liability_close: rf.close,
+              monthly_interest: rf.monthlyInterest, monthly_depreciation: rf.monthlyDepreciation, monthly_cost: expensed ? rf.monthlyCost : rf.monthlyCost.map(() => '0'),
               within_1_year: band('WITHIN_1_YEAR'), year_1_to_2: band('YEAR_1_TO_2'), year_2_to_3: band('YEAR_2_TO_3'),
               year_3_to_4: band('YEAR_3_TO_4'), year_4_to_5: band('YEAR_4_TO_5'), after_5_years: band('AFTER_5_YEARS'),
             });

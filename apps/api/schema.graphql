@@ -13,6 +13,18 @@ input AccountingInput {
   usefulLifeMonths: Int
 }
 
+"""The lease charge in one month of the year (periods ending in it)."""
+type AccountingMonth {
+  depreciation: Money!
+  interest: Money!
+
+  """Operating and exempt lease expense."""
+  leaseCost: Money!
+
+  """1 to 12."""
+  month: Int!
+}
+
 """One payment period of the lease schedule."""
 type AccountingPeriod {
   closingLiability: Money!
@@ -37,6 +49,7 @@ enum AccountingStandard {
 The portfolio’s lease accounting at today, converted to the reporting currency at the company’s rates.
 """
 type AccountingSummary {
+  byCountry: [CountryLiability!]!
   byCurrency: [CurrencyLiability!]!
   byStandard: [StandardCount!]!
   cashThisYear: Money!
@@ -47,11 +60,18 @@ type AccountingSummary {
   currentLiability: Money!
   depreciationThisYear: Money!
   interestThisYear: Money!
+  largest: [LeaseLiability!]!
+
+  """
+  Expense of ASC 842 operating leases and of short-term or low-value exempt leases; nil for leases on the balance sheet.
+  """
   leaseCostThisYear: Money!
   leasesMeasured: Int!
   leasesUnmeasured: Int!
   liability: Money!
   maturity: [PortfolioMaturityBand!]!
+  monthly: [AccountingMonth!]!
+  rollForward: LiabilityRollForward!
   rou: Money!
   year: Int!
 }
@@ -131,6 +151,12 @@ type CityRent {
 
 """An ISO 3166-1 alpha-2 country code."""
 scalar CountryCode
+
+type CountryLiability {
+  countryCode: CountryCode!
+  leases: Int!
+  liability: Money!
+}
 
 type CountryRent {
   countryCode: CountryCode!
@@ -669,6 +695,19 @@ type LeaseKeyDatesConnectionEdge {
   node: KeyDate!
 }
 
+type LeaseLiability {
+  city: String!
+  lease: Lease
+
+  """In the reporting currency."""
+  liability: Money!
+
+  """In the lease currency."""
+  liabilityLocal: Money!
+  propertyName: String!
+  reference: String!
+}
+
 type LeaseOption {
   exerciseOn: Date!
   kind: OptionKind!
@@ -755,6 +794,23 @@ type LeaseTasksConnection {
 type LeaseTasksConnectionEdge {
   cursor: String!
   node: Task!
+}
+
+"""
+The lease liability year to date, in whole periods ended by today: opening + additions + interest - payments + remeasurements + FX = closing.
+"""
+type LiabilityRollForward {
+  additions: Money!
+  closing: Money!
+
+  """
+  Translation difference; nil while the company’s rates are held for the year.
+  """
+  fx: Money!
+  interest: Money!
+  opening: Money!
+  payments: Money!
+  remeasurements: Money!
 }
 
 """Undiscounted lease payments falling due in a band of years from today."""
