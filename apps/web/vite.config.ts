@@ -27,7 +27,9 @@ export default defineConfig({
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router)[\\/]/ },
             { name: 'relay', test: /node_modules[\\/](react-relay|relay-runtime)[\\/]/ },
             { name: 'mui', test: /node_modules[\\/](@mui[\\/](material|system|utils|styled-engine|private-theming|core-downloads-tracker)|@emotion|stylis)[\\/]/ },
-            { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/ },
+            // Only the grid itself: by default a group also pulls in its dependencies, which took MUI X
+            // internals that the first page needs (date-picker localisation) into this lazy chunk.
+            { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/, includeDependenciesRecursively: false },
             { name: 'intl', test: /node_modules[\\/](react-intl|@formatjs|intl-messageformat)[\\/]/ },
           ],
         },
