@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Types and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile Relay artifacts
+        run: pnpm --filter @tenuro/web relay
+      - name: Check the GraphQL schema file is current
+        run: |
+          pnpm --filter @tenuro/api schema
+          git diff --exit-code -- apps/api/schema.graphql
+      - name: Typecheck every package
+        run: pnpm -r typecheck
+      - name: Unit and component tests
+        run: pnpm -r --filter '!@tenuro/api' test
+
+  api:
+    name: API tests (PostgreSQL 16)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      TEST_OWNER_DATABASE_URL: postgres://tenuro:ci-owner@127.0.0.1:5432/tenuro_test
+      TEST_DATABASE_URL: postgres://tenuro_app:ci-app@127.0.0.1:5432/tenuro_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create the database roles the server uses
+        run: |
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE tenuro LOGIN PASSWORD 'ci-owner' CONNECTION LIMIT 12;
+          CREATE ROLE tenuro_app LOGIN PASSWORD 'ci-app' CONNECTION LIMIT 20;
+          CREATE DATABASE tenuro_test OWNER tenuro;
+          REVOKE ALL ON DATABASE tenuro_test FROM PUBLIC;
+          GRANT CONNECT ON DATABASE tenuro_test TO tenuro_app;
+          SQL
+      - name: API tests
+        run: pnpm --filter @tenuro/api test
+
+  release:
+    name: Release build, budgets and smoke run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [verify]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Bundle size budget
+        run: node scripts/check-bundle.mjs apps/web/dist
+      - name: Assemble the release folder
+        run: |
+          if [ -x deploy/ci/build-release.sh ]; then
+            deploy/ci/build-release.sh "$GITHUB_SHA" release
+          else
+            echo "deploy/ci/build-release.sh is not on this branch yet" >&2; exit 1
+          fi
+      - name: Self-check on a baseline x86-64 CPU (no SSE4, no AVX)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user
+          cd release && qemu-x86_64 -cpu qemu64 runtime/bin/node server/index.mjs --selfcheck
+      - name: Migrate and seed a fresh database within the unit's memory cap
+        env:
+          PGHOST: 127.0.0.1
+          PGPASSWORD: postgres
+        run: |
+          psql -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE tenuro LOGIN PASSWORD 'ci-owner';
+          CREATE ROLE tenuro_app LOGIN PASSWORD 'ci-app';
+          CREATE DATABASE tenuro OWNER tenuro;
+          REVOKE ALL ON DATABASE tenuro FROM PUBLIC;
+          GRANT CONNECT ON DATABASE tenuro TO tenuro_app;
+          SQL
+          cd release
+          PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro /usr/bin/time -v runtime/bin/node server/migrate.mjs 2> migrate-time.txt
+          peak=$(awk '/Maximum resident set size/ {print int($6/1024)}' migrate-time.txt)
+          echo "migrate and seed peak memory: ${peak} MB (unit cap 160 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$peak" -lt 150 ]
+      - name: Nightly rebuild cost
+        env:
+          PGHOST: 127.0.0.1
+        run: |
+          cd release
+          PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro runtime/bin/node server/rebuild.mjs | tee rebuild.json
+          echo "nightly rebuild: $(cat rebuild.json)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Boot in production mode and run the smoke journeys
+        env:
+          PGHOST: 127.0.0.1
+        run: |
+          cd release
+          export NODE_ENV=production PORT=9000 SLOT=blue PGUSER=tenuro_app PGPASSWORD=ci-app PGDATABASE=tenuro SESSION_SECRET=ci-only-secret
+          runtime/bin/node --max-old-space-size=144 server/index.mjs > server.log 2>&1 &
+          for i in $(seq 30); do curl -fsS http://127.0.0.1:9000/api/health >/dev/null && break; sleep 1; done
+          runtime/bin/node server/smoke.mjs
+          rss=$(curl -fsS http://127.0.0.1:9000/api/health | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).rssMb))')
+          echo "server memory after the smoke run: ${rss} MB (unit cap 224 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$rss" -lt 200 ]
+      - name: Server log
+        if: always()
+        run: cat release/server.log 2>/dev/null || true

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 const env = process.env;
 
 function required(name: string): string {
@@ -8,19 +10,29 @@ function required(name: string): string {
 
 const production = env.NODE_ENV === 'production';
 
+// In a release the server is one bundle at server/index.mjs, with the web template beside it and
+// the commit sha in ../REVISION. These paths resolve relative to that bundle.
+function releaseRevision(): string {
+  try {
+    return readFileSync(new URL('../REVISION', import.meta.url), 'utf8').trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 export const config = {
   production,
   port: Number(env.PORT ?? 4000),
   host: '127.0.0.1',
   slot: env.SLOT ?? 'dev',
-  revision: env.REVISION ?? 'dev',
+  revision: env.REVISION ?? releaseRevision(),
   databaseUrl: env.DATABASE_URL,
   sessionSecret: production ? required('SESSION_SECRET') : (env.SESSION_SECRET ?? 'dev-only-session-secret'),
   cookieName: production ? '__Host-tenuro_session' : 'tenuro_session',
   sessionDays: 7,
   // Paths inside a release; overridable for local development and tests.
-  webDist: env.WEB_DIST ?? new URL('../../web/dist/', import.meta.url).pathname,
-  persistedQueries: env.PERSISTED_QUERIES ?? new URL('../../web/persisted-queries.json', import.meta.url).pathname,
+  webDist: env.WEB_DIST ?? new URL('./web/', import.meta.url).pathname,
+  persistedQueries: env.PERSISTED_QUERIES ?? new URL('./persisted-queries.json', import.meta.url).pathname,
   limits: {
     // Per-visitor sandbox quotas.
     sandboxWrites: 300,
