@@ -1,0 +1,37 @@
+{
+  "name": "@tenuro/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../../.env.local --watch --experimental-strip-types src/main.ts",
+    "migrate": "node --env-file=../../.env.local --experimental-strip-types src/db/migrate-cli.ts",
+    "seed": "node --env-file=../../.env.local --experimental-strip-types src/seed/cli.ts",
+    "schema": "node --experimental-strip-types src/schema/print.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@graphql-yoga/plugin-persisted-operations": "^4.0.1",
+    "@pothos/core": "^4.16.0",
+    "@pothos/plugin-complexity": "^4.2.3",
+    "@pothos/plugin-dataloader": "^4.5.0",
+    "@pothos/plugin-errors": "^4.9.3",
+    "@pothos/plugin-relay": "^4.8.1",
+    "@pothos/plugin-scope-auth": "^4.2.2",
+    "@tenuro/lease-rules": "workspace:*",
+    "dataloader": "^2.2.3",
+    "decimal.js": "^10.6.0",
+    "graphql": "^17.0.2",
+    "graphql-yoga": "^6.0.1",
+    "kysely": "^0.29.8",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
