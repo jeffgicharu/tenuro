@@ -1,0 +1,50 @@
+[Unit]
+Description=Remove Tenuro uploads left in incoming/ for more than 6 hours
+Documentation=https://github.com/jeffgicharu/tenuro/blob/main/deploy/README.md
+
+[Service]
+Type=oneshot
+User=tenuro-ci
+Group=tenuro-ci
+ExecStart=/usr/bin/find /srv/tenuro/incoming -mindepth 1 -maxdepth 1 -mmin +360 -exec /bin/rm -rf --one-file-system -- {} +
+TimeoutStartSec=300
+UMask=0077
+
+# Filesystem view: only the upload folder is visible under /srv, writable.
+TemporaryFileSystem=/var:ro /srv:ro /opt:ro /mnt:ro /media:ro
+BindPaths=/srv/tenuro/incoming
+InaccessiblePaths=-/etc/nginx -/etc/letsencrypt -/etc/ssl/private -/etc/ssl/cloudflare
+
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=32M
+MemorySwapMax=0
+TasksMax=8
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryDenyWriteExecute=yes

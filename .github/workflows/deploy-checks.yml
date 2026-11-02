@@ -1,0 +1,58 @@
+name: Deploy checks
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - ".github/workflows/deploy*.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/deploy*.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  server-files:
+    name: Server files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck nginx-light
+          sudo systemctl stop nginx || true
+          pipx install actionlint-py==1.7.12.25
+
+      - name: shellcheck
+        run: |
+          shellcheck -x deploy/install.sh deploy/lib/*.sh deploy/ci/*.sh deploy/test/*.sh deploy/test/stubs/* \
+            deploy/server/usr/local/sbin/* deploy/server/usr/local/lib/tenuro/*
+
+      - name: actionlint
+        run: actionlint .github/workflows/*.yml
+
+      - name: Activation and retire
+        run: deploy/test/run.sh
+
+      - name: Installer nginx step
+        run: deploy/test/install-nginx.sh
+
+      - name: Secret generation
+        run: deploy/test/secrets.sh
+
+      - name: systemd units
+        run: deploy/test/units.sh
+
+      - name: nginx site
+        run: deploy/test/nginx.sh
+
+      - name: Backup and restore test (PostgreSQL 16)
+        run: deploy/test/backup.sh

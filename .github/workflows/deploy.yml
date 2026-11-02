@@ -1,0 +1,133 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Re-activate a kept release (full 40-character sha). Leave empty to build and deploy the selected commit."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_HOST: ${{ secrets.TENURO_DEPLOY_HOST }}
+  DEPLOY_USER: tenuro-ci
+
+jobs:
+  build:
+    name: Build release
+    # Set the repository variable DEPLOY_ENABLED=true once the server side is installed.
+    if: ${{ vars.DEPLOY_ENABLED == 'true' && (inputs.sha == '' || inputs.sha == null) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Assemble the release folder (includes the pinned Node runtime)
+        run: deploy/ci/build-release.sh "$GITHUB_SHA" release
+
+      - name: Self-check on a baseline x86-64 CPU (no SSE4, no AVX)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-user
+          qemu-x86_64 -cpu qemu64 release/runtime/bin/node --version
+          cd release
+          qemu-x86_64 -cpu qemu64 runtime/bin/node server/index.mjs --selfcheck
+
+      - name: Package
+        run: tar -C release -cf release.tar .
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ github.sha }}
+          path: release.tar
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    name: Upload and activate
+    needs: build
+    if: ${{ always() && vars.DEPLOY_ENABLED == 'true' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.sha != '' && inputs.sha != null)) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://tenuro.jeffgicharu.com
+    steps:
+      - name: Choose the release
+        id: rel
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          if [ -n "$INPUT_SHA" ]; then sha=$INPUT_SHA; mode=reactivate; else sha=$GITHUB_SHA; mode=build; fi
+          case "$sha" in *[!0-9a-f]*) echo "not a lowercase hex sha: $sha" >&2; exit 1 ;; esac
+          [ "${#sha}" -eq 40 ] || { echo "sha must be 40 characters" >&2; exit 1; }
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          echo "mode=$mode" >>"$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.rel.outputs.mode == 'build'
+        with:
+          name: release-${{ steps.rel.outputs.sha }}
+
+      - name: Unpack
+        if: steps.rel.outputs.mode == 'build'
+        run: |
+          mkdir release
+          tar -C release -xf release.tar
+          test "$(cat release/REVISION)" = "${{ steps.rel.outputs.sha }}"
+
+      - name: Set up SSH (pinned host key, two single-purpose keys)
+        env:
+          UPLOAD_KEY: ${{ secrets.TENURO_UPLOAD_KEY }}
+          ACTIVATE_KEY: ${{ secrets.TENURO_ACTIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TENURO_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$UPLOAD_KEY" >"$HOME/.ssh/tenuro_upload"
+          printf '%s\n' "$ACTIVATE_KEY" >"$HOME/.ssh/tenuro_activate"
+          printf '%s\n' "$KNOWN_HOSTS" >"$HOME/.ssh/tenuro_known_hosts"
+          grep -q "^$DEPLOY_HOST " "$HOME/.ssh/tenuro_known_hosts" || { echo "TENURO_KNOWN_HOSTS has no entry for $DEPLOY_HOST" >&2; exit 1; }
+
+      - name: Upload (write-only rrsync into incoming/)
+        if: steps.rel.outputs.mode == 'build'
+        run: |
+          ssh_opts="-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/tenuro_known_hosts -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=20"
+          rsync -rt --perms --chmod=D0750,F0640 --stats \
+            -e "ssh -i $HOME/.ssh/tenuro_upload $ssh_opts" \
+            release/ "$DEPLOY_USER@$DEPLOY_HOST:${{ steps.rel.outputs.sha }}/"
+
+      - name: Activate (checks the idle slot, switches, re-checks through nginx, rolls back on failure)
+        run: |
+          ssh -i "$HOME/.ssh/tenuro_activate" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/tenuro_known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=20 -o ServerAliveInterval=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" "${{ steps.rel.outputs.sha }}"
+
+      - name: Remove keys
+        if: always()
+        run: rm -f "$HOME/.ssh/tenuro_upload" "$HOME/.ssh/tenuro_activate" "$HOME/.ssh/tenuro_known_hosts"
