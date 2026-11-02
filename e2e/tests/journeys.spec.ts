@@ -105,6 +105,15 @@ test.describe('main journeys', () => {
     expect(problems).toEqual([]);
   });
 
+  test('each page names its route\'s code up front, and the build manifest is not served', async ({ request }) => {
+    const html = await (await request.get('/leases')).text();
+    expect(html).toMatch(/<link rel="modulepreload" crossorigin href="\/assets\/RegisterPage-[^"]+\.js">/);
+    const lease = await (await request.get('/leases/abc')).text();
+    expect(lease).toMatch(/href="\/assets\/LeasePage-[^"]+\.js"/);
+    expect(lease).not.toMatch(/RegisterPage-/);
+    expect((await request.get('/.vite/manifest.json')).headers()['content-type'] ?? '').not.toMatch(/json/);
+  });
+
   test('every page answers with the security headers', async ({ request }) => {
     const res = await request.get('/leases');
     const headers = res.headers();

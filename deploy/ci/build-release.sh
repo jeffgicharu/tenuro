@@ -37,6 +37,9 @@ cp apps/api/dist/ops/smoke-query.json "$out/ops/smoke-query.json"
 
 cp -R apps/web/dist/. "$out/public/"
 mv "$out/public/index.html" "$out/server/web/index.html"
+# The build manifest tells the server which chunks each route needs (it adds them to the page).
+mv "$out/public/.vite/manifest.json" "$out/server/web/manifest.json"
+rmdir "$out/public/.vite"
 if [[ -d apps/web/storybook-static ]]; then
   cp -R apps/web/storybook-static "$out/public/storybook"
 fi

@@ -11,6 +11,7 @@ import { schema } from './graphql/schema.ts';
 import { startTimings, useServerTiming } from './graphql/timing.ts';
 import { API_CSP, COMMON_HEADERS, newNonce, pageCsp } from './http/security.ts';
 import { serveDocument } from './http/documents.ts';
+import { loadManifest, routePreloader } from './http/preloads.ts';
 import { serveStatic } from './http/static.ts';
 
 const CLIENT_HEADER = 'x-tenuro-client';
@@ -70,10 +71,13 @@ export function createApp(db: Db) {
   });
 
   let indexTemplate: string | null = null;
+  let preloadsFor: ((pathname: string) => string) | null = null;
   const renderIndex = async (req: IncomingMessage, res: ServerResponse) => {
     indexTemplate ??= await readFile(`${config.webDist}/index.html`, 'utf8');
+    preloadsFor ??= routePreloader(loadManifest(config.webDist), indexTemplate);
     const nonce = newNonce();
-    const html = indexTemplate
+    const pathname = (req.url ?? '/').split('?')[0]!;
+    const html = indexTemplate.replace('</head>', `${preloadsFor(pathname)}</head>`)
       .replaceAll('<script', `<script nonce="${nonce}"`)
       .replaceAll('<style', `<style nonce="${nonce}"`)
       .replaceAll('<link rel="stylesheet"', `<link nonce="${nonce}" rel="stylesheet"`)
