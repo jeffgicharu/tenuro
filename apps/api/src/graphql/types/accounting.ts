@@ -1,4 +1,5 @@
 import { scheduleJournals, type JournalEntry, type ScheduleRow } from '@tenuro/ledger';
+import { sql } from 'kysely';
 import { leaseAccounting, figuresAt, rollForward, yearTotals, type LeaseAccountingResult } from '../../domain/accounting.ts';
 import { builder } from '../builder.ts';
 import type { Context } from '../context.ts';
@@ -170,6 +171,12 @@ const BAND_COLUMNS = { WITHIN_1_YEAR: 'within_1_year', YEAR_1_TO_2: 'year_1_to_2
 const zeros = () => Array<number>(12).fill(0);
 
 interface SummaryShape { totals: Totals; currency: string; year: number }
+interface GroupRow {
+  currency: string; measured_as: string; country_code: string; n: number;
+  liability: string; rou: string; interest: string; depreciation: string; lease_cost: string; cash: string;
+  within_1_year: string; year_1_to_2: string; year_2_to_3: string; year_3_to_4: string; year_4_to_5: string; after_5_years: string;
+  open: string; additions: string; interest_ytd: string; payments: string; remeasure: string; close: string;
+}
 
 async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> {
   const tenant = (await ctx.loaders.tenant.load(tenantId))!;
@@ -183,8 +190,11 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
     monthlyInterest: zeros(), monthlyDepreciation: zeros(), monthlyCost: zeros(),
     byCurrency: new Map(), byStandard: new Map(), byCountry: new Map(), leases: [],
   };
-  const add = (l: { lease_id: string; reference: string; property_name: string; city: string; country_code: string }, cur: string, standard: string, f: Figures) => {
-    totals.measured += 1;
+  // Adds figures for `n` leases in one currency, standard and country (a group of stored rows, or one
+  // lease measured live). Conversion is linear, so converting a group's exact sum is the same as
+  // converting each lease and adding.
+  const add = (country: string, cur: string, standard: string, n: number, f: Figures) => {
+    totals.measured += n;
     for (const k of ['liability', 'rou', 'interest', 'depreciation', 'leaseCost', 'cash', 'open', 'additions', 'interestYtd', 'payments', 'remeasure', 'close'] as const) totals[k] += fx(f[k], cur);
     for (const k of BAND_KEYS) totals.bands[k]! += fx(f.bands[k] ?? 0, cur);
     for (let m = 0; m < 12; m++) {
@@ -193,33 +203,61 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
       totals.monthlyCost[m]! += fx(f.monthlyCost[m] ?? 0, cur);
     }
     const c = totals.byCurrency.get(cur) ?? { liability: 0, leases: 0 };
-    c.liability += f.liability; c.leases += 1; totals.byCurrency.set(cur, c);
-    const k = totals.byCountry.get(l.country_code) ?? { liability: 0, leases: 0 };
-    k.liability += fx(f.liability, cur); k.leases += 1; totals.byCountry.set(l.country_code, k);
-    totals.byStandard.set(standard, (totals.byStandard.get(standard) ?? 0) + 1);
-    totals.leases.push({ leaseId: l.lease_id, reference: l.reference, property: l.property_name, city: l.city, liability: fx(f.liability, cur), local: f.liability, currency: cur });
-    if (totals.leases.length > 40) { totals.leases.sort((a, b) => b.liability - a.liability); totals.leases.length = 10; }
+    c.liability += f.liability; c.leases += n; totals.byCurrency.set(cur, c);
+    const k = totals.byCountry.get(country) ?? { liability: 0, leases: 0 };
+    k.liability += fx(f.liability, cur); k.leases += n; totals.byCountry.set(country, k);
+    totals.byStandard.set(standard, (totals.byStandard.get(standard) ?? 0) + n);
   };
 
-  // Shared leases: their stored figures (only rows the person sees unchanged).
-  const stored = await ctx.tx.selectFrom('v_lease as l').innerJoin('lease_accounting as a', 'a.lease_row_id', 'l.id')
-    .where('l.status', 'in', ['ACTIVE', 'HOLDING_OVER'])
-    .select(['l.lease_id', 'l.reference', 'l.property_name', 'l.city', 'l.country_code',
-      'a.currency', 'a.measured_as', 'a.liability', 'a.rou', 'a.interest_year', 'a.depreciation_year', 'a.lease_cost_year', 'a.cash_year',
-      'a.within_1_year', 'a.year_1_to_2', 'a.year_2_to_3', 'a.year_3_to_4', 'a.year_4_to_5', 'a.after_5_years',
-      'a.liability_open', 'a.additions_ytd', 'a.interest_ytd', 'a.payments_ytd', 'a.remeasure_ytd', 'a.liability_close',
-      'a.monthly_interest', 'a.monthly_depreciation', 'a.monthly_cost'])
-    .execute();
-  const arr = (xs: readonly (string | number)[] | null) => Array.from({ length: 12 }, (_, i) => Number(xs?.[i] ?? 0));
-  for (const r of stored) {
-    add(r, r.currency, r.measured_as, {
-      liability: Number(r.liability), rou: Number(r.rou), interest: Number(r.interest_year), depreciation: Number(r.depreciation_year),
-      leaseCost: Number(r.lease_cost_year), cash: Number(r.cash_year),
-      bands: Object.fromEntries(BAND_KEYS.map((k) => [k, Number(r[BAND_COLUMNS[k]])])),
-      open: Number(r.liability_open), additions: Number(r.additions_ytd), interestYtd: Number(r.interest_ytd), payments: Number(r.payments_ytd),
-      remeasure: Number(r.remeasure_ytd), close: Number(r.liability_close),
-      monthlyInterest: arr(r.monthly_interest), monthlyDepreciation: arr(r.monthly_depreciation), monthlyCost: arr(r.monthly_cost),
+  // Shared leases: their stored figures (only rows the person sees unchanged), summed in the database
+  // by currency, standard and country, with the monthly charge by currency and the ten largest.
+  const LIVE = sql`l.status IN ('ACTIVE', 'HOLDING_OVER')`;
+  const [groups, months, largest] = await Promise.all([
+    sql<GroupRow>`
+      SELECT a.currency, a.measured_as, l.country_code, count(*)::int AS n,
+        sum(a.liability)::text AS liability, sum(a.rou)::text AS rou, sum(a.interest_year)::text AS interest,
+        sum(a.depreciation_year)::text AS depreciation, sum(a.lease_cost_year)::text AS lease_cost, sum(a.cash_year)::text AS cash,
+        sum(a.within_1_year)::text AS within_1_year, sum(a.year_1_to_2)::text AS year_1_to_2, sum(a.year_2_to_3)::text AS year_2_to_3,
+        sum(a.year_3_to_4)::text AS year_3_to_4, sum(a.year_4_to_5)::text AS year_4_to_5, sum(a.after_5_years)::text AS after_5_years,
+        sum(a.liability_open)::text AS open, sum(a.additions_ytd)::text AS additions, sum(a.interest_ytd)::text AS interest_ytd,
+        sum(a.payments_ytd)::text AS payments, sum(a.remeasure_ytd)::text AS remeasure, sum(a.liability_close)::text AS close
+      FROM v_lease l JOIN lease_accounting a ON a.lease_row_id = l.id
+      WHERE ${LIVE}
+      GROUP BY 1, 2, 3`.execute(ctx.tx),
+    sql<{ currency: string; month: number; interest: string; depreciation: string; cost: string }>`
+      SELECT a.currency, m.month::int AS month, sum(m.interest)::text AS interest, sum(m.depreciation)::text AS depreciation, sum(m.cost)::text AS cost
+      FROM v_lease l JOIN lease_accounting a ON a.lease_row_id = l.id
+      CROSS JOIN LATERAL unnest(a.monthly_interest, a.monthly_depreciation, a.monthly_cost) WITH ORDINALITY AS m(interest, depreciation, cost, month)
+      WHERE ${LIVE}
+      GROUP BY 1, 2`.execute(ctx.tx),
+    // Ranked in dollars, which orders them as the reporting currency would.
+    sql<{ lease_id: string; reference: string; property_name: string; city: string; currency: string; liability: string }>`
+      SELECT l.lease_id, l.reference, l.property_name, l.city, a.currency, a.liability::text AS liability
+      FROM v_lease l JOIN lease_accounting a ON a.lease_row_id = l.id
+      LEFT JOIN LATERAL (SELECT per_usd FROM fx_rate f WHERE f.currency = a.currency ORDER BY on_date DESC LIMIT 1) r ON true
+      WHERE ${LIVE}
+      ORDER BY a.liability / coalesce(r.per_usd, 1) DESC, l.lease_id
+      LIMIT 10`.execute(ctx.tx),
+  ]);
+  for (const g of groups.rows) {
+    add(g.country_code, g.currency, g.measured_as, g.n, {
+      liability: Number(g.liability), rou: Number(g.rou), interest: Number(g.interest), depreciation: Number(g.depreciation),
+      leaseCost: Number(g.lease_cost), cash: Number(g.cash),
+      bands: Object.fromEntries(BAND_KEYS.map((k) => [k, Number(g[BAND_COLUMNS[k]])])),
+      open: Number(g.open), additions: Number(g.additions), interestYtd: Number(g.interest_ytd), payments: Number(g.payments),
+      remeasure: Number(g.remeasure), close: Number(g.close),
+      monthlyInterest: zeros(), monthlyDepreciation: zeros(), monthlyCost: zeros(),
     });
+  }
+  for (const m of months.rows) {
+    if (m.month < 1 || m.month > 12) continue;
+    totals.monthlyInterest[m.month - 1]! += fx(Number(m.interest), m.currency);
+    totals.monthlyDepreciation[m.month - 1]! += fx(Number(m.depreciation), m.currency);
+    totals.monthlyCost[m.month - 1]! += fx(Number(m.cost), m.currency);
+  }
+  for (const l of largest.rows) {
+    const local = Number(l.liability);
+    totals.leases.push({ leaseId: l.lease_id, reference: l.reference, property: l.property_name, city: l.city, liability: fx(local, l.currency), local, currency: l.currency });
   }
   // Leases with no stored figures (changed or added in the person's session): measured live.
   const live = await ctx.tx.selectFrom('v_lease as l').leftJoin('lease_accounting as a', 'a.lease_row_id', 'l.id')
@@ -231,7 +269,9 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
     const y = yearTotals(s.result.schedule, year);
     const rf = rollForward(s.result.schedule, ctx.today);
     const expensed = s.result.schedule.input.standard === 'ASC842_OPERATING' || l.exemption !== 'NONE';
-    add(l, s.result.schedule.currency, s.result.schedule.input.standard, {
+    const cur = s.result.schedule.currency;
+    totals.leases.push({ leaseId: l.lease_id, reference: l.reference, property: l.property_name, city: l.city, liability: fx(Number(at.liability), cur), local: Number(at.liability), currency: cur });
+    add(l.country_code, cur, s.result.schedule.input.standard, 1, {
       liability: Number(at.liability), rou: Number(at.rou), interest: Number(y.interest), depreciation: Number(y.depreciation),
       leaseCost: expensed ? Number(y.leaseCost) : 0, cash: Number(y.cashPaid),
       bands: Object.fromEntries(at.maturity.bands.map((b) => [b.key, Number(b.amount)])),
