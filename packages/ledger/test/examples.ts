@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildSchedule, effectiveTerm, remeasure } from '../src/index.js';
-import type { AccountingStandard, LeaseAccountingInput, Schedule } from '../src/index.js';
+import { buildSchedule, effectiveTerm, remeasure } from '../src/index.ts';
+import type { AccountingStandard, LeaseAccountingInput, Schedule } from '../src/index.ts';
 
 /** The worked examples, set up through the public API exactly as the API layer would. */
 

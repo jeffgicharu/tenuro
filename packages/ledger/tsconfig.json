@@ -1,7 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["src", "test", "bench", "vitest.config.ts"]
+  "include": [
+    "src",
+    "test",
+    "bench",
+    "vitest.config.ts"
+  ]
 }

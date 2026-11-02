@@ -13,9 +13,56 @@ input AccountingInput {
   usefulLifeMonths: Int
 }
 
+"""One payment period of the lease schedule."""
+type AccountingPeriod {
+  closingLiability: Money!
+  closingRou: Money!
+  depreciation: Money!
+  endDate: Date!
+  interest: Money!
+  leaseCost: Money!
+  openingLiability: Money!
+  payment: Money!
+  paymentDate: Date!
+  period: Int!
+  startDate: Date!
+}
+
 enum AccountingStandard {
   ASC842
   IFRS16
+}
+
+"""
+The portfolio’s lease accounting at today, converted to the reporting currency at the company’s rates.
+"""
+type AccountingSummary {
+  byCurrency: [CurrencyLiability!]!
+  byStandard: [StandardCount!]!
+  cashThisYear: Money!
+
+  """
+  Due within a year (undiscounted payments in the first band, capped at the liability).
+  """
+  currentLiability: Money!
+  depreciationThisYear: Money!
+  interestThisYear: Money!
+  leaseCostThisYear: Money!
+  leasesMeasured: Int!
+  leasesUnmeasured: Int!
+  liability: Money!
+  maturity: [PortfolioMaturityBand!]!
+  rou: Money!
+  year: Int!
+}
+
+"""What the lease charges in a calendar year (periods ending in it)."""
+type AccountingYear {
+  cashPaid: Money!
+  depreciation: Money!
+  interest: Money!
+  leaseCost: Money!
+  year: Int!
 }
 
 type Activity implements Node {
@@ -106,6 +153,12 @@ type CreateTaskPayload {
 
 """An ISO 4217 currency code."""
 scalar CurrencyCode
+
+"""Lease liability held in one lease currency (not converted)."""
+type CurrencyLiability {
+  leases: Int!
+  liability: Money!
+}
 
 """A calendar date, YYYY-MM-DD, with no time zone."""
 scalar Date
@@ -267,6 +320,22 @@ type FieldError {
   step: String
 }
 
+"""A double-entry journal the schedule produces."""
+type JournalEntry {
+  date: Date!
+  kind: String!
+  lines: [JournalLine!]!
+  memo: String!
+  period: Int!
+}
+
+type JournalLine {
+  account: String!
+  accountName: String!
+  credit: Money!
+  debit: Money!
+}
+
 type KeyDate implements Node {
   daysUntil: Int!
   dueOn: Date!
@@ -356,6 +425,10 @@ type KeyDateWeek {
 One lease of one set of premises. Its id is stable across private edits in a session.
 """
 type Lease implements Node {
+  """
+  Null when the lease cannot be measured (for example a term shorter than one payment period).
+  """
+  accounting: LeaseAccounting
   activity(after: String, before: String, first: Int, last: Int): LeaseActivityConnection!
 
   """Passing rent today, annualised."""
@@ -432,6 +505,32 @@ type Lease implements Node {
 
   """Increments on every change; send it back with amendments."""
   version: Int!
+}
+
+"""The lease measured under its accounting standard."""
+type LeaseAccounting {
+  annualDiscountRate: Decimal!
+  exemption: String!
+  futureInterest: Money!
+  initialLiability: Money!
+  initialRou: Money!
+  journals(
+    """Only journals dated in this calendar year."""
+    year: Int
+  ): [JournalEntry!]!
+  liabilityToday: Money!
+  maturity: [MaturityBand!]!
+
+  """IFRS16, ASC842_FINANCE or ASC842_OPERATING."""
+  measuredAs: String!
+  periodsPerYear: Int!
+  remeasurements: [Remeasurement!]!
+  rouToday: Money!
+  schedule: [AccountingPeriod!]!
+  termPeriods: Int!
+  thisYear: AccountingYear!
+  totalInterest: Money!
+  totalPayments: Money!
 }
 
 type LeaseActivityConnection {
@@ -658,6 +757,12 @@ type LeaseTasksConnectionEdge {
   node: Task!
 }
 
+"""Undiscounted lease payments falling due in a band of years from today."""
+type MaturityBand {
+  amount: Money!
+  key: String!
+}
+
 """
 An exact amount in one currency. Format it with the viewer locale; never parse it as a float.
 """
@@ -872,6 +977,11 @@ type Portfolio {
   wault: Decimal
 }
 
+type PortfolioMaturityBand {
+  amount: Money!
+  key: String!
+}
+
 type Property implements Node {
   addressLine: String!
   areaSqm: Decimal!
@@ -912,6 +1022,15 @@ type Query {
 type QuotaExceeded implements DomainError {
   limit: String!
   message: String!
+}
+
+"""
+A change in rent (index or market review) applied at the unchanged discount rate.
+"""
+type Remeasurement {
+  effectiveDate: Date!
+  liabilityAdjustment: Money!
+  rouAdjustment: Money!
 }
 
 type RentPeriod {
@@ -1012,6 +1131,11 @@ enum SortDirection {
 type StaleVersion implements DomainError {
   currentVersion: Int!
   message: String!
+}
+
+type StandardCount {
+  leases: Int!
+  standard: String!
 }
 
 input SubmitLeaseInput {
@@ -1162,6 +1286,7 @@ enum ViewScope {
 
 """The signed-in person and everything scoped to them."""
 type Viewer {
+  accountingSummary: AccountingSummary!
   canEdit: Boolean!
   isAdmin: Boolean!
 

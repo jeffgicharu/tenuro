@@ -1,6 +1,6 @@
-import { type Dec, D, dec, roundMoney, ZERO } from './decimal.js';
-import { LedgerError } from './errors.js';
-import type { AdditionalPayment, Frequency, RentSpec } from './types.js';
+import { type Dec, D, dec, roundMoney, ZERO } from './decimal.ts';
+import { LedgerError } from './errors.ts';
+import type { AdditionalPayment, Frequency, RentSpec } from './types.ts';
 
 export function periodsPerYear(frequency: Frequency): number {
   switch (frequency) {

@@ -513,3 +513,84 @@ describe('key dates across the portfolio', () => {
     expect(stale.data!.updateKeyDate.__typename).toBe('StaleVersion');
   });
 });
+
+describe('lease accounting', () => {
+  type Acc = { node: { accounting: {
+    measuredAs: string; termPeriods: number; initialLiability: { amount: string }; liabilityToday: { amount: string };
+    totalPayments: { amount: string }; futureInterest: { amount: string };
+    maturity: { key: string; amount: { amount: string } }[];
+    schedule: { period: number; closingLiability: { amount: string } }[];
+    journals: { kind: string; lines: { debit: { amount: string }; credit: { amount: string } }[] }[];
+  } | null } };
+
+  it('measures a lease: a schedule over its term, balanced journals, and a maturity that adds up', async () => {
+    const v = new Visitor(app, '198.51.100.50');
+    await v.signIn('mbuyu-court', 'VIEWER');
+    const lease = await firstLease(v);
+    const r = await v.gql<Acc>(`query($id: ID!) { node(id: $id) { ... on Lease { accounting {
+      measuredAs termPeriods initialLiability { amount } liabilityToday { amount } totalPayments { amount } futureInterest { amount }
+      maturity { key amount { amount } }
+      schedule { period closingLiability { amount } }
+      journals { kind lines { debit { amount } credit { amount } } }
+    } } } }`, { id: lease.id });
+    expect(r.errors).toBeUndefined();
+    const a = r.data!.node.accounting!;
+    expect(['IFRS16', 'ASC842_FINANCE', 'ASC842_OPERATING']).toContain(a.measuredAs);
+    expect(a.schedule).toHaveLength(a.termPeriods);
+    expect(Number(a.initialLiability.amount)).toBeGreaterThan(0);
+    expect(Number(a.liabilityToday.amount)).toBeLessThanOrEqual(Number(a.initialLiability.amount) + 0.01);
+    // The liability runs down to nothing by the end of the term.
+    expect(Math.abs(Number(a.schedule.at(-1)!.closingLiability.amount))).toBeLessThan(1);
+    // Undiscounted remaining payments = today's liability + interest still to charge.
+    const undiscounted = a.maturity.reduce((n, b) => n + Number(b.amount.amount), 0);
+    expect(Math.abs(undiscounted - (Number(a.liabilityToday.amount) + Number(a.futureInterest.amount)))).toBeLessThan(1);
+    expect(a.journals.length).toBeGreaterThan(0);
+    for (const j of a.journals) {
+      const dr = j.lines.reduce((n, l) => n + Number(l.debit.amount), 0);
+      const cr = j.lines.reduce((n, l) => n + Number(l.credit.amount), 0);
+      expect(Math.abs(dr - cr)).toBeLessThan(0.005);
+    }
+  });
+});
+
+describe('portfolio accounting', () => {
+  const SUMMARY = `{ viewer { portfolio { liveLeases } accountingSummary {
+    leasesMeasured leasesUnmeasured liability { amount currency } rou { amount } interestThisYear { amount } currentLiability { amount }
+    maturity { key amount { amount } } byCurrency { leases liability { amount currency } } byStandard { standard leases }
+  } } }`;
+  type S = { viewer: { portfolio: { liveLeases: number }; accountingSummary: {
+    leasesMeasured: number; leasesUnmeasured: number; liability: { amount: string; currency: string }; rou: { amount: string };
+    interestThisYear: { amount: string }; currentLiability: { amount: string };
+    maturity: { key: string; amount: { amount: string } }[]; byCurrency: { leases: number }[]; byStandard: { standard: string; leases: number }[];
+  } } };
+
+  it('covers every live lease, and the breakdowns add up', async () => {
+    const v = new Visitor(app, '198.51.100.60');
+    await v.signIn('mbuyu-court', 'VIEWER');
+    const r = await v.gql<S>(SUMMARY);
+    expect(r.errors).toBeUndefined();
+    const s = r.data!.viewer.accountingSummary;
+    expect(s.leasesMeasured + s.leasesUnmeasured).toBe(r.data!.viewer.portfolio.liveLeases);
+    expect(s.byCurrency.reduce((n, c) => n + c.leases, 0)).toBe(s.leasesMeasured);
+    expect(s.byStandard.reduce((n, c) => n + c.leases, 0)).toBe(s.leasesMeasured);
+    expect(Number(s.liability.amount)).toBeGreaterThan(0);
+    expect(Number(s.currentLiability.amount)).toBeLessThanOrEqual(Number(s.liability.amount));
+    expect(s.maturity.map((b) => b.key)).toEqual(['WITHIN_1_YEAR', 'YEAR_1_TO_2', 'YEAR_2_TO_3', 'YEAR_3_TO_4', 'YEAR_4_TO_5', 'AFTER_5_YEARS']);
+  });
+
+  it('measures a lease a person amends live, in their figures only', async () => {
+    const editor = new Visitor(app, '198.51.100.61');
+    const other = new Visitor(app, '198.51.100.62');
+    await editor.signIn('mbuyu-court', 'MANAGER');
+    await other.signIn('mbuyu-court', 'VIEWER');
+    const liability = async (v: Visitor) => Number((await v.gql<S>(SUMMARY)).data!.viewer.accountingSummary.liability.amount);
+    const before = await liability(editor);
+    const lease = await firstLease(editor);
+    const r = await editor.gql<{ amendLease: { __typename: string } }>(AMEND, {
+      input: { id: lease.id, version: lease.version, lease: toInput(lease.formData, (f) => { f.rent.rentPerPeriod = String(Number(f.rent.rentPerPeriod) * 4); f.rent.steps = []; }) },
+    });
+    expect(r.data!.amendLease.__typename).toBe('MutationAmendLeaseSuccess');
+    expect(await liability(editor)).toBeGreaterThan(before);
+    expect(Math.abs((await liability(other)) - before)).toBeLessThan(0.01);
+  });
+});

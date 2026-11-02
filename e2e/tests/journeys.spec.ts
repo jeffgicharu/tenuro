@@ -127,3 +127,26 @@ test.describe('key dates', () => {
     expect(problems).toEqual([]);
   });
 });
+
+test.describe('accounting', () => {
+  test('the portfolio accounting reads at today, exports, and a lease shows its schedule and journals', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Mbuyu Court Holdings', 'Portfolio admin', '/accounting');
+    await expect(page.getByRole('heading', { level: 1, name: 'Accounting' })).toBeVisible();
+    await expect(page.getByText('Lease liability', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Maturity of remaining payments' })).toBeVisible();
+    await expectAccessible(page, 'accounting');
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    expect((await download).suggestedFilename()).toMatch(/^accounting-\d{4}-\d{2}-\d{2}\.csv$/);
+
+    await page.goto('/leases?status=ACTIVE');
+    await page.getByRole('grid').getByRole('row').nth(1).getByRole('link').first().click();
+    await page.getByRole('tab', { name: 'Accounting' }).click();
+    await expect(page.getByText('Lease liability today')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Period schedule' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Journals in \d{4}$/ })).toBeVisible();
+    await expectAccessible(page, 'lease accounting');
+    expect(problems).toEqual([]);
+  });
+});

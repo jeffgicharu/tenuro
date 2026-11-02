@@ -1,7 +1,7 @@
-import { ACCOUNTS, type AccountKey } from './accounts.js';
-import { type Dec, D, fmt, sum, ZERO } from './decimal.js';
-import { fromRow, type RawRow } from './engine.js';
-import type { AccountingStandard, CommencementAmounts, JournalEntry, JournalLine, Schedule } from './types.js';
+import { ACCOUNTS, type AccountKey } from './accounts.ts';
+import { type Dec, D, fmt, sum, ZERO } from './decimal.ts';
+import { fromRow, type RawRow } from './engine.ts';
+import type { AccountingStandard, CommencementAmounts, JournalEntry, JournalLine, Schedule } from './types.ts';
 
 /** A posting with a signed amount: positive debits the account, negative credits it. */
 export type Posting = readonly [AccountKey, Dec];

@@ -300,6 +300,26 @@ export interface NotificationTable extends Scoped {
   created_at: Timestamp;
 }
 
+export interface LeaseAccountingTable {
+  lease_row_id: string;
+  tenant_id: string;
+  measured_as: string;
+  currency: string;
+  as_of: IsoDate;
+  liability: Numeric;
+  rou: Numeric;
+  interest_year: Numeric;
+  depreciation_year: Numeric;
+  lease_cost_year: Numeric;
+  cash_year: Numeric;
+  within_1_year: Numeric;
+  year_1_to_2: Numeric;
+  year_2_to_3: Numeric;
+  year_3_to_4: Numeric;
+  year_4_to_5: Numeric;
+  after_5_years: Numeric;
+}
+
 export interface FxRateTable {
   currency: string;
   on_date: IsoDate;
@@ -354,6 +374,7 @@ export interface Database {
   saved_view: SavedViewTable;
   notification: NotificationTable;
   fx_rate: FxRateTable;
+  lease_accounting: LeaseAccountingTable;
   web_vital: WebVitalTable;
   csp_report: CspReportTable;
   ops_check: OpsCheckTable;

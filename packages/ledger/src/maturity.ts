@@ -1,7 +1,7 @@
-import { addMonths, assertIsoDate } from './dates.js';
-import { type Dec, D, fmt, sum, ZERO } from './decimal.js';
-import { LedgerError } from './errors.js';
-import type { Money, Schedule } from './types.js';
+import { addMonths, assertIsoDate } from './dates.ts';
+import { type Dec, D, fmt, sum, ZERO } from './decimal.ts';
+import { LedgerError } from './errors.ts';
+import type { Money, Schedule } from './types.ts';
 
 export type MaturityBandKey = 'WITHIN_1_YEAR' | 'YEAR_1_TO_2' | 'YEAR_2_TO_3' | 'YEAR_3_TO_4' | 'YEAR_4_TO_5' | 'AFTER_5_YEARS';
 

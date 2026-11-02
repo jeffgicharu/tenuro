@@ -34,6 +34,9 @@ importers:
       '@tenuro/lease-rules':
         specifier: workspace:*
         version: link:../../packages/lease-rules
+      '@tenuro/ledger':
+        specifier: workspace:*
+        version: link:../../packages/ledger
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3

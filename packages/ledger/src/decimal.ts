@@ -1,5 +1,5 @@
 import DecimalJs from 'decimal.js';
-import { LedgerError } from './errors.js';
+import { LedgerError } from './errors.ts';
 
 /** Decimal constructor used for every figure in the ledger: 34 significant digits, ties away from zero. */
 export const D = DecimalJs.clone({ precision: 34, rounding: DecimalJs.ROUND_HALF_UP });

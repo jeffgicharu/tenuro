@@ -1,11 +1,11 @@
-import { assertIsoDate } from './dates.js';
-import { type Dec, D, dec, fmt, ONE, roundMoney, ZERO } from './decimal.js';
-import { fromRow, periodRate, presentValue, runSegment } from './engine.js';
-import { LedgerError } from './errors.js';
-import { type Posting, remeasurementEntry } from './journals.js';
-import { assertTerm, nonNegative } from './payments.js';
-import { assemble, buildSchedule, calendarFor, depreciationEnd } from './schedule.js';
-import type { LeaseChange, Remeasurement, RemeasurementEvent, Schedule } from './types.js';
+import { assertIsoDate } from './dates.ts';
+import { type Dec, D, dec, fmt, ONE, roundMoney, ZERO } from './decimal.ts';
+import { fromRow, periodRate, presentValue, runSegment } from './engine.ts';
+import { LedgerError } from './errors.ts';
+import { type Posting, remeasurementEntry } from './journals.ts';
+import { assertTerm, nonNegative } from './payments.ts';
+import { assemble, buildSchedule, calendarFor, depreciationEnd } from './schedule.ts';
+import type { LeaseChange, Remeasurement, RemeasurementEvent, Schedule } from './types.ts';
 
 const MEMO: Record<LeaseChange['kind'], string> = {
   INDEX_CHANGE: 'Remeasure lease liability for a change in the rent index (unchanged discount rate)',

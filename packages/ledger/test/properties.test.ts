@@ -1,8 +1,8 @@
 import Decimal from 'decimal.js';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { ACCOUNTS, buildSchedule, maturityAnalysis, remeasure, scheduleJournals } from '../src/index.js';
-import type { LeaseAccountingInput, Schedule } from '../src/index.js';
+import { ACCOUNTS, buildSchedule, maturityAnalysis, remeasure, scheduleJournals } from '../src/index.ts';
+import type { LeaseAccountingInput, Schedule } from '../src/index.ts';
 
 const D = Decimal.clone({ precision: 34, rounding: Decimal.ROUND_HALF_UP });
 
@@ -111,7 +111,14 @@ describe('properties of random leases', () => {
         if (!final) throw new Error('no final row');
         const base = input.timing === 'ADVANCE' ? new D(final.openingLiability).minus(final.payment) : new D(final.openingLiability);
         const residual = new D(final.interest).minus(base.times(s.basis.periodRate)).abs();
-        expect(residual.lessThan(new D(10).pow(-s.minorUnits).times(n))).toBe(true);
+        // Each period's rounding (half a minor unit at most) compounds at the period rate, so the bound
+        // is the compounded sum, as in the property above. A flat n minor units was too tight for long,
+        // high-rate leases in zero-decimal currencies (UGX, 109 months at 19.78%: about 150 units).
+        const growth = new D(1).plus(s.basis.periodRate);
+        let compounding = new D(0);
+        for (let k = 1; k <= n; k++) compounding = compounding.plus(growth.pow(k));
+        const bound = D.max(new D(10).pow(-s.minorUnits).times(n), new D(10).pow(-s.minorUnits).times(0.5).times(compounding));
+        expect(residual.lessThanOrEqualTo(bound), `residual ${residual.toString()} > bound ${bound.toString()}`).toBe(true);
       }),
       { numRuns: 400 },
     );

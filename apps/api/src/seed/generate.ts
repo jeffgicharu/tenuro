@@ -3,8 +3,9 @@ import type { Insertable } from 'kysely';
 import type {
   ActivityTable, AppUserTable, DepositTable, DocumentTable, EscalationTable, KeyDateTable, LeaseOptionTable,
   LeasePartyTable, LeaseTable, NotificationTable, PropertyTable, PropertyType, RentStepTable, SavedViewTable,
-  TaskTable, TenantTable, FxRateTable, KeyDateKind, TaskPriority, TaskStatus,
+  TaskTable, TenantTable, FxRateTable, LeaseAccountingTable, KeyDateKind, TaskPriority, TaskStatus,
 } from '../db/types.ts';
+import { leaseAccounting, figuresAt, yearTotals, type AccountingLease } from '../domain/accounting.ts';
 import { addDays, addMonths, addYears, daysBetween, type IsoDate } from '../domain/dates.ts';
 import { annualRent, MONTHS_PER_PERIOD, nextReviewOn, type RentTerms } from '../domain/rent.ts';
 import { MINOR_UNITS, PER_USD, type Market } from './markets.ts';
@@ -33,6 +34,7 @@ export interface SeedData {
   saved_view: Insertable<SavedViewTable>[];
   notification: Insertable<NotificationTable>[];
   fx_rate: Insertable<FxRateTable>[];
+  lease_accounting: Insertable<LeaseAccountingTable>[];
 }
 
 export interface SeedOptions {
@@ -117,7 +119,7 @@ function buildingName(rng: Rng, t: TenantSeed, market: Market, type: PropertyTyp
 
 const emptySeed = (): SeedData => ({
   tenant: [], app_user: [], property: [], lease: [], lease_party: [], rent_step: [], escalation: [], lease_option: [],
-  deposit: [], key_date: [], task: [], document: [], activity: [], saved_view: [], notification: [], fx_rate: [],
+  deposit: [], key_date: [], task: [], document: [], activity: [], saved_view: [], notification: [], fx_rate: [], lease_accounting: [],
 });
 
 // The whole seed portfolio in memory, for tests and the self-check.
@@ -375,6 +377,30 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           created_at: ts(addDays(commencement, -r.int(14, 60))), updated_at: ts(minIso(addDays(commencement, r.int(0, 400)), today)),
         } satisfies Insertable<LeaseTable>;
         out.lease.push(lesseeRow);
+
+        // Live leases are measured now, so the portfolio's accounting adds up stored figures.
+        if (status === 'ACTIVE' || status === 'HOLDING_OVER') {
+          try {
+            const acc = leaseAccounting(
+              { ...lesseeRow, rent_per_period: String(rentPerPeriod) } as AccountingLease,
+              steps.map((x) => ({ starts_on: x.startsOn, rent_per_period: x.rentPerPeriod })),
+              escalations.map((x) => ({ kind: x.kind, rate: x.rate, every_months: x.everyMonths })),
+              today,
+            );
+            const at = figuresAt(acc.schedule, today);
+            const year = yearTotals(acc.schedule, Number(today.slice(0, 4)));
+            const band = (k: string) => at.maturity.bands.find((b) => b.key === k)?.amount ?? '0';
+            out.lease_accounting.push({
+              lease_row_id: leaseId, tenant_id: tenantId, measured_as: acc.schedule.input.standard, currency, as_of: today,
+              liability: at.liability, rou: at.rou, interest_year: year.interest, depreciation_year: year.depreciation,
+              lease_cost_year: year.leaseCost, cash_year: year.cashPaid,
+              within_1_year: band('WITHIN_1_YEAR'), year_1_to_2: band('YEAR_1_TO_2'), year_2_to_3: band('YEAR_2_TO_3'),
+              year_3_to_4: band('YEAR_3_TO_4'), year_4_to_5: band('YEAR_4_TO_5'), after_5_years: band('AFTER_5_YEARS'),
+            });
+          } catch {
+            // A lease the engine cannot measure is left out of the totals, as the API leaves it out of the lease page.
+          }
+        }
 
         escalations.forEach((e, i) => out.escalation.push({
           id: stableId('esc', leaseId, i), tenant_id: tenantId, sandbox_id: null, lease_row_id: leaseId,

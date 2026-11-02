@@ -5,12 +5,12 @@ import { generateBatches, type SeedData, type SeedOptions } from './generate.ts'
 
 const DELETE_ORDER: (keyof Database)[] = [
   'sandbox', 'session', 'notification', 'activity', 'document', 'task', 'key_date', 'lease_draft', 'lease_modification',
-  'saved_view', 'deposit', 'lease_option', 'escalation', 'rent_step', 'lease_party', 'lease', 'property', 'app_user', 'tenant', 'fx_rate',
+  'saved_view', 'lease_accounting', 'deposit', 'lease_option', 'escalation', 'rent_step', 'lease_party', 'lease', 'property', 'app_user', 'tenant', 'fx_rate',
 ];
 
 const INSERT_ORDER: (keyof SeedData)[] = [
   'tenant', 'app_user', 'fx_rate', 'property', 'lease', 'lease_party', 'rent_step', 'escalation', 'lease_option', 'deposit',
-  'key_date', 'task', 'document', 'activity', 'saved_view', 'notification',
+  'key_date', 'task', 'document', 'activity', 'saved_view', 'notification', 'lease_accounting',
 ];
 
 export interface RebuildReport {

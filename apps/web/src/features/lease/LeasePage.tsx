@@ -18,12 +18,13 @@ import { LeaseKeyDates } from './LeaseKeyDates.tsx';
 import { LeaseDocuments } from './LeaseDocuments.tsx';
 import { LeaseTasks } from './LeaseTasks.tsx';
 import { LeaseActivity } from './LeaseActivity.tsx';
+import { LeaseAccounting } from './LeaseAccounting.tsx';
 import { LeaseRail } from './LeaseRail.tsx';
 
-const TABS = ['overview', 'schedule', 'key-dates', 'documents', 'tasks', 'activity'] as const;
+const TABS = ['overview', 'schedule', 'accounting', 'key-dates', 'documents', 'tasks', 'activity'] as const;
 type TabKey = (typeof TABS)[number];
 const TAB_LABEL: Record<TabKey, string> = {
-  overview: 'lease.tab.overview', schedule: 'lease.tab.schedule', 'key-dates': 'lease.tab.keyDates',
+  overview: 'lease.tab.overview', schedule: 'lease.tab.schedule', accounting: 'lease.tab.accounting', 'key-dates': 'lease.tab.keyDates',
   documents: 'lease.tab.documents', tasks: 'lease.tab.tasks', activity: 'lease.tab.activity',
 };
 
@@ -76,6 +77,7 @@ export function LeasePage() {
             <Suspense fallback={<Box sx={{ display: 'grid', gap: 2 }}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} height={32} />)}</Box>}>
               {tab === 'overview' && <LeaseOverview lease={lease} />}
               {tab === 'schedule' && <LeaseRentSchedule lease={lease} />}
+              {tab === 'accounting' && <LeaseAccounting leaseId={lease.id} reference={lease.reference} />}
               {tab === 'key-dates' && <LeaseKeyDates lease={lease} />}
               {tab === 'documents' && <LeaseDocuments lease={lease} />}
               {tab === 'tasks' && <LeaseTasks lease={lease} canEdit={canEdit} />}

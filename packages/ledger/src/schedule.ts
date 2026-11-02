@@ -1,9 +1,9 @@
-import { assertIsoDate } from './dates.js';
-import { type Dec, dec, fmt, minorUnits, roundMoney, sum, ZERO } from './decimal.js';
-import { type PeriodCalendar, periodDates, periodRate, presentValue, type RawRow, runSegment } from './engine.js';
-import { LedgerError } from './errors.js';
-import { assertTerm, extraStream, nonNegative, periodsPerYear, rentStream } from './payments.js';
-import type { CommencementAmounts, LeaseAccountingInput, RemeasurementEvent, Schedule, ScheduleRow } from './types.js';
+import { assertIsoDate } from './dates.ts';
+import { type Dec, dec, fmt, minorUnits, roundMoney, sum, ZERO } from './decimal.ts';
+import { type PeriodCalendar, periodDates, periodRate, presentValue, type RawRow, runSegment } from './engine.ts';
+import { LedgerError } from './errors.ts';
+import { assertTerm, extraStream, nonNegative, periodsPerYear, rentStream } from './payments.ts';
+import type { CommencementAmounts, LeaseAccountingInput, RemeasurementEvent, Schedule, ScheduleRow } from './types.ts';
 
 export function buildSchedule(input: LeaseAccountingInput): Schedule {
   const dp = minorUnits(input.currency);

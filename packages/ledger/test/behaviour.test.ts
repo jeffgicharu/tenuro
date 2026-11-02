@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildSchedule, classifyAsc842, effectiveTerm, LedgerError, maturityAnalysis, remeasure, scheduleJournals } from '../src/index.js';
-import type { LeaseAccountingInput } from '../src/index.js';
-import { eurOffice } from './examples.js';
+import { buildSchedule, classifyAsc842, effectiveTerm, LedgerError, maturityAnalysis, remeasure, scheduleJournals } from '../src/index.ts';
+import type { LeaseAccountingInput } from '../src/index.ts';
+import { eurOffice } from './examples.ts';
 
 const base: LeaseAccountingInput = {
   currency: 'USD',

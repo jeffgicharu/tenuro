@@ -4,13 +4,8 @@
   "private": true,
   "description": "Lease accounting engine: IFRS 16 and ASC 842 schedules, remeasurement, journals and maturity analysis",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+    ".": "./src/index.ts"
   },
   "files": [
     "dist"

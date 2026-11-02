@@ -1,4 +1,4 @@
-import type { DecimalInput } from './decimal.js';
+import type { DecimalInput } from './decimal.ts';
 
 export type Frequency = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 export type PaymentTiming = 'ADVANCE' | 'ARREARS';

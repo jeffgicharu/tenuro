@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildSchedule, maturityAnalysis, scheduleJournals } from '../src/index.js';
-import type { Schedule } from '../src/index.js';
-import { aedWarehouse, eurOffice, kesSequence, readCsv } from './examples.js';
+import { buildSchedule, maturityAnalysis, scheduleJournals } from '../src/index.ts';
+import type { Schedule } from '../src/index.ts';
+import { aedWarehouse, eurOffice, kesSequence, readCsv } from './examples.ts';
 
 /**
  * Every figure here is compared, to the minor unit, with fixtures produced by

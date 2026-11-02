@@ -9,7 +9,7 @@ import Tooltip from '@mui/material/Tooltip';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { styled, useTheme } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
-import { CalendarClock, FilePlus2, LayoutDashboard, LogOut, Menu, Search, PanelLeftClose, PanelLeftOpen, ScrollText } from 'lucide-react';
+import { CalendarClock, FilePlus2, Landmark, LayoutDashboard, LogOut, Menu, Search, PanelLeftClose, PanelLeftOpen, ScrollText } from 'lucide-react';
 import { signOut } from '../app/session.ts';
 import type { AppShell_viewer$key } from './__generated__/AppShell_viewer.graphql';
 import { usePreferences } from '../app/preferences.tsx';
@@ -29,6 +29,7 @@ interface NavItem {
   label: string;
   icon: ReactNode;
   end?: boolean;
+  group: 'portfolio' | 'finance' | 'action';
 }
 
 export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_viewer$key; children: ReactNode }) {
@@ -70,10 +71,17 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
   const tenantName = intl.locale.startsWith('ar') && viewer.tenant.nameLocal ? viewer.tenant.nameLocal : viewer.tenant.name;
 
   const items: NavItem[] = [
-    { to: '/', label: intl.formatMessage({ id: 'nav.overview' }), icon: <LayoutDashboard size={18} strokeWidth={1.6} aria-hidden />, end: true },
-    { to: '/leases', label: intl.formatMessage({ id: 'nav.leases' }), icon: <ScrollText size={18} strokeWidth={1.6} aria-hidden />, end: false },
-    { to: '/key-dates', label: intl.formatMessage({ id: 'nav.keyDates' }), icon: <CalendarClock size={18} strokeWidth={1.6} aria-hidden />, end: false },
-    ...(viewer.canEdit ? [{ to: '/leases/new', label: intl.formatMessage({ id: 'nav.newLease' }), icon: <FilePlus2 size={18} strokeWidth={1.6} aria-hidden />, end: true }] : []),
+    { to: '/', label: intl.formatMessage({ id: 'nav.overview' }), icon: <LayoutDashboard size={18} strokeWidth={1.6} aria-hidden />, end: true, group: 'portfolio' },
+    { to: '/leases', label: intl.formatMessage({ id: 'nav.leases' }), icon: <ScrollText size={18} strokeWidth={1.6} aria-hidden />, end: false, group: 'portfolio' },
+    { to: '/key-dates', label: intl.formatMessage({ id: 'nav.keyDates' }), icon: <CalendarClock size={18} strokeWidth={1.6} aria-hidden />, end: false, group: 'portfolio' },
+    { to: '/accounting', label: intl.formatMessage({ id: 'nav.accounting' }), icon: <Landmark size={18} strokeWidth={1.6} aria-hidden />, end: false, group: 'finance' },
+    ...(viewer.canEdit ? [{ to: '/leases/new', label: intl.formatMessage({ id: 'nav.newLease' }), icon: <FilePlus2 size={18} strokeWidth={1.6} aria-hidden />, end: true, group: 'action' as const }] : []),
+  ];
+  // Sections of the rail: what the portfolio holds, what it costs, and the one thing you start.
+  const groups: { key: NavItem['group']; label?: string }[] = [
+    { key: 'portfolio', label: intl.formatMessage({ id: 'nav.group.portfolio' }) },
+    { key: 'finance', label: intl.formatMessage({ id: 'nav.group.finance' }) },
+    { key: 'action' },
   ];
 
   const isActive = (item: NavItem) =>
@@ -116,8 +124,18 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
           </ButtonBase>
         </Tooltip>
       </Box>
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, px: collapsed ? 2 : 3, display: 'grid', gap: 0.5 }}>
-        {items.map((item) => {
+      {groups.map((g) => {
+        const inGroup = items.filter((i) => i.group === g.key);
+        if (!inGroup.length) return null;
+        const headingId = `nav-group-${g.key}`;
+        return (
+      <Box key={g.key} sx={{ mb: 3 }}>
+        {g.label && !collapsed && (
+          <Box id={headingId} sx={{ px: 6, pb: 1, fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: t.inkTertiary }}>{g.label}</Box>
+        )}
+        {g.label && collapsed && <Box aria-hidden sx={{ mx: 3, mb: 1, borderTop: `1px solid ${t.rule}` }} />}
+      <Box component="ul" aria-labelledby={g.label && !collapsed ? headingId : undefined} sx={{ listStyle: 'none', m: 0, p: 0, px: collapsed ? 2 : 3, display: 'grid', gap: 0.5 }}>
+        {inGroup.map((item) => {
           const active = isActive(item);
           const link = (
             <NavItemLink
@@ -149,6 +167,9 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
           );
         })}
       </Box>
+      </Box>
+        );
+      })}
       <Box sx={{ flex: 1 }} />
       <Box sx={{ px: collapsed ? 2 : 3, pb: 3, display: 'grid', gap: 1 }}>
         {desktop && (

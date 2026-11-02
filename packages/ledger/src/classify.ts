@@ -1,4 +1,4 @@
-import { type DecimalInput, dec } from './decimal.js';
+import { type DecimalInput, dec } from './decimal.ts';
 
 export interface Asc842Criteria {
   /** (a) Ownership transfers to the lessee by the end of the term. */

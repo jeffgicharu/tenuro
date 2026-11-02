@@ -1,6 +1,6 @@
-import { addDays, addMonths } from './dates.js';
-import { type Dec, D, ONE, roundMoney, sum, ZERO } from './decimal.js';
-import type { AccountingStandard, PaymentTiming, ScheduleRow } from './types.js';
+import { addDays, addMonths } from './dates.ts';
+import { type Dec, D, ONE, roundMoney, sum, ZERO } from './decimal.ts';
+import type { AccountingStandard, PaymentTiming, ScheduleRow } from './types.ts';
 
 /** A schedule row with exact decimals; converted to strings at the API boundary. */
 export interface RawRow {

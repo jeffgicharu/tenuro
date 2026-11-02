@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import { expect, it } from 'vitest';
-import { buildSchedule, scheduleJournals } from '../src/index.js';
-import type { LeaseAccountingInput } from '../src/index.js';
+import { buildSchedule, scheduleJournals } from '../src/index.ts';
+import type { LeaseAccountingInput } from '../src/index.ts';
 
 const tenYearsMonthly: LeaseAccountingInput = {
   currency: 'EUR',

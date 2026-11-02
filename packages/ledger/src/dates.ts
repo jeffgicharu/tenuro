@@ -1,4 +1,4 @@
-import { LedgerError } from './errors.js';
+import { LedgerError } from './errors.ts';
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
