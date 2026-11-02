@@ -71,10 +71,10 @@ export function SessionBanner({ viewer: ref }: { viewer: SessionBanner_viewer$ke
       }}
     >
       <FlaskConical size={15} strokeWidth={1.7} aria-hidden style={{ flexShrink: 0, color: t.accent }} />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        {narrow ? <FormattedMessage id="workspace.bannerShort" /> : <FormattedMessage id="workspace.banner" values={{ time }} />}
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 3, rowGap: 0.5, lineHeight: 1.4 }}>
+        <span>{narrow ? <FormattedMessage id="workspace.bannerShort" /> : <FormattedMessage id="workspace.banner" values={{ time }} />}</span>
         {!viewer.canEdit && !narrow && (
-          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, marginInlineStart: 3, color: t.ink }}>
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, color: t.ink }}>
             <Eye size={14} strokeWidth={1.7} aria-hidden />
             <FormattedMessage id="workspace.readOnly" />
           </Box>
