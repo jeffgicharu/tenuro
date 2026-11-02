@@ -53,7 +53,9 @@ function TaskRow({ task: ref, canEdit }: { task: LeaseTasksRow_task$key; canEdit
     mutation LeaseTasksUpdateMutation($input: UpdateTaskInput!) {
       updateTask(input: $input) {
         __typename
-        ... on MutationUpdateTaskSuccess { data { task { id status version isOverdue completedAt } } }
+        ... on MutationUpdateTaskSuccess {
+          data { task { id status version isOverdue completedAt lease { id ...LeaseRail_lease } } }
+        }
         ... on DomainError { message }
       }
     }
@@ -176,7 +178,8 @@ function NewTaskDialog({ leaseId, connectionId, users, onClose }: {
       createTask(input: $input) {
         __typename
         ... on MutationCreateTaskSuccess {
-          data { task @appendNode(connections: $connections, edgeTypeName: "LeaseTasksConnectionEdge") { id ...LeaseTasksRow_task } }
+          # Returning the rail's fragment keeps its open-task count current without a reload.
+          data { task @appendNode(connections: $connections, edgeTypeName: "LeaseTasksConnectionEdge") { id ...LeaseTasksRow_task lease { id ...LeaseRail_lease } } }
         }
         ... on ValidationFailed { fieldErrors { path message } }
         ... on DomainError { message }
