@@ -4,12 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "relay": "FORCE_NO_WATCHMAN=1 relay-compiler",
-    "build": "FORCE_NO_WATCHMAN=1 relay-compiler && vite build",
+    "relay": "node -e \"require('fs').existsSync('persisted-queries.json')||require('fs').writeFileSync('persisted-queries.json','{}')\" && FORCE_NO_WATCHMAN=1 relay-compiler",
+    "build": "pnpm run relay && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
-    "relay:watch": "FORCE_NO_WATCHMAN=1 relay-compiler --watch"
+    "test": "pnpm run relay && vitest run",
+    "relay:watch": "node -e \"require('fs').existsSync('persisted-queries.json')||require('fs').writeFileSync('persisted-queries.json','{}')\" && FORCE_NO_WATCHMAN=1 relay-compiler --watch"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
