@@ -42,6 +42,9 @@ jobs:
       - name: Activation and retire
         run: deploy/test/run.sh
 
+      - name: Journal redaction
+        run: deploy/test/redact.sh
+
       - name: Installer nginx step
         run: deploy/test/install-nginx.sh
 
