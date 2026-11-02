@@ -1,0 +1,19 @@
+{
+  "src": "./src",
+  "schema": "../api/schema.graphql",
+  "language": "typescript",
+  "eagerEsModules": true,
+  "excludes": ["**/node_modules/**", "**/__generated__/**"],
+  "persistConfig": {
+    "file": "./persisted-queries.json",
+    "algorithm": "SHA256"
+  },
+  "customScalarTypes": {
+    "Date": "string",
+    "DateTime": "string",
+    "Decimal": "string",
+    "CurrencyCode": "string",
+    "CountryCode": "string"
+  },
+  "noFutureProofEnums": true
+}
