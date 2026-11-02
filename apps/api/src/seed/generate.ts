@@ -55,9 +55,32 @@ const toReporting = (amount: Decimal, from: string, to: string) =>
 
 const ts = (iso: IsoDate, hour = 9, minute = 0) => `${iso}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
 
+// Unit sizes per type, drawn log-uniformly: most shops are small units, with the odd anchor store;
+// offices run from a single floor plate up to several floors.
 const AREA: Record<PropertyType, [number, number]> = {
-  OFFICE: [140, 2600], RETAIL: [45, 900], MIXED_USE: [180, 1400], WAREHOUSE: [1500, 22000], INDUSTRIAL: [800, 7500],
+  OFFICE: [110, 2200], RETAIL: [35, 650], MIXED_USE: [150, 1200], WAREHOUSE: [1200, 18000], INDUSTRIAL: [700, 6500],
 };
+const drawArea = (rng: Rng, type: PropertyType) => {
+  const [lo, hi] = AREA[type];
+  return Math.exp(rng.between(Math.log(lo), Math.log(hi)));
+};
+
+// When leases start: English leases mostly on a quarter day, continental ones often at the start
+// of a calendar quarter, and elsewhere usually the 1st, sometimes the 15th or another day.
+const QUARTER_DAY: Record<number, string> = { 3: '25', 6: '24', 9: '29', 12: '25' };
+function leaseStart(rng: Rng, country: string, monthStart: IsoDate): IsoDate {
+  const month = Number(monthStart.slice(5, 7));
+  if (country === 'GB' && rng.chance(0.6)) {
+    const snapped = addMonths(monthStart, (3 - (month % 3)) % 3);
+    return snapped.slice(0, 8) + QUARTER_DAY[Number(snapped.slice(5, 7))]!;
+  }
+  if ((country === 'DE' || country === 'FR' || country === 'NL') && rng.chance(0.5)) {
+    return addMonths(monthStart, (3 - ((month - 1) % 3)) % 3).slice(0, 8) + '01';
+  }
+  const roll = rng.next();
+  const day = roll < 0.62 ? 1 : roll < 0.72 ? 15 : rng.int(2, 28);
+  return monthStart.slice(0, 8) + String(day).padStart(2, '0');
+}
 const UNITS_PER_PROPERTY: Record<PropertyType, [number, number]> = {
   OFFICE: [3, 11], RETAIL: [4, 14], MIXED_USE: [3, 8], WAREHOUSE: [1, 3], INDUSTRIAL: [1, 3],
 };
@@ -167,8 +190,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
       const [uMin, uMax] = UNITS_PER_PROPERTY[type];
       const units = Math.min(propRng.int(uMin, uMax), leaseTarget - unitTotal);
       unitTotal += units;
-      const [aMin, aMax] = AREA[type];
-      const unitArea = propRng.between(aMin, aMax);
+      const unitArea = drawArea(propRng, type);
       const street = STREET_PATTERNS[market.country]!(propRng.pick(t.region === 'GULF' ? GULF_ROOTS : t.region === 'EA' ? EA_ROOTS : EU_ROOTS), p);
       const photoRegion = t.region === 'EA' ? 'ea' : t.region === 'GULF' ? 'gulf' : 'eu';
       const row: Insertable<PropertyTable> = {
@@ -203,15 +225,16 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
         const leaseId = stableId('lease', t.slug, n);
         const termYears = r.pick(market.termYears[type]);
         const offsetMonths = r.int(-(termYears * 12 + 10), 4);
-        const commencement = addMonths(today, offsetMonths).slice(0, 8) + '01';
-        const expiry = addDays(addYears(commencement, termYears), -1);
+        const commencement = leaseStart(r, market.country, addMonths(today, offsetMonths).slice(0, 8) + '01');
+        // Some terms run a few months past whole years (a fit-out period, or aligning to a quarter).
+        const extraMonths = r.chance(0.18) ? r.pick([3, 6, 9]) : 0;
+        const expiry = addDays(addMonths(addYears(commencement, termYears), extraMonths), -1);
         const currency = r.weighted(market.currencies);
         const frequency = r.weighted(market.frequency);
         const months = MONTHS_PER_PERIOD[frequency];
         const city = market.cities.find((c) => c.name === prop.row.city)!;
         const rateRange = currency === 'USD' && market.usdRent ? market.usdRent[type] : market.rent[type];
-        const [aMin, aMax] = AREA[type];
-        const area = Number(r.between(aMin, aMax).toFixed(0));
+        const area = Math.round(drawArea(r, type));
         const ratePerSqmMonth = r.between(rateRange[0], rateRange[1]) * city.factor;
         const rentPerPeriod = niceRound(ratePerSqmMonth * area * months, currency);
         const [ibrMin, ibrMax] = market.ibr[currency] ?? [0.06, 0.08];
@@ -284,7 +307,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           }
           const nextReview = nextReviewOn(terms, addMonths(today, -6));
           if (nextReview) keyDates.push({ kind: 'RENT_REVIEW', due: nextReview, title: tx.keyDate.RENT_REVIEW });
-          if (expiry < today) keyDates.push({ kind: 'DEPOSIT_RETURN', due: addMonths(expiry, 2), title: tx.keyDate.DEPOSIT_RETURN });
+          if (expiry < today) keyDates.push({ kind: 'DEPOSIT_RETURN', due: addDays(expiry, r.int(30, 75)), title: tx.keyDate.DEPOSIT_RETURN });
           if (r.chance(0.25)) keyDates.push({ kind: 'INSURANCE', due: addMonths(today, r.int(-3, 11)).slice(0, 8) + '01', title: tx.keyDate.INSURANCE });
         }
         const owner = r.pick(managers).id;
@@ -377,7 +400,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           id: stableId('deposit', leaseId), tenant_id: tenantId, sandbox_id: null, lease_row_id: leaseId,
           kind: market.country === 'NL' || market.country === 'DE' || market.country === 'FR' ? 'BANK_GUARANTEE' : 'CASH',
           amount: niceRound((rentPerPeriod / months) * depositMonths, currency), currency, held_by: landlord,
-          return_due_on: addMonths(expiry, 2),
+          return_due_on: addDays(expiry, 60),
           status: status === 'EXPIRED' ? r.weighted([['RETURNED', 70], ['PARTLY_RETURNED', 15], ['HELD', 15]] as const) : 'HELD',
         });
 

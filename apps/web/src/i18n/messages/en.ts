@@ -49,7 +49,7 @@ export const en = {
   'signin.roleShort.VIEWER': 'Viewer',
   'signin.role.ADMIN': 'Everything, including shared views and settings.',
   'signin.role.MANAGER': 'Create and amend leases, manage dates and tasks.',
-  'signin.role.VIEWER': 'Read and export. Every change is refused by the API.',
+  'signin.role.VIEWER': 'Can view and export, but can’t make changes.',
   'signin.signingIn': 'Signing in…',
   'signin.error': 'Sign-in did not work. Try again in a moment.',
   'signin.limit': 'Too many sign-ins from your network in a short time. Try again later.',

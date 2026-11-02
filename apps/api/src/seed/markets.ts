@@ -44,8 +44,8 @@ export const EAST_AFRICA: Market[] = [
   {
     country: 'KE', weight: 55,
     currencies: [['KES', 70], ['USD', 30]],
-    rent: { OFFICE: [950, 1500], RETAIL: [1400, 3600], MIXED_USE: [900, 1600], WAREHOUSE: [480, 720], INDUSTRIAL: [380, 560] },
-    usdRent: { OFFICE: [9, 14], RETAIL: [12, 28], MIXED_USE: [8, 13], WAREHOUSE: [4, 6], INDUSTRIAL: [3, 4.5] },
+    rent: { OFFICE: [950, 1500], RETAIL: [1300, 3000], MIXED_USE: [900, 1600], WAREHOUSE: [480, 720], INDUSTRIAL: [380, 560] },
+    usdRent: { OFFICE: [9, 14], RETAIL: [10, 22], MIXED_USE: [8, 13], WAREHOUSE: [4, 6], INDUSTRIAL: [3, 4.5] },
     ibr: { KES: [0.128, 0.152], USD: [0.072, 0.084] },
     frequency: [['QUARTERLY', 70], ['MONTHLY', 30]], timing: 'ADVANCE',
     escalation: [['FIXED', 85], ['NONE', 10], ['MARKET_REVIEW', 5]], fixedRate: [0.05, 0.075], reviewEveryMonths: 12,
@@ -68,8 +68,8 @@ export const EAST_AFRICA: Market[] = [
   {
     country: 'UG', weight: 18,
     currencies: [['USD', 60], ['UGX', 40]],
-    rent: { OFFICE: [42000, 58000], RETAIL: [55000, 110000], MIXED_USE: [38000, 52000], WAREHOUSE: [16000, 24000], INDUSTRIAL: [13000, 19000] },
-    usdRent: { OFFICE: [11, 16], RETAIL: [14, 30], MIXED_USE: [10, 14], WAREHOUSE: [4.5, 6.5], INDUSTRIAL: [3.5, 5] },
+    rent: { OFFICE: [42000, 58000], RETAIL: [40000, 85000], MIXED_USE: [38000, 52000], WAREHOUSE: [16000, 24000], INDUSTRIAL: [13000, 19000] },
+    usdRent: { OFFICE: [11, 16], RETAIL: [11, 24], MIXED_USE: [10, 14], WAREHOUSE: [4.5, 6.5], INDUSTRIAL: [3.5, 5] },
     ibr: { UGX: [0.158, 0.182], USD: [0.075, 0.088] },
     frequency: [['QUARTERLY', 60], ['MONTHLY', 25], ['ANNUAL', 15]], timing: 'ADVANCE',
     escalation: [['FIXED', 80], ['NONE', 20]], fixedRate: [0.03, 0.05], reviewEveryMonths: 12,
@@ -86,8 +86,8 @@ export const EAST_AFRICA: Market[] = [
   {
     country: 'TZ', weight: 17,
     currencies: [['USD', 65], ['TZS', 35]],
-    rent: { OFFICE: [33000, 45000], RETAIL: [42000, 90000], MIXED_USE: [30000, 40000], WAREHOUSE: [14000, 21000], INDUSTRIAL: [11000, 17000] },
-    usdRent: { OFFICE: [13, 18], RETAIL: [15, 32], MIXED_USE: [11, 15], WAREHOUSE: [5, 7.5], INDUSTRIAL: [4, 6] },
+    rent: { OFFICE: [33000, 45000], RETAIL: [32000, 65000], MIXED_USE: [30000, 40000], WAREHOUSE: [14000, 21000], INDUSTRIAL: [11000, 17000] },
+    usdRent: { OFFICE: [13, 18], RETAIL: [12, 25], MIXED_USE: [11, 15], WAREHOUSE: [5, 7.5], INDUSTRIAL: [4, 6] },
     ibr: { TZS: [0.142, 0.165], USD: [0.074, 0.086] },
     frequency: [['QUARTERLY', 55], ['ANNUAL', 25], ['MONTHLY', 20]], timing: 'ADVANCE',
     escalation: [['FIXED', 85], ['NONE', 15]], fixedRate: [0.03, 0.05], reviewEveryMonths: 12,
@@ -104,8 +104,8 @@ export const EAST_AFRICA: Market[] = [
   {
     country: 'RW', weight: 10,
     currencies: [['USD', 60], ['RWF', 40]],
-    rent: { OFFICE: [17000, 24000], RETAIL: [22000, 42000], MIXED_USE: [15000, 21000], WAREHOUSE: [6500, 9500], INDUSTRIAL: [5500, 8000] },
-    usdRent: { OFFICE: [13, 18], RETAIL: [16, 30], MIXED_USE: [11, 15], WAREHOUSE: [5, 7], INDUSTRIAL: [4, 6] },
+    rent: { OFFICE: [17000, 24000], RETAIL: [16000, 32000], MIXED_USE: [15000, 21000], WAREHOUSE: [6500, 9500], INDUSTRIAL: [5500, 8000] },
+    usdRent: { OFFICE: [13, 18], RETAIL: [11, 22], MIXED_USE: [11, 15], WAREHOUSE: [5, 7], INDUSTRIAL: [4, 6] },
     ibr: { RWF: [0.148, 0.168], USD: [0.074, 0.086] },
     frequency: [['QUARTERLY', 60], ['MONTHLY', 40]], timing: 'ADVANCE',
     escalation: [['FIXED', 85], ['NONE', 15]], fixedRate: [0.03, 0.05], reviewEveryMonths: 12,

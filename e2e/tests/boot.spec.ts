@@ -48,6 +48,9 @@ test('a manager signs in, reads the register and opens a lease without a single 
   await expect(page.getByRole('grid')).toBeVisible();
   await expect(page.locator('.MuiDataGrid-row').first()).toBeVisible();
   await expect(page.getByText(/^Rows 1–100 of/)).toBeVisible();
+  // The default columns fit a 1440 px screen beside the open navigation: nothing scrolls sideways.
+  const overflow = await page.locator('.MuiDataGrid-virtualScroller').evaluate((s) => s.scrollWidth - s.clientWidth);
+  expect(overflow, 'register overflow at 1440 px').toBeLessThanOrEqual(0);
 
   await page.getByRole('button', { name: 'Next page' }).click();
   await expect(page.getByText(/^Rows 101–200 of/)).toBeVisible();

@@ -50,7 +50,7 @@ export const sw: Catalogue = {
   'signin.roleShort.VIEWER': 'Mtazamaji',
   'signin.role.ADMIN': 'Kila kitu, ikiwemo mionekano ya pamoja na mipangilio.',
   'signin.role.MANAGER': 'Kuunda na kurekebisha mikataba, kusimamia tarehe na kazi.',
-  'signin.role.VIEWER': 'Kusoma na kuhamisha data. Mfumo unakataa kila badiliko.',
+  'signin.role.VIEWER': 'Anaweza kuona na kuhamisha data, lakini hawezi kufanya mabadiliko.',
   'signin.signingIn': 'Inaingia…',
   'signin.error': 'Kuingia hakukufanikiwa. Jaribu tena baada ya muda mfupi.',
   'signin.limit': 'Majaribio mengi ya kuingia kutoka mtandao wako kwa muda mfupi. Jaribu baadaye.',

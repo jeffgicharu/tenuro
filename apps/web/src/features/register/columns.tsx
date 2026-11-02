@@ -167,7 +167,7 @@ export function useRegisterColumns(reportingCurrency: string): GridColDef<Regist
         renderCell: ({ row }) => <span data-num>{f.area(row.areaSqm)}</span>,
       },
       {
-        field: 'nextKeyDate', headerName: m('register.col.nextKey'), width: 156,
+        field: 'nextKeyDate', headerName: m('register.col.nextKey'), width: 180,
         renderCell: ({ row }) => row.nextKeyDate ? (
           <Stack>
             <span data-num>{f.date(row.nextKeyDate)}</span>

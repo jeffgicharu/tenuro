@@ -20,10 +20,12 @@ export function watchPage(page: Page) {
 
 const SHORT_ROLE: Record<Role, string> = { 'Portfolio admin': 'Admin', 'Lease manager': 'Manager', 'Read-only viewer': 'Viewer' };
 
-// Finds the button the way a person would: the company's section, then the role named on the button.
+// Finds the button the way a screen-reader user meets it: the group named after the company, then
+// the role named on the button (each company's buttons are a labelled group, so "Admin" is never
+// announced without its company).
 export async function signIn(page: Page, company: Company, role: Role) {
   await page.goto('/sign-in');
-  const section = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: company }) });
+  const section = page.getByRole('group', { name: company });
   await section.getByRole('button', { name: new RegExp(`^${SHORT_ROLE[role]}\\b`) }).click();
   await page.waitForURL('**/leases');
 }

@@ -266,6 +266,11 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
             '& .MuiDataGrid-row:hover': { backgroundColor: t.brandTint },
             '& .MuiDataGrid-row:active': { backgroundColor: t.brandSoft },
             '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center' },
+            // The last header's hidden menu button and resize handle spill past its edge, which gave
+            // the grid sideways scroll. MUI clips that header only once the grid already scrolls
+            // sideways; clip it always. (The hidden menu also shrinks to zero width; clip it too.)
+            '& .MuiDataGrid-columnHeader--last': { overflow: 'hidden' },
+            '& .MuiDataGrid-menuIcon': { overflow: 'hidden' },
             // The reference column sticks to the start edge (the free grid has no pinned columns).
             // Its background layers the row's hover tint over the surface, so it stays opaque.
             '& .MuiDataGrid-cell[data-field="reference"], & .MuiDataGrid-columnHeader[data-field="reference"]': {

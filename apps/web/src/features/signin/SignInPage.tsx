@@ -161,7 +161,8 @@ export function SignInPage() {
                       </Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
+                  {/* A labelled group, so each role button is announced with its company ("Mbuyu Court Holdings, group: Admin, Wanjiru Kariuki"). */}
+                  <Box role="group" aria-labelledby={`company-${tenant.id}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
                     {accounts.map((a) => {
                       const Icon = ROLE_ICON[a.role];
                       const current = viewer?.user.id === a.id;
@@ -174,8 +175,7 @@ export function SignInPage() {
                           loading={pending === a.id}
                           disabled={pending !== null && pending !== a.id}
                           // The accessible name is the visible text (role and person), as WCAG 2.5.3 asks;
-                          // the company heading is announced as the description.
-                          aria-describedby={`company-${tenant.id}`}
+                          // the surrounding group names the company.
                           sx={{
                             justifyContent: 'flex-start', alignItems: 'flex-start', textAlign: 'start', flexDirection: 'column', gap: 0.5,
                             py: 2.5, px: 3, minHeight: 64, backgroundColor: current ? t.brandSoft : t.surface,
