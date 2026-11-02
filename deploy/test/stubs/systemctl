@@ -1,0 +1,22 @@
+#!/bin/bash
+# Records calls. On request: fails migrations, journey checks, a slot restart or the nginx
+# reload, or signals the caller (the activation script) in the middle of the reload.
+printf 'systemctl %s\n' "$*" >>"$STUB_LOG"
+case "$*" in
+  "start tenuro-migrate@"*) [[ ${STUB_FAIL_MIGRATE:-} == 1 ]] && exit 1 ;;
+  "start tenuro-smoke@"*) [[ ${STUB_FAIL_SMOKE:-} == 1 ]] && exit 1 ;;
+  "restart tenuro@"*) [[ ${STUB_FAIL_RESTART:-} == 1 ]] && exit 1 ;;
+  "is-active --quiet nginx") [[ ${STUB_NGINX_INACTIVE:-} == 1 ]] && exit 3 ;;
+  "reload nginx")
+    if [[ -n ${STUB_SIGNAL_ON_RELOAD:-} && ! -e $STUB_LOG.signalled ]]; then
+      : >"$STUB_LOG.signalled"
+      kill -s "$STUB_SIGNAL_ON_RELOAD" "$PPID"
+      exit 0
+    fi
+    if [[ ${STUB_FAIL_RELOAD:-} == 1 && ! -e $STUB_LOG.reload-failed ]]; then
+      : >"$STUB_LOG.reload-failed"
+      exit 1
+    fi
+    ;;
+esac
+exit 0

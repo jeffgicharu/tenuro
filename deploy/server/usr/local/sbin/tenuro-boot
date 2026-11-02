@@ -1,0 +1,62 @@
+#!/bin/bash
+# Runs once at boot (tenuro-boot.service): starts the slot named in state/active and makes
+# sure the nginx snippet names it too. nginx -t comes first, and nginx is reloaded only if the
+# snippet actually changed. This covers a power loss between an activation's commit and its
+# boot handover, or in the middle of a rollback.
+set -euo pipefail
+
+if [[ ${TENURO_ACTIVATE_TEST:-} == 1 && $EUID -ne 0 ]]; then
+  BASE=${TENURO_TEST_BASE:?}
+  SNIPPET=${TENURO_TEST_SNIPPET:?}
+else
+  export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  if [[ $EUID -ne 0 ]]; then echo "tenuro-boot must run as root" >&2; exit 1; fi
+  BASE=/srv/tenuro
+  SNIPPET=/etc/nginx/tenuro/active-slot.conf
+fi
+STATE=$BASE/state
+
+exec 9<"$STATE"
+flock -w 900 9
+
+active=$(cat "$STATE/active" 2>/dev/null || true)
+case $active in
+  blue) port=9000 other=green ;;
+  green) port=9001 other=blue ;;
+  "") echo "no active slot recorded; nothing to start"; exit 0 ;;
+  *) echo "unrecognised state file" >&2; exit 1 ;;
+esac
+
+systemctl enable --quiet "tenuro@$active.service" || true
+systemctl disable --quiet "tenuro@$other.service" || true
+# --no-block: tenuro@ is ordered after postgresql, which may still be starting.
+systemctl start --no-block "tenuro@$active.service"
+
+current=$(grep -Eo 'tenuro_slot (blue|green)' "$SNIPPET" 2>/dev/null | cut -d' ' -f2 || true)
+if [[ $current == "$active" && ! -e $SNIPPET.prev ]]; then
+  echo "tenuro@$active started; nginx already names it"
+  exit 0
+fi
+
+saved=$(mktemp "$SNIPPET.saved.XXXXXX")
+[[ -e $SNIPPET ]] && cp -p -- "$SNIPPET" "$saved"
+tmp=$(mktemp "$SNIPPET.XXXXXX")
+# shellcheck disable=SC2016  # nginx variables are literal text
+printf 'set $tenuro_slot %s;\nset $tenuro_port %s;\n' "$active" "$port" >"$tmp"
+chmod 644 -- "$tmp"
+mv -f -- "$tmp" "$SNIPPET"
+if ! nginx -t -q; then
+  if [[ -s $saved ]]; then
+    mv -f -- "$saved" "$SNIPPET"
+    echo "nginx -t failed with the snippet for $active; the previous snippet was put back and nginx was not reloaded" >&2
+  else
+    rm -f -- "$saved"
+    echo "nginx -t failed with the snippet for $active (there was no previous snippet); nginx was not reloaded" >&2
+  fi
+  exit 1
+fi
+rm -f -- "$saved" "$SNIPPET.prev"
+if systemctl is-active --quiet nginx; then
+  systemctl reload nginx
+fi
+echo "tenuro@$active started; nginx snippet restored to $active"

@@ -1,0 +1,14 @@
+#!/bin/bash
+# shellcheck disable=SC2016  # nginx variables are literal text here
+# nginx -t passes unless STUB_FAIL_NGINX_T=1, or the snippet names STUB_FAIL_NGINX_T_FOR_SLOT.
+# It also fails if the snippet is malformed.
+printf 'nginx %s\n' "$*" >>"$STUB_LOG"
+if [[ $1 == -t ]]; then
+  [[ ${STUB_FAIL_NGINX_T:-} == 1 ]] && exit 1
+  grep -Eq '^set \$tenuro_slot (blue|green);$' "$TENURO_TEST_SNIPPET" || exit 1
+  grep -Eq '^set \$tenuro_port (9000|9001);$' "$TENURO_TEST_SNIPPET" || exit 1
+  if [[ -n ${STUB_FAIL_NGINX_T_FOR_SLOT:-} ]] && grep -q "tenuro_slot $STUB_FAIL_NGINX_T_FOR_SLOT;" "$TENURO_TEST_SNIPPET"; then
+    exit 1
+  fi
+fi
+exit 0

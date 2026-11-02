@@ -27,7 +27,11 @@ export const config = {
   slot: env.SLOT ?? 'dev',
   revision: env.REVISION ?? releaseRevision(),
   databaseUrl: env.DATABASE_URL,
-  sessionSecret: production ? required('SESSION_SECRET') : (env.SESSION_SECRET ?? 'dev-only-session-secret'),
+  // Read on first use, not at load: tools that share these modules but hold no secrets (the smoke
+  // check, the self-check) must be able to import them. The server checks it at start-up.
+  get sessionSecret(): string {
+    return production ? required('SESSION_SECRET') : (env.SESSION_SECRET ?? 'dev-only-session-secret');
+  },
   cookieName: production ? '__Host-tenuro_session' : 'tenuro_session',
   sessionDays: 7,
   // Paths inside a release; overridable for local development and tests.

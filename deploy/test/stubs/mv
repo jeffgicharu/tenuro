@@ -1,0 +1,9 @@
+#!/bin/bash
+# The real mv, except that with STUB_RACE_SYMLINK=<target> the upload folder is swapped for a
+# symlink to <target> at the last moment, as a hostile upload user racing the freeze would.
+real=$(type -P -a mv | grep -v -- "/stubs/mv$" | head -n1)
+if [[ -n ${STUB_RACE_SYMLINK:-} && $1 == -T && $2 == -- && $3 == */incoming/* ]]; then
+  rm -rf -- "$3"
+  ln -s -- "$STUB_RACE_SYMLINK" "$3"
+fi
+exec "$real" "$@"

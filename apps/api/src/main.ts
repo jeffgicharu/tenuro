@@ -9,6 +9,9 @@ if (process.argv.includes('--selfcheck')) {
   process.exit(0);
 }
 
+// Fail at start-up, not on the first sign-in, if the server is missing its secret.
+void config.sessionSecret;
+
 const db = createDb(config.databaseUrl, 6);
 const server = await listen(db);
 startSweeper(db);
