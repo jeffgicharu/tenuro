@@ -13,6 +13,7 @@ import {
   GULF_BUILDINGS, GULF_LANDLORD_NOUNS, GULF_LANDLORD_PREFIX, GULF_LOGISTICS, GULF_ROOTS, PEOPLE, PREMISES, STREET_PATTERNS,
 } from './names.ts';
 import { Rng, stableId } from './rng.ts';
+import { seedText } from './text.ts';
 import { TENANTS, type TenantSeed } from './tenants.ts';
 
 export interface SeedData {
@@ -104,6 +105,7 @@ export function generate(opts: SeedOptions): SeedData {
   TENANTS.forEach((t, tenantIndex) => {
     if (opts.only && !opts.only.includes(t.slug)) return;
     const rng = new Rng(`tenuro:${t.slug}`);
+    const tx = seedText(t.region);
     const tenantId = stableId('tenant', t.slug);
     out.tenant.push({
       id: tenantId, slug: t.slug, name: t.name, name_local: t.nameLocal, locale: t.locale, languages: t.languages,
@@ -166,7 +168,7 @@ export function generate(opts: SeedOptions): SeedData {
         year_built: propRng.int(1978, 2023),
         latitude: (district.lat + propRng.between(-0.012, 0.012)).toFixed(6),
         longitude: (district.lng + propRng.between(-0.012, 0.012)).toFixed(6),
-        photo: `/static/photos/exteriors/${photoRegion}-${String(1 + (p % 8)).padStart(2, '0')}.jpg`,
+        photo: `/static/photos/exteriors/${photoRegion}-${String(photoFor(type, t.region, p)).padStart(2, '0')}.jpg`,
         created_at: ts(addYears(today, -12)),
       };
       out.property.push(row);
@@ -239,7 +241,7 @@ export function generate(opts: SeedOptions): SeedData {
             id: stableId('option', leaseId, 'break'), tenant_id: tenantId, sandbox_id: null, lease_row_id: leaseId,
             kind: 'BREAK', exercise_on: breakOn, notice_by: notice, term_months: null, price: null,
             reasonably_certain: false, status: breakOn < today ? 'LAPSED' : 'OPEN',
-            terms: 'Tenant-only break on not less than six months’ written notice; vacant possession and rent paid to date.',
+            terms: tx.breakTerms,
           });
         }
         if (r.chance(0.7)) {
@@ -249,7 +251,7 @@ export function generate(opts: SeedOptions): SeedData {
             kind: 'RENEWAL', exercise_on: addDays(expiry, 1), notice_by: addMonths(expiry, -r.pick([6, 9, 12])),
             term_months: renewTerm, price: null, reasonably_certain: type === 'WAREHOUSE' && r.chance(0.3),
             status: expiry < today ? (status === 'HOLDING_OVER' ? 'OPEN' : r.pick(['EXERCISED', 'LAPSED'] as const)) : 'OPEN',
-            terms: `Option to renew for ${renewTerm / 12} years at open market rent, on the same terms otherwise.`,
+            terms: tx.renewTerms(renewTerm / 12),
           });
         }
         out.lease_option.push(...options);
@@ -258,17 +260,15 @@ export function generate(opts: SeedOptions): SeedData {
         const keyDates: { kind: KeyDateKind; due: IsoDate; title: string }[] = [];
         const relevant = expiry >= addMonths(today, -12) && status !== 'TERMINATED';
         if (relevant) {
-          keyDates.push({ kind: 'EXPIRY', due: expiry, title: 'Lease expiry' });
+          keyDates.push({ kind: 'EXPIRY', due: expiry, title: tx.keyDate.EXPIRY });
           for (const o of options) {
-            if (o.notice_by) keyDates.push({
-              kind: o.kind === 'BREAK' ? 'BREAK_NOTICE' : 'RENEWAL_NOTICE', due: o.notice_by,
-              title: o.kind === 'BREAK' ? 'Break notice deadline' : 'Renewal notice deadline',
-            });
+            const kind = o.kind === 'BREAK' ? 'BREAK_NOTICE' : 'RENEWAL_NOTICE';
+            if (o.notice_by) keyDates.push({ kind, due: o.notice_by, title: tx.keyDate[kind] });
           }
           const nextReview = nextReviewOn(terms, addMonths(today, -6));
-          if (nextReview) keyDates.push({ kind: 'RENT_REVIEW', due: nextReview, title: escKind === 'FIXED' ? 'Fixed rent uplift' : escKind === 'CPI' ? 'Indexation review' : 'Rent review' });
-          if (expiry < today) keyDates.push({ kind: 'DEPOSIT_RETURN', due: addMonths(expiry, 2), title: 'Deposit return due' });
-          if (r.chance(0.25)) keyDates.push({ kind: 'INSURANCE', due: addMonths(today, r.int(-3, 11)).slice(0, 8) + '01', title: 'Insurance certificate renewal' });
+          if (nextReview) keyDates.push({ kind: 'RENT_REVIEW', due: nextReview, title: tx.keyDate.RENT_REVIEW });
+          if (expiry < today) keyDates.push({ kind: 'DEPOSIT_RETURN', due: addMonths(expiry, 2), title: tx.keyDate.DEPOSIT_RETURN });
+          if (r.chance(0.25)) keyDates.push({ kind: 'INSURANCE', due: addMonths(today, r.int(-3, 11)).slice(0, 8) + '01', title: tx.keyDate.INSURANCE });
         }
         const owner = r.pick(managers).id;
         let nextKey: { due: IsoDate; kind: KeyDateKind } | null = null;
@@ -285,13 +285,8 @@ export function generate(opts: SeedOptions): SeedData {
           const daysOut = daysBetween(today, k.due);
           if (daysOut >= -20 && daysOut <= 120 && r.chance(0.72)) {
             const taskTitles: Record<KeyDateKind, string> = {
-              EXPIRY: 'Decide on exit or renewal and brief the landlord',
-              BREAK_NOTICE: 'Confirm break decision and serve notice if exercising',
-              RENEWAL_NOTICE: 'Prepare renewal terms and serve notice',
-              RENT_REVIEW: escKind === 'FIXED' ? 'Check uplifted rent on the next invoice' : 'Agree the reviewed rent with the landlord',
-              DEPOSIT_RETURN: 'Chase return of the deposit',
-              INSURANCE: 'Obtain the renewed insurance certificate',
-              CUSTOM: 'Follow up',
+              ...tx.task,
+              RENT_REVIEW: escKind === 'FIXED' ? tx.task.RENT_REVIEW_FIXED : tx.task.RENT_REVIEW,
             };
             const st: TaskStatus = daysOut < 0 ? r.weighted([['DONE', 55], ['IN_PROGRESS', 30], ['TODO', 15]] as const) : r.weighted([['TODO', 60], ['IN_PROGRESS', 35], ['DONE', 5]] as const);
             const created = addDays(k.due, -r.int(60, 150));
@@ -403,14 +398,14 @@ export function generate(opts: SeedOptions): SeedData {
             verb, summary, diff: diff ? JSON.stringify(diff) : null, created_at: ts(on, r.int(7, 17), r.int(0, 59)),
           });
         };
-        act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', `Lease ${lesseeRow.reference} created`, adminAccount.id);
-        act('signed', commencement, 'DOCUMENT_ADDED', 'Signed lease agreement uploaded', owner);
+        act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', tx.activity.created(lesseeRow.reference), adminAccount.id);
+        act('signed', commencement, 'DOCUMENT_ADDED', tx.activity.signed, owner);
         steps.forEach((s, i) => act(`step${i}`, s.startsOn, 'RENT_CHANGED',
-          escKind === 'CPI' ? 'Indexation applied to passing rent' : 'Rent review settled',
-          owner, { field: 'rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }));
-        if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', 'Lease is holding over past its expiry date', owner, { field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' });
-        if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', 'Lease expired', owner, { field: 'status', from: 'ACTIVE', to: 'EXPIRED' });
-        if (status === 'TERMINATED') act('terminated', minIso(addMonths(commencement, r.int(12, 40)), today), 'STATUS_CHANGED', 'Lease terminated by agreement', adminAccount.id, { field: 'status', from: 'ACTIVE', to: 'TERMINATED' });
+          escKind === 'CPI' ? tx.activity.indexation : tx.activity.review,
+          owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }]));
+        if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.holding, owner, [{ field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' }]);
+        if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.expired, owner, [{ field: 'status', from: 'ACTIVE', to: 'EXPIRED' }]);
+        if (status === 'TERMINATED') act('terminated', minIso(addMonths(commencement, r.int(12, 40)), today), 'STATUS_CHANGED', tx.activity.terminated, adminAccount.id, [{ field: 'status', from: 'ACTIVE', to: 'TERMINATED' }]);
       }
     }
 
@@ -469,5 +464,15 @@ export function generate(opts: SeedOptions): SeedData {
 }
 
 const minIso = (a: IsoDate, b: IsoDate) => (a < b ? a : b);
+
+// Each region has 8 exteriors: offices first, then retail frontage, then logistics (Europe has a
+// fourth office). A property only ever gets a photo of its own kind.
+function photoFor(type: PropertyType, region: TenantSeed['region'], n: number): number {
+  const sets = region === 'EU'
+    ? { office: [1, 2, 3, 4], retail: [5, 6], logistics: [7, 8] }
+    : { office: [1, 2, 3], retail: [4, 5, 6], logistics: [7, 8] };
+  const list = type === 'RETAIL' ? sets.retail : type === 'WAREHOUSE' || type === 'INDUSTRIAL' ? sets.logistics : sets.office;
+  return list[n % list.length]!;
+}
 const landlordSlug = (name: string, n: number) =>
   /^[\x00-\x7F]+$/.test(name) ? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) : `landlord-${n}`;

@@ -34,7 +34,9 @@ export const builder = new SchemaBuilder<{
   complexity: {
     defaultComplexity: 1,
     defaultListMultiplier: 10,
-    limit: { complexity: 5_000, depth: 12, breadth: 400 },
+    // The lease page asks for every section's first page at once (about 6,100). Production also
+    // runs only persisted queries, so this guards development and any future public API.
+    limit: { complexity: 20_000, depth: 12, breadth: 400 },
   },
 });
 
