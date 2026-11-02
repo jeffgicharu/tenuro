@@ -2,6 +2,9 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
+// relay-test-utils' mock environment calls jest.fn() internally; Vitest's vi is compatible.
+vi.stubGlobal('jest', vi);
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
