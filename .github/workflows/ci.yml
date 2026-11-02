@@ -150,7 +150,7 @@ jobs:
           cd release
           export NODE_ENV=production PORT=9000 SLOT=blue PGUSER=tenuro_app PGPASSWORD=ci-app PGDATABASE=tenuro SESSION_SECRET=ci-only-secret
           runtime/bin/node --max-old-space-size=144 server/index.mjs > server.log 2>&1 &
-          for i in $(seq 30); do curl -fsS http://127.0.0.1:9000/api/health >/dev/null && break; sleep 1; done
+          for _ in $(seq 30); do curl -fsS http://127.0.0.1:9000/api/health >/dev/null && break; sleep 1; done
           runtime/bin/node server/smoke.mjs
           rss=$(curl -fsS http://127.0.0.1:9000/api/health | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).rssMb))')
           echo "server memory after the smoke run: ${rss} MB (unit cap 224 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
