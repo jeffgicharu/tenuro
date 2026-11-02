@@ -1,0 +1,5 @@
+# The CI activation key's forced command may run the activation script as root and nothing
+# else. sudo 1.9.9 on Ubuntu 22.04 has no regex arguments, so the sha is validated by both
+# /usr/local/sbin/tenuro-activate-ssh and tenuro-activate itself. env_reset stays on.
+Defaults:tenuro-ci !requiretty
+tenuro-ci ALL=(root) NOPASSWD: /usr/local/sbin/tenuro-activate

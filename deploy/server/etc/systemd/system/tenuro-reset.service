@@ -1,0 +1,57 @@
+[Unit]
+Description=Tenuro nightly rebuild of the data and visitor sandboxes
+Documentation=https://github.com/jeffgicharu/tenuro/blob/main/deploy/README.md
+After=postgresql.service
+Wants=postgresql.service
+ConditionPathExists=/srv/tenuro/current/server/rebuild.mjs
+
+[Service]
+Type=oneshot
+User=tenuro-jobs
+Group=tenuro-jobs
+EnvironmentFile=/srv/tenuro/shared/ops.env
+Environment=NODE_ENV=production
+WorkingDirectory=/srv/tenuro/current
+ExecStart=/srv/tenuro/current/runtime/bin/node --max-old-space-size=144 server/rebuild.mjs
+TimeoutStartSec=1800
+StateDirectory=tenuro-jobs
+StateDirectoryMode=0700
+UMask=0077
+
+# The box is shared: run behind everyone else.
+Nice=10
+IOSchedulingClass=idle
+CPUQuota=50%
+MemoryMax=192M
+MemorySwapMax=0
+TasksMax=32
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+# V8's JIT needs writable and executable memory; every other protection stays on.
+MemoryDenyWriteExecute=no
