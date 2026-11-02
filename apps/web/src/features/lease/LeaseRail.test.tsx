@@ -72,7 +72,7 @@ describe('lease page rail', () => {
     );
 
     const rail = await screen.findByRole('complementary', { name: 'rail' });
-    expect(rail).toHaveTextContent(/Open tasks\s*View all\s*1\b/);
+    expect(rail).toHaveTextContent(/Open tasks\s*View all\s*1(?!\d)/);
 
     const user = userEvent.setup();
     await user.click(screen.getAllByRole('button', { name: 'Add task' })[0]!);
@@ -89,7 +89,7 @@ describe('lease page rail', () => {
       }),
     );
 
-    await waitFor(() => expect(rail).toHaveTextContent(/Open tasks\s*View all\s*2\b/));
+    await waitFor(() => expect(rail).toHaveTextContent(/Open tasks\s*View all\s*2(?!\d)/));
     expect(screen.getByText('Request the service charge budget')).toBeInTheDocument();
   });
 });
