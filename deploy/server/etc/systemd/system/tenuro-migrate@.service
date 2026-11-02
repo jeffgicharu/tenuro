@@ -10,6 +10,8 @@ User=tenuro-jobs
 Group=tenuro-jobs
 EnvironmentFile=/srv/tenuro/shared/ops.env
 Environment=NODE_ENV=production
+# Caps glibc malloc arenas: the seed's native memory otherwise fragments and RSS creeps toward the cap.
+Environment=MALLOC_ARENA_MAX=2
 WorkingDirectory=/srv/tenuro/slots/%i
 ExecStart=/srv/tenuro/slots/%i/runtime/bin/node --max-old-space-size=112 server/migrate.mjs
 TimeoutStartSec=300
