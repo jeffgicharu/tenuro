@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from 'react';
+import { startTransition, Suspense, useEffect, useMemo, useState } from 'react';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -191,6 +191,13 @@ function FacetList({ facet, filter, fixed, label, selected, searchable, onChange
   const t = useTheme().tokens;
   const intl = useIntl();
   const [query, setQuery] = useState('');
+  // Counts follow the filter one step behind, in a transition of their own: picking a value must
+  // not hold the URL change (itself a transition) and the grid refetch until new counts arrive.
+  // The old counts stay visible meanwhile.
+  const [countsFilter, setCountsFilter] = useState(filter);
+  useEffect(() => {
+    startTransition(() => setCountsFilter(filter));
+  }, [filter]);
   const data = useLazyLoadQuery<FilterBarFacetsQuery>(
     graphql`
       query FilterBarFacetsQuery($filter: LeaseFilter) {
@@ -205,7 +212,7 @@ function FacetList({ facet, filter, fixed, label, selected, searchable, onChange
         }
       }
     `,
-    { filter: toGraphQLFilter(filter) as FilterBarFacetsQuery['variables']['filter'] },
+    { filter: toGraphQLFilter(countsFilter) as FilterBarFacetsQuery['variables']['filter'] },
     { fetchPolicy: 'store-or-network' },
   );
   const counts = new Map((data.viewer?.leaseFacets[facet] ?? []).map((c) => [c.value, c.count]));

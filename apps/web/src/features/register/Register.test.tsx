@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import { createMockEnvironment, MockPayloadGenerator } from 'relay-test-utils';
@@ -96,7 +96,7 @@ describe('lease register', () => {
     const env = setup();
     resolveInitial(env);
     await user.click(await screen.findByRole('button', { name: 'Open break option' }));
-    const op = lastOperation(env);
+    const op = await waitFor(() => lastOperation(env));
     expect(op.request.node.operation.name).toBe('RegisterGridPaginationQuery');
     expect(op.request.variables).toMatchObject({ first: 100, filter: { hasOpenBreak: true } });
   });
@@ -112,7 +112,7 @@ describe('lease register', () => {
       }));
     });
     await user.click(await screen.findByRole('checkbox', { name: /Active/ }));
-    const op = lastOperation(env);
+    const op = await waitFor(() => lastOperation(env));
     expect(op.request.node.operation.name).toBe('RegisterGridPaginationQuery');
     expect(op.request.variables.filter).toEqual({ status: ['ACTIVE'] });
   });
@@ -122,7 +122,7 @@ describe('lease register', () => {
     const env = setup();
     resolveInitial(env);
     await user.click(await screen.findByRole('tab', { name: /Holding over/ }));
-    const op = lastOperation(env);
+    const op = await waitFor(() => lastOperation(env));
     expect(op.request.variables).toMatchObject({ filter: { status: ['HOLDING_OVER'] }, orderBy: [{ field: 'ANNUAL_RENT', direction: 'DESC' }] });
     expect(screen.getByRole('tab', { name: /Holding over/ })).toHaveAttribute('aria-selected', 'true');
   });
@@ -135,7 +135,9 @@ describe('lease register', () => {
     await user.type(screen.getByLabelText('Name'), 'Nairobi retail');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(lastOperation(env, 'SavedViewsBarSaveMutation')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /Nairobi retail/ })).toBeInTheDocument();
+    // The dialog stays open until the server answers (so a validation error can show in it), and
+    // while a modal is open MUI hides the rest of the page from assistive tech; look behind it.
+    expect(screen.getByRole('tab', { name: /Nairobi retail/, hidden: true })).toBeInTheDocument();
   });
 
   it('offers "New lease" to managers but not to read-only viewers', async () => {
