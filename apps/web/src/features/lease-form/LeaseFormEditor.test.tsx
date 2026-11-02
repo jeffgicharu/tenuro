@@ -76,13 +76,17 @@ describe('LeaseFormEditor', () => {
     await screen.findByRole('heading', { name: 'Review', level: 2 });
     await userEvent.click(screen.getByRole('button', { name: /create lease/i }));
     const op = await pendingMutation(environment, 'LeaseFormEditorSubmitMutation');
+    // An explicit payload: the generator cannot pick a union member for an operation that is not
+    // marked as a test operation.
     act(() => {
-      environment.mock.resolve(op, MockPayloadGenerator.generate(op, {
-        MutationSubmitLeaseResult: () => ({
-          __typename: 'ValidationFailed', message: 'x',
-          fieldErrors: [{ path: 'term.expiryDate', code: 'outside_term', message: 'Outside the term', step: 'term' }],
-        }),
-      }));
+      environment.mock.resolve(op, {
+        data: {
+          submitLease: {
+            __typename: 'ValidationFailed', message: 'x',
+            fieldErrors: [{ path: 'term.expiryDate', code: 'outside_term', message: 'Outside the term', step: 'term' }],
+          },
+        },
+      });
     });
     await screen.findByRole('heading', { name: 'Term', level: 2 });
     expect(screen.getByText(/the server found 1 problem/i)).toBeInTheDocument();
@@ -103,9 +107,7 @@ describe('LeaseFormEditor', () => {
     await userEvent.type(await screen.findByRole('textbox', { name: /landlord name/i }), 'N');
     const op = await pendingMutation(environment, 'useAutosaveSaveDraftMutation');
     act(() => {
-      environment.mock.resolve(op, MockPayloadGenerator.generate(op, {
-        MutationSaveLeaseDraftResult: () => ({ __typename: 'StaleVersion', message: 'stale', currentVersion: 5 }),
-      }));
+      environment.mock.resolve(op, { data: { saveLeaseDraft: { __typename: 'StaleVersion', message: 'stale', currentVersion: 5 } } });
     });
     const dialog = await screen.findByRole('dialog', { name: /someone changed this since you opened it/i });
     expect(within(dialog).getByRole('button', { name: /keep my version/i })).toBeInTheDocument();

@@ -8,8 +8,10 @@ import { minorUnits } from '../i18n/format.ts';
 const ARABIC_INDIC = /[٠-٩۰-۹]/g;
 
 // Turns whatever was typed or pasted into a plain decimal string: Arabic-Indic digits become ASCII,
-// grouping separators go, the Arabic decimal separator becomes a dot, and digits beyond the
-// currency's minor unit are dropped. The value never passes through a float.
+// grouping separators go, and the Arabic decimal separator becomes a dot. Extra decimal digits are
+// ignored as they are typed. In a currency with no minor unit (UGX, RWF) the decimals are kept
+// instead, so validation can say "no decimal places": dropping the dot would merge the digits typed
+// after it into the whole number and silently multiply the amount. The value never becomes a float.
 export function normaliseDecimal(input: string, places: number): string {
   let s = input
     .replace(ARABIC_INDIC, (d) => String((d.charCodeAt(0) & 0xf) % 10))
@@ -20,7 +22,7 @@ export function normaliseDecimal(input: string, places: number): string {
   if (dot !== -1) {
     const int = s.slice(0, dot);
     const frac = s.slice(dot + 1).replace(/\./g, '');
-    s = places === 0 ? int : `${int}.${frac.slice(0, places)}`;
+    s = places === 0 ? `${int}.${frac}` : `${int}.${frac.slice(0, places)}`;
   }
   return s;
 }
@@ -28,6 +30,8 @@ export function normaliseDecimal(input: string, places: number): string {
 export function formatDecimalForDisplay(value: string, locale: string, maxPlaces: number): string {
   if (!/^\d+(\.\d*)?$/.test(value)) return value;
   const frac = value.split('.')[1] ?? '';
+  // Never round what was typed: a value with too many decimals is shown as entered, and flagged.
+  if (frac.length > maxPlaces) return value;
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: Math.min(frac.length, maxPlaces),
     maximumFractionDigits: maxPlaces,
