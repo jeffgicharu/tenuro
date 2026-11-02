@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { useRevalidator } from 'react-router';
 import Box from '@mui/material/Box';
@@ -14,6 +14,9 @@ import { PortfolioFigures } from './PortfolioFigures.tsx';
 import { RecentActivity } from './RecentActivity.tsx';
 import { RentMix } from './RentMix.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
+
+// The map's outlines are a separate chunk, fetched after the rest of the overview.
+const PortfolioMap = lazy(() => import('./PortfolioMap.tsx'));
 import { useRouteQuery } from '../../app/relayRoute.ts';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { ErrorBoundary } from '../../components/ErrorBoundary.tsx';
@@ -73,8 +76,13 @@ function DashboardContent() {
       <Box sx={{ mb: { xs: 4, md: 5 } }}>
         <NeedsAttention portfolio={viewer.portfolio} canEdit={viewer.canEdit} userId={viewer.user.id} />
       </Box>
-      <Box sx={{ display: 'grid', gap: { xs: 4, md: 5 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.7fr) minmax(0, 1fr)' }, mb: { xs: 4, md: 5 } }}>
+      <Box sx={{ mb: { xs: 4, md: 5 } }}>
         <ExpiryProfile portfolio={viewer.portfolio} />
+      </Box>
+      <Box sx={{ display: 'grid', gap: { xs: 4, md: 5 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.5fr) minmax(0, 1fr)' }, mb: { xs: 4, md: 5 } }}>
+        <Suspense fallback={<Box sx={{ minHeight: 440, border: `1px solid ${t.rule}`, borderRadius: 1.5, backgroundColor: t.surface }} />}>
+          <PortfolioMap portfolio={viewer.portfolio} />
+        </Suspense>
         <RentMix portfolio={viewer.portfolio} />
       </Box>
       <Box sx={{ display: 'grid', gap: { xs: 4, md: 5 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.25fr) minmax(0, 1fr)' } }}>

@@ -13,6 +13,7 @@ export const dashboardQuery = graphql`
         ...PortfolioFigures_portfolio
         ...ExpiryProfile_portfolio
         ...RentMix_portfolio
+        ...PortfolioMap_portfolio
         ...CriticalDates_portfolio
         ...RecentActivity_portfolio
       }

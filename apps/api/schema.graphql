@@ -71,6 +71,17 @@ type AttentionItem {
   rentAtStake: Money!
 }
 
+"""
+Passing rent of live leases in one city, with its position (the mean of its properties).
+"""
+type CityRent {
+  city: String!
+  countryCode: CountryCode!
+  latitude: Decimal!
+  longitude: Decimal!
+  rent: RentShare!
+}
+
 """An ISO 3166-1 alpha-2 country code."""
 scalar CountryCode
 
@@ -796,6 +807,11 @@ type Portfolio {
 
   """The latest changes across the portfolio, newest first."""
   recentActivity(first: Int = 8): [Activity!]!
+
+  """
+  Live leases’ passing rent by city, largest first, for the portfolio map.
+  """
+  rentByCity: [CityRent!]!
   rentByCountry: [CountryRent!]!
   rentByType: [TypeRent!]!
 

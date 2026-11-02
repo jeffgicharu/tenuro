@@ -21,7 +21,8 @@ export interface RebuildReport {
 
 // Replaces all base data in one transaction, so readers see the old portfolio until the commit and
 // never a half-built one. Visitor sandboxes and sessions go with it. Data is built and
-// written in batches of a few hundred leases to keep peak memory low on the shared server. Runs as the owner role,
+// written in batches of about a hundred leases, in statements of about 2,000 parameters, to keep
+// peak memory low on the shared server (the native buffers behind each statement count, not just the heap). Runs as the owner role,
 // which row-level security does not apply to.
 export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Promise<RebuildReport> {
   const rows: Record<string, number> = {};
@@ -30,7 +31,7 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
   await db.transaction().execute(async (tx) => {
     await sql`SET LOCAL statement_timeout = 0`.execute(tx);
     for (const table of DELETE_ORDER) await tx.deleteFrom(table).execute();
-    const batches = generateBatches(opts, 200);
+    const batches = generateBatches(opts, 120);
     let batchCount = 0;
     for (;;) {
       const g0 = performance.now();
@@ -44,7 +45,7 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
         if (!list.length) continue;
         // Small statements keep the SQL text and parameter arrays small as well.
         const columns = Object.keys(list[0]!).length;
-        const chunk = Math.max(1, Math.floor(4_000 / columns));
+        const chunk = Math.max(1, Math.floor(2_000 / columns));
         for (let j = 0; j < list.length; j += chunk) {
           await tx.insertInto(table).values(list.slice(j, j + chunk) as never).execute();
         }
@@ -53,7 +54,7 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
       batchCount += 1;
       if (process.env.SEED_DEBUG && batchCount % 5 === 0) {
         const m = process.memoryUsage();
-        log(`  batch ${batchCount}: heap ${Math.round(m.heapUsed / 1048576)}/${Math.round(m.heapTotal / 1048576)} MB, rss ${Math.round(m.rss / 1048576)} MB`);
+        log(`  batch ${batchCount}: heap ${Math.round(m.heapUsed / 1048576)}/${Math.round(m.heapTotal / 1048576)} MB, external ${Math.round(m.external / 1048576)} MB (buffers ${Math.round(m.arrayBuffers / 1048576)}), rss ${Math.round(m.rss / 1048576)} MB`);
       }
     }
     log(`  ${batchCount} batches written`);

@@ -136,6 +136,18 @@ const KeyDateKindSummary = builder.objectRef<KindRow>('KeyDateKindSummary').impl
   }),
 });
 
+interface CityRow { city: string; country: string; lat: string; lng: string; leases: number; rent: string; share: string }
+const CityRent = builder.objectRef<CityRow>('CityRent').implement({
+  description: 'Passing rent of live leases in one city, with its position (the mean of its properties).',
+  fields: (t) => ({
+    city: t.exposeString('city'),
+    countryCode: t.field({ type: 'CountryCode', resolve: (c) => c.country }),
+    latitude: t.field({ type: 'Decimal', resolve: (c) => decimalString(c.lat) }),
+    longitude: t.field({ type: 'Decimal', resolve: (c) => decimalString(c.lng) }),
+    rent: t.field({ type: RentShare, resolve: (c) => ({ key: c.city, leases: c.leases, rent: c.rent, share: c.share }) }),
+  }),
+});
+
 const DECISION_KINDS = sql`('BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'EXPIRY')`;
 
 const Portfolio = builder.objectRef<Record<string, never>>('Portfolio').implement({
@@ -263,6 +275,18 @@ const Portfolio = builder.objectRef<Record<string, never>>('Portfolio').implemen
         `.execute(ctx.tx);
         return r.rows.sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0));
       },
+    }),
+    rentByCity: t.field({
+      type: [CityRent],
+      description: 'Live leases’ passing rent by city, largest first, for the portfolio map.',
+      resolve: async (_p, _a, ctx) => (await sql<CityRow>`
+        SELECT l.city, l.country_code AS country, avg(p.latitude)::numeric(9, 5)::text AS lat, avg(p.longitude)::numeric(9, 5)::text AS lng,
+          count(*)::int AS leases, sum(l.annual_rent_reporting)::text AS rent,
+          (sum(l.annual_rent_reporting) / nullif(sum(sum(l.annual_rent_reporting)) OVER (), 0))::numeric(6, 4)::text AS share
+        FROM v_lease l JOIN property p ON p.id = l.property_id
+        WHERE l.status IN ('ACTIVE', 'HOLDING_OVER') AND p.latitude IS NOT NULL
+        GROUP BY l.city, l.country_code ORDER BY sum(l.annual_rent_reporting) DESC LIMIT 40
+      `.execute(ctx.tx)).rows,
     }),
     rentByCountry: t.field({ type: [CountryRent], resolve: (_p, _a, ctx) => shares(ctx, 'country_code') }),
     rentByType: t.field({ type: [TypeRent], resolve: (_p, _a, ctx) => shares(ctx, 'property_type') }),

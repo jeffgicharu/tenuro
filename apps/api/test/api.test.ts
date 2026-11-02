@@ -357,6 +357,7 @@ describe('portfolio dashboard', () => {
     expiryProfile { year from leases passingRent { amount } }
     rentByCountry { countryCode rent { leases share passingRent { amount } } }
     rentByType { propertyType rent { leases share } }
+    rentByCity { city countryCode latitude longitude rent { leases share } }
     upcomingKeyDates(first: 5) { dueOn daysUntil lease { reference } }
     keyDateWeeks { start count }
     attentionBuckets { withinDays fromDays count rentAtStake { amount } }
@@ -370,6 +371,7 @@ describe('portfolio dashboard', () => {
       expiryProfile: { year: number | null; from: number; leases: number; passingRent: { amount: string } }[];
       rentByCountry: { countryCode: string; rent: { leases: number; share: string; passingRent: { amount: string } } }[];
       rentByType: { propertyType: string; rent: { leases: number; share: string } }[];
+      rentByCity: { city: string; countryCode: string; latitude: string; longitude: string; rent: { leases: number; share: string } }[];
       upcomingKeyDates: { dueOn: string; daysUntil: number; lease: { reference: string } }[];
       keyDateWeeks: { start: string; count: number }[];
       attentionBuckets: { withinDays: number; fromDays: number | null; count: number; rentAtStake: { amount: string } }[];
@@ -390,6 +392,12 @@ describe('portfolio dashboard', () => {
     expect(p.expiryProfile.reduce((n, b) => n + b.leases, 0)).toBe(p.liveLeases);
     expect(p.rentByCountry.reduce((n, c) => n + c.rent.leases, 0)).toBe(p.liveLeases);
     expect(p.rentByType.reduce((n, c) => n + c.rent.leases, 0)).toBe(p.liveLeases);
+    // The map's cities sit in the company's countries, with a position, largest rent first.
+    const countries = new Set(p.rentByCountry.map((c) => c.countryCode));
+    expect(p.rentByCity.length).toBeGreaterThan(0);
+    expect(p.rentByCity.every((c) => countries.has(c.countryCode) && Math.abs(Number(c.latitude)) <= 90 && Math.abs(Number(c.longitude)) <= 180)).toBe(true);
+    const cityShares = p.rentByCity.map((c) => Number(c.rent.share));
+    expect(cityShares).toEqual([...cityShares].sort((x, y) => y - x));
     const shares = p.rentByCountry.reduce((n, c) => n + Number(c.rent.share), 0);
     expect(Math.abs(shares - 1)).toBeLessThan(0.01);
     const register = await v.gql<{ viewer: { leases: { totalCount: number } } }>('{ viewer { leases(first: 1, filter: { status: [ACTIVE, HOLDING_OVER] }) { totalCount } } }');
