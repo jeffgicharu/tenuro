@@ -6,6 +6,7 @@ import { KeyDateKindEnum, Money, money, PropertyTypeEnum, decimalString } from '
 import { Viewer } from './viewer.ts';
 import { Activity, KeyDate } from './workflow.ts';
 import { Lease } from './lease.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 // The portfolio at a glance: the dashboard's figures, computed in the database over the
 // signed-in person's view of the leases (shared rows plus their own private changes).
@@ -109,7 +110,7 @@ interface AttentionRow { key_date_id: string; rent: string; has_task: boolean }
 
 const AttentionItem = builder.objectRef<AttentionRow>('AttentionItem').implement({
   fields: (t) => ({
-    keyDate: t.field({ type: KeyDate, resolve: async (a, _x, ctx) => (await ctx.tx.selectFrom('v_key_date').selectAll().where('key_date_id', '=', a.key_date_id).executeTakeFirst())! }),
+    keyDate: t.field({ type: KeyDate, resolve: async (a, _x, ctx) => (await ctx.tx.selectFrom('v_key_date').selectAll().where(viewIdIn([a.key_date_id])).where('key_date_id', '=', a.key_date_id).executeTakeFirst())! }),
     rentAtStake: t.field({ type: Money, description: 'The lease’s passing rent a year, in the reporting currency.', resolve: async (a, _x, ctx) => money(a.rent, await reportingCurrency(ctx)) }),
     hasOpenTask: t.boolean({ description: 'Someone already has a task open for this date.', resolve: (a) => a.has_task }),
   }),
@@ -132,7 +133,7 @@ const KeyDateKindSummary = builder.objectRef<KindRow>('KeyDateKindSummary').impl
   fields: (t) => ({
     kind: t.field({ type: KeyDateKindEnum, resolve: (k) => k.kind as 'EXPIRY' }),
     count: t.exposeInt('n'),
-    next: t.field({ type: KeyDate, resolve: async (k, _x, ctx) => (await ctx.tx.selectFrom('v_key_date').selectAll().where('key_date_id', '=', k.next_id).executeTakeFirst())! }),
+    next: t.field({ type: KeyDate, resolve: async (k, _x, ctx) => (await ctx.tx.selectFrom('v_key_date').selectAll().where(viewIdIn([k.next_id])).where('key_date_id', '=', k.next_id).executeTakeFirst())! }),
   }),
 });
 

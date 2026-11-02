@@ -6,6 +6,7 @@ import { builder } from '../builder.ts';
 import { DocumentKindEnum, KeyDateKindEnum, KeyDateStatusEnum, TaskPriorityEnum, TaskStatusEnum } from './common.ts';
 import { Lease } from './lease.ts';
 import { User } from './tenant.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 type KeyDateRow = Selectable<Database['v_key_date']>;
 type TaskRow = Selectable<Database['v_task']>;
@@ -18,7 +19,7 @@ const DOCUMENT_COLUMNS = ['id', 'tenant_id', 'sandbox_id', 'lease_id', 'kind', '
 export const KeyDate = builder.node(builder.objectRef<KeyDateRow>('KeyDate'), {
   id: { resolve: (k) => k.key_date_id },
   loadMany: async (ids, ctx) => {
-    const rows = await ctx.tx.selectFrom('v_key_date').selectAll().where('key_date_id', 'in', ids as string[]).execute();
+    const rows = await ctx.tx.selectFrom('v_key_date').selectAll().where(viewIdIn(ids as string[])).where('key_date_id', 'in', ids as string[]).execute();
     const map = new Map(rows.map((r) => [r.key_date_id, r]));
     return ids.map((id) => map.get(id) ?? null);
   },
@@ -38,7 +39,7 @@ export const KeyDate = builder.node(builder.objectRef<KeyDateRow>('KeyDate'), {
 export const Task = builder.node(builder.objectRef<TaskRow>('Task'), {
   id: { resolve: (k) => k.task_id },
   loadMany: async (ids, ctx) => {
-    const rows = await ctx.tx.selectFrom('v_task').selectAll().where('task_id', 'in', ids as string[]).execute();
+    const rows = await ctx.tx.selectFrom('v_task').selectAll().where(viewIdIn(ids as string[])).where('task_id', 'in', ids as string[]).execute();
     const map = new Map(rows.map((r) => [r.task_id, r]));
     return ids.map((id) => map.get(id) ?? null);
   },
@@ -58,7 +59,7 @@ export const Task = builder.node(builder.objectRef<TaskRow>('Task'), {
     keyDate: t.field({
       type: KeyDate, nullable: true,
       resolve: async (k, _a, ctx) => (k.key_date_id
-        ? ((await ctx.tx.selectFrom('v_key_date').selectAll().where('key_date_id', '=', k.key_date_id).executeTakeFirst()) ?? null)
+        ? ((await ctx.tx.selectFrom('v_key_date').selectAll().where(viewIdIn([k.key_date_id])).where('key_date_id', '=', k.key_date_id).executeTakeFirst()) ?? null)
         : null),
     }),
   }),

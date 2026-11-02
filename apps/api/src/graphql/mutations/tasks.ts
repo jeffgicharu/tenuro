@@ -8,9 +8,10 @@ import { TaskPriorityEnum, TaskStatusEnum } from '../types/common.ts';
 import { Lease } from '../types/lease.ts';
 import { User } from '../types/tenant.ts';
 import { KeyDate, Task } from '../types/workflow.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 const loadTask = async (ctx: Context, id: string) =>
-  (await ctx.tx.selectFrom('v_task').selectAll().where('task_id', '=', id).executeTakeFirst()) ?? null;
+  (await ctx.tx.selectFrom('v_task').selectAll().where(viewIdIn([id])).where('task_id', '=', id).executeTakeFirst()) ?? null;
 
 async function checkAssignee(ctx: Context, userId: string | null | undefined) {
   if (!userId) return;

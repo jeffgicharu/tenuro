@@ -9,6 +9,7 @@ import { config } from '../config.ts';
 import { todayIso } from '../domain/dates.ts';
 import { PermissionDenied, QuotaExceeded } from './errors.ts';
 import type { LeaseRow } from './types/lease-shape.ts';
+import { viewIdIn } from '../db/viewid.ts';
 
 export interface Context {
   db: Db;
@@ -61,7 +62,7 @@ export function createLoaders(tx: Tx) {
       byKey(ids, await tx.selectFrom('property').selectAll().where('id', 'in', ids as string[]).execute(), (r) => r.id)),
     // Loads by logical id; the view returns the caller's overlay copy when one exists.
     lease: new DataLoader<string, LeaseRow | null>(async (ids) =>
-      byKey(ids, (await tx.selectFrom('v_lease').selectAll().where('lease_id', 'in', ids as string[]).execute()) as LeaseRow[], (r) => r.lease_id)),
+      byKey(ids, (await tx.selectFrom('v_lease').selectAll().where(viewIdIn(ids as string[])).where('lease_id', 'in', ids as string[]).execute()) as LeaseRow[], (r) => r.lease_id)),
     // Loads one specific lease row (a version), e.g. to find the currency of its child rows.
     leaseByRow: new DataLoader<string, { id: string; currency: string } | null>(async (ids) =>
       byKey(ids, await tx.selectFrom('lease').select(['id', 'currency']).where('id', 'in', ids as string[]).execute(), (r) => r.id)),

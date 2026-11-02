@@ -7,6 +7,7 @@ import { chargeWrite, requireRole, requireSession } from '../context.ts';
 import { NotFound, PermissionDenied, ValidationFailed, WRITE_ERRORS } from '../errors.ts';
 import { ViewScopeEnum } from '../types/common.ts';
 import { SavedView, Viewer } from '../types/viewer.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 const MAX_CONFIG = 8 * 1024;
 
@@ -41,7 +42,7 @@ builder.relayMutationField(
       if (input.shared) requireRole(ctx, 'ADMIN');
       await chargeWrite(ctx);
       if (input.id) {
-        const current = await ctx.tx.selectFrom('v_saved_view').selectAll().where('view_id', '=', input.id.id).executeTakeFirst();
+        const current = await ctx.tx.selectFrom('v_saved_view').selectAll().where(viewIdIn([input.id.id])).where('view_id', '=', input.id.id).executeTakeFirst();
         if (!current) throw new NotFound('The view');
         if (current.owner_id === null && session.role !== 'ADMIN') throw new PermissionDenied('ADMIN');
         if (current.owner_id !== null && current.owner_id !== session.userId) throw new NotFound('The view');
@@ -63,7 +64,7 @@ builder.relayMutationField(
     outputFields: (t) => ({
       view: t.field({
         type: SavedView,
-        resolve: async (p, _a, ctx) => (await ctx.tx.selectFrom('v_saved_view').selectAll().where('view_id', '=', p.viewId).executeTakeFirstOrThrow()),
+        resolve: async (p, _a, ctx) => (await ctx.tx.selectFrom('v_saved_view').selectAll().where(viewIdIn([p.viewId])).where('view_id', '=', p.viewId).executeTakeFirstOrThrow()),
       }),
       viewer: t.field({ type: Viewer, resolve: (_p, _a, ctx) => ctx.session! }),
     }),
@@ -77,7 +78,7 @@ builder.relayMutationField(
     errors: { types: WRITE_ERRORS },
     resolve: async (_root, { input }, ctx) => {
       const session = requireSession(ctx);
-      const current = await ctx.tx.selectFrom('v_saved_view').selectAll().where('view_id', '=', input.id.id).executeTakeFirst();
+      const current = await ctx.tx.selectFrom('v_saved_view').selectAll().where(viewIdIn([input.id.id])).where('view_id', '=', input.id.id).executeTakeFirst();
       if (!current || (current.owner_id !== null && current.owner_id !== session.userId)) throw new NotFound('The view');
       if (current.owner_id === null) requireRole(ctx, 'ADMIN');
       await chargeWrite(ctx);

@@ -1,6 +1,9 @@
-import { sql } from 'kysely';
+import { randomUUID } from 'node:crypto';
+import { CompiledQuery, sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from '../src/config.ts';
+import { withScope, type Tx } from '../src/db/client.ts';
+import { viewIdIn } from '../src/db/viewid.ts';
 import { localId, prepareDatabase, startApp, Visitor, type TestApp } from './harness.ts';
 
 let app: TestApp;
@@ -372,18 +375,42 @@ describe('server timing', () => {
 });
 
 describe('lookups through the person\'s view', () => {
-  it('can find a lease, key date or task by its view id through an index', async () => {
-    // The test data is small enough that the planner may rightly prefer a scan, so scans are turned
-    // off: what matters is that the index matches the view's id once Postgres folds the view in.
-    const plan = (view: string, column: string, table: string) => app.owner.transaction().execute(async (tx) => {
+  // Row-level security keeps Postgres from using an index on the view id itself (coalesce(origin_id,
+  // id)), so lookups add a condition it can push down. Checked as the app role, under the policy, on
+  // the queries the API actually sends. Scans are off because the test data is small enough that a
+  // scan would be the planner's honest choice; what matters is that an index can serve the lookup.
+  it('can find a lease, key date or task by its view id through an index under row-level security', async () => {
+    const tenantId = (await app.owner.selectFrom('tenant').select('id').limit(1).executeTakeFirstOrThrow()).id;
+    const first = async (table: 'lease' | 'key_date' | 'task') =>
+      (await app.owner.selectFrom(table).select('id').where('sandbox_id', 'is', null).where('tenant_id', '=', tenantId).limit(1).executeTakeFirstOrThrow()).id;
+    const plan = (build: (tx: Tx) => { compile(): CompiledQuery }) => withScope(app.db, { tenantId, sandboxId: null }, async (tx) => {
       await sql`SET LOCAL enable_seqscan = off`.execute(tx);
-      const id = (await sql<{ id: string }>`SELECT id FROM ${sql.table(table)} WHERE sandbox_id IS NULL LIMIT 1`.execute(tx)).rows[0]!.id;
-      const rows = (await sql<{ 'QUERY PLAN': string }>`EXPLAIN SELECT * FROM ${sql.table(view)} WHERE ${sql.ref(column)} = ${id}`.execute(tx)).rows;
-      return rows.map((r) => r['QUERY PLAN']).join('\n');
+      const q = build(tx).compile();
+      const r = await tx.executeQuery<{ 'QUERY PLAN': string }>(CompiledQuery.raw(`EXPLAIN ${q.sql}`, [...q.parameters]));
+      return r.rows.map((x) => x['QUERY PLAN']).join('\n');
     });
-    expect(await plan('v_lease', 'lease_id', 'lease')).toMatch(/lease_view_id/);
-    expect(await plan('v_key_date', 'key_date_id', 'key_date')).toMatch(/key_date_view_id/);
-    expect(await plan('v_task', 'task_id', 'task')).toMatch(/task_view_id/);
+    const lease = await first('lease');
+    const keyDate = await first('key_date');
+    const task = await first('task');
+    expect(await plan((tx) => tx.selectFrom('v_lease').selectAll().where(viewIdIn([lease])).where('lease_id', 'in', [lease]))).toMatch(/Index Cond: \(id = ANY/);
+    expect(await plan((tx) => tx.selectFrom('v_key_date').selectAll().where(viewIdIn([keyDate])).where('key_date_id', '=', keyDate))).toMatch(/Index Cond: \(id = ANY/);
+    expect(await plan((tx) => tx.selectFrom('v_task').selectAll().where(viewIdIn([task])).where('task_id', '=', task))).toMatch(/Index Cond: \(id = ANY/);
+  });
+
+  it('finds the same row by view id as before, for a shared row and a private copy', async () => {
+    const v = new Visitor(app);
+    await v.signIn('mbuyu-court', 'MANAGER');
+    const sandboxId = await v.sandboxId();
+    const tenantId = (await app.owner.selectFrom('tenant').select('id').where('slug', '=', 'mbuyu-court').executeTakeFirstOrThrow()).id;
+    const shared = await app.owner.selectFrom('key_date').selectAll().where('sandbox_id', 'is', null).where('tenant_id', '=', tenantId).limit(1).executeTakeFirstOrThrow();
+    const look = (id: string) => withScope(app.db, { tenantId, sandboxId }, (tx) =>
+      tx.selectFrom('v_key_date').select(['key_date_id', 'id', 'title']).where(viewIdIn([id])).where('key_date_id', '=', id).execute());
+    expect(await look(shared.id)).toEqual([{ key_date_id: shared.id, id: shared.id, title: shared.title }]);
+    // A private copy answers to the shared row's id, and its own id finds nothing.
+    const copyId = randomUUID();
+    await app.owner.insertInto('key_date').values({ ...shared, id: copyId, sandbox_id: sandboxId, origin_id: shared.id, title: `${shared.title} (changed)`, version: shared.version + 1 }).execute();
+    expect(await look(shared.id)).toEqual([{ key_date_id: shared.id, id: copyId, title: `${shared.title} (changed)` }]);
+    expect(await look(copyId)).toEqual([]);
   });
 });
 

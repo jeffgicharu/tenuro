@@ -12,6 +12,7 @@ import {
 import { Lease, Property } from './lease.ts';
 import type { LeaseRow } from './lease-shape.ts';
 import { Tenant, User } from './tenant.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 export const LeaseOrderFieldEnum = builder.enumType('LeaseOrderField', {
   values: ['REFERENCE', 'PROPERTY_NAME', 'CITY', 'COUNTRY', 'LANDLORD', 'STATUS', 'COMMENCEMENT_DATE', 'EXPIRY_DATE',
@@ -87,7 +88,7 @@ type SavedViewRow = Selectable<Database['v_saved_view']>;
 export const SavedView = builder.node(builder.objectRef<SavedViewRow>('SavedView'), {
   id: { resolve: (v) => v.view_id },
   loadMany: async (ids, ctx) => {
-    const rows = await ctx.tx.selectFrom('v_saved_view').selectAll().where('view_id', 'in', ids as string[]).execute();
+    const rows = await ctx.tx.selectFrom('v_saved_view').selectAll().where(viewIdIn(ids as string[])).where('view_id', 'in', ids as string[]).execute();
     const map = new Map(rows.map((r) => [r.view_id, r]));
     return ids.map((id) => map.get(id) ?? null);
   },

@@ -6,9 +6,10 @@ import { NotFound, StaleVersion, ValidationFailed, WRITE_ERRORS } from '../error
 import { KeyDateStatusEnum } from '../types/common.ts';
 import { User } from '../types/tenant.ts';
 import { KeyDate } from '../types/workflow.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 const loadKeyDate = async (ctx: Context, id: string) =>
-  (await ctx.tx.selectFrom('v_key_date').selectAll().where('key_date_id', '=', id).executeTakeFirst()) ?? null;
+  (await ctx.tx.selectFrom('v_key_date').selectAll().where(viewIdIn([id])).where('key_date_id', '=', id).executeTakeFirst()) ?? null;
 
 // Reminders are days before the date: whole numbers from 1 to 365, at most six, latest first.
 function checkReminders(days: readonly number[]): number[] {

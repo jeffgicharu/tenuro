@@ -6,6 +6,7 @@ import type { Context } from '../context.ts';
 import { KeyDateKindEnum, KeyDateStatusEnum } from './common.ts';
 import { Viewer } from './viewer.ts';
 import { KeyDate } from './workflow.ts';
+import { viewIdIn } from '../../db/viewid.ts';
 
 // The key dates across the whole portfolio: the list, the month calendar and the reminders due.
 // Everything reads the person's own view (shared rows plus their private changes).
@@ -65,7 +66,7 @@ const Reminder = builder.objectRef<{ key_date_id: string; remind_on: string; day
   fields: (t) => ({
     remindOn: t.field({ type: 'Date', resolve: (r) => r.remind_on }),
     daysBefore: t.exposeInt('days_before'),
-    keyDate: t.field({ type: KeyDate, resolve: async (r, _a, ctx) => (await ctx.tx.selectFrom('v_key_date').selectAll().where('key_date_id', '=', r.key_date_id).executeTakeFirst())! }),
+    keyDate: t.field({ type: KeyDate, resolve: async (r, _a, ctx) => (await ctx.tx.selectFrom('v_key_date').selectAll().where(viewIdIn([r.key_date_id])).where('key_date_id', '=', r.key_date_id).executeTakeFirst())! }),
   }),
 });
 

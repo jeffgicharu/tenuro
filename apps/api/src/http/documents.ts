@@ -3,6 +3,7 @@ import type { SessionInfo } from '../auth/session.ts';
 import { withScope, type Db } from '../db/client.ts';
 import { API_CSP, COMMON_HEADERS } from './security.ts';
 import { renderAgreement, renderMemo, renderPlan } from './rendered.ts';
+import { viewIdIn } from '../db/viewid.ts';
 
 const safeName = (name: string) => name.replace(/[^\w.\- ]+/g, '_').slice(0, 120);
 
@@ -21,7 +22,7 @@ export async function serveDocument(db: Db, session: SessionInfo, id: string, do
   }
   if (!doc.content && (doc.template === 'lease-agreement' || doc.template === 'floor-plan' || doc.template === 'rent-review-memo') && doc.lease_id) {
     const rendered = await withScope(db, { tenantId: session.tenantId, sandboxId: session.sandboxId }, async (tx) => {
-      const lease = await tx.selectFrom('v_lease').selectAll().where('lease_id', '=', doc.lease_id!).executeTakeFirst();
+      const lease = await tx.selectFrom('v_lease').selectAll().where(viewIdIn([doc.lease_id!])).where('lease_id', '=', doc.lease_id!).executeTakeFirst();
       if (!lease) return null;
       const tenant = await tx.selectFrom('tenant').select(['languages']).where('id', '=', session.tenantId).executeTakeFirst();
       const lang = tenant?.languages?.[0] === 'ar' ? 'ar' as const : 'en' as const;
