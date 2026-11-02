@@ -134,9 +134,13 @@ server {
 
     # Sign-in creates sessions and sandboxes: a tight per-visitor limit on top of the
     # app's own daily cap.
+    # In the proxied locations below, nginx sets X-Robots-Tag itself (and hides the app's copy),
+    # so its own 413 and 429 responses carry noindex too.
     location = /api/session {
         limit_req zone=tenuro_signin burst=5 nodelay;
         client_max_body_size 4k;
+        proxy_hide_header X-Robots-Tag;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:$tenuro_port;
     }
 
@@ -145,18 +149,24 @@ server {
         client_max_body_size 12m;                   # the app caps each file at 10 MB
         proxy_request_buffering on;
         proxy_read_timeout 60s;
+        proxy_hide_header X-Robots-Tag;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:$tenuro_port;
     }
 
     location = /api/vitals {
         limit_req zone=tenuro_beacon burst=10 nodelay;
         client_max_body_size 16k;
+        proxy_hide_header X-Robots-Tag;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:$tenuro_port;
     }
 
     location = /api/csp-report {
         limit_req zone=tenuro_report burst=5 nodelay;
         client_max_body_size 16k;
+        proxy_hide_header X-Robots-Tag;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:$tenuro_port;
     }
 
@@ -164,13 +174,17 @@ server {
         limit_req zone=tenuro_app burst=40 nodelay;
         proxy_buffering off;                        # CSV and Excel exports stream
         proxy_read_timeout 60s;
+        proxy_hide_header X-Robots-Tag;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:$tenuro_port;
     }
 
-    # /graphql and every page route. The app sends the security headers and renders
+    # /graphql and every page route. The app sends the other security headers and renders
     # index.html itself so each response carries a fresh CSP nonce.
     location / {
         limit_req zone=tenuro_app burst=40 nodelay;
+        proxy_hide_header X-Robots-Tag;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:$tenuro_port;
     }
 }

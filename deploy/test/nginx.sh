@@ -98,30 +98,45 @@ class H(http.server.BaseHTTPRequestHandler):
         if n: self.rfile.read(n)
         body = json.dumps({"path": self.path, "xff": self.headers.get("x-forwarded-for")}).encode()
         self.send_response(200); self.send_header("content-type", "application/json")
+        self.send_header("x-robots-tag", "noindex, nofollow")
         self.send_header("content-length", str(len(body))); self.end_headers(); self.wfile.write(body)
     do_GET = do_POST = _send
 http.server.ThreadingHTTPServer(("127.0.0.1", 19000), H).serve_forever()
 PY
 BPID=$!
 sleep 0.7
-code=$(curl "${H[@]}" -o "$P/body" -w '%{http_code}' "$U/graphql" -d '{}' -H 'content-type: application/json')
+code=$(curl "${H[@]}" -o "$P/body" -D "$P/hdr" -w '%{http_code}' "$U/graphql" -d '{}' -H 'content-type: application/json' -H 'x-tenuro-client: smoke')
 t "graphql reaches the slot's port" '[ "$code" = 200 ] && grep -q "\"/graphql\"" "$P/body"'
+t "proxied responses carry X-Robots-Tag exactly once" '[ "$(grep -ci "^x-robots-tag:" "$P/hdr")" = 1 ]'
+for path in /api/health /api/session /api/vitals /api/csp-report /api/uploads /leases; do
+  curl "${H[@]}" -o /dev/null -D "$P/hdr" -X POST -d x "$U$path"
+  t "$path carries X-Robots-Tag exactly once" '[ "$(grep -ci "^x-robots-tag: noindex" "$P/hdr")" = 1 ]'
+done
 codes=$(for _ in $(seq 30); do curl "${H[@]}" -o /dev/null -w '%{http_code}\n' -X POST "$U/api/session" -d x; done | sort | uniq -c | tr '\n' ' ')
 t "loopback is never rate limited ($codes)" '! grep -q 429 <<<"$codes"'
 codes=$(for _ in $(seq 12); do curl "${CF[@]}" -o /dev/null -w '%{http_code}\n' -X POST -H 'CF-Connecting-IP: 203.0.113.9' "$U/api/session" -d x; done | sort | uniq -c | tr '\n' ' ')
 t "a visitor via Cloudflare is limited after the burst ($codes)" 'grep -q 429 <<<"$codes"'
+code=$(curl "${CF[@]}" -o /dev/null -D "$P/hdr" -w '%{http_code}' -X POST -H 'CF-Connecting-IP: 203.0.113.9' "$U/api/session" -d x)
+t "nginx's own 429 carries noindex" '[ "$code" = 429 ] && grep -qi "^x-robots-tag: noindex" "$P/hdr"'
 out=$(curl "${CF[@]}" -H 'CF-Connecting-IP: 198.51.100.7' "$U/graphql" -d '{}')
 t "the app sees the visitor's address" 'grep -q "198.51.100.7" <<<"$out"'
 out=$(curl "${H[@]}" -H 'CF-Connecting-IP: 198.51.100.7' "$U/graphql" -d '{}')
 t "CF-Connecting-IP from outside Cloudflare is ignored" '! grep -q "198.51.100.7" <<<"$out"'
 head -c 20000 /dev/zero >"$P/big"
-code=$(curl "${H[@]}" -o /dev/null -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/vitals")
+code=$(curl "${H[@]}" -o /dev/null -D "$P/hdr" -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/vitals")
 t "vitals body over 16 KB refused" '[ "$code" = 413 ]'
-code=$(curl "${H[@]}" -o /dev/null -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/csp-report")
+t "nginx's own 413 carries noindex (vitals)" 'grep -qi "^x-robots-tag: noindex" "$P/hdr"'
+code=$(curl "${H[@]}" -o /dev/null -D "$P/hdr" -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/csp-report")
 t "csp-report body over 16 KB refused" '[ "$code" = 413 ]'
+t "nginx's own 413 carries noindex (csp-report)" 'grep -qi "^x-robots-tag: noindex" "$P/hdr"'
+code=$(curl "${H[@]}" -o /dev/null -D "$P/hdr" -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/session")
+t "sign-in body over 4 KB refused with noindex" '[ "$code" = 413 ] && grep -qi "^x-robots-tag: noindex" "$P/hdr"'
 head -c 3000000 /dev/zero >"$P/big"
-code=$(curl "${H[@]}" -o /dev/null -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/graphql")
+code=$(curl "${H[@]}" -o /dev/null -D "$P/hdr" -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/graphql")
 t "graphql body over 2 MB refused" '[ "$code" = 413 ]'
+t "nginx's own 413 carries noindex (graphql)" 'grep -qi "^x-robots-tag: noindex" "$P/hdr"'
+code=$(curl "${H[@]}" -o /dev/null -D "$P/hdr" -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/exports")
+t "api body over 2 MB refused with noindex" '[ "$code" = 413 ] && grep -qi "^x-robots-tag: noindex" "$P/hdr"'
 code=$(curl "${H[@]}" -o /dev/null -w '%{http_code}' -X POST --data-binary @"$P/big" "$U/api/uploads")
 t "a 3 MB upload is accepted on /api/uploads" '[ "$code" = 200 ]'
 
