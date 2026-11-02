@@ -14,3 +14,4 @@ incoming-media/
 .claude/
 .cache/
 .DS_Store
+apps/web/persisted-queries.json
