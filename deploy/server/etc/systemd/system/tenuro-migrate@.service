@@ -17,6 +17,14 @@ StateDirectory=tenuro-jobs
 StateDirectoryMode=0700
 UMask=0077
 
+# Filesystem view: /var, /srv, /opt, /mnt and /media are empty except for Tenuro's own
+# folders, and other services' config is hidden, so other sites' files on this shared host
+# are out of reach even when they are world-readable.
+TemporaryFileSystem=/var:ro /srv:ro /opt:ro /mnt:ro /media:ro
+BindReadOnlyPaths=/srv/tenuro
+BindPaths=/var/lib/tenuro-jobs
+InaccessiblePaths=-/etc/nginx -/etc/letsencrypt -/etc/ssl/private -/etc/ssl/cloudflare
+
 MemoryMax=160M
 MemorySwapMax=0
 TasksMax=32

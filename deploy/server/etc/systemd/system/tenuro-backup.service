@@ -15,6 +15,12 @@ StateDirectory=tenuro-backup
 StateDirectoryMode=0700
 UMask=0077
 
+# Filesystem view: /var, /srv, /opt, /mnt and /media are empty except for the backup folder,
+# and other services' config is hidden.
+TemporaryFileSystem=/var:ro /srv:ro /opt:ro /mnt:ro /media:ro
+BindPaths=/var/lib/tenuro-backup
+InaccessiblePaths=-/etc/nginx -/etc/letsencrypt -/etc/ssl/private -/etc/ssl/cloudflare
+
 Nice=10
 IOSchedulingClass=idle
 MemoryMax=96M

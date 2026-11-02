@@ -47,6 +47,10 @@ put() { # $1 mode, $2 owner:group, $3 path relative to /
 step "Checking prerequisites"
 [[ $EUID -eq 0 ]] || die "run with sudo"
 [[ -x /usr/bin/rrsync ]] || die "/usr/bin/rrsync not found"
+# rrsync -munge needs rsync 3.2.4 or later.
+rsync_version=$(rsync --version | awk 'NR == 1 { print $3 }')
+[[ $(printf '%s\n3.2.4\n' "$rsync_version" | sort -V | head -n1) == 3.2.4 ]] || die "rsync $rsync_version is too old for rrsync -munge (needs 3.2.4+)"
+grep -q -- 'munge' /usr/bin/rrsync || die "/usr/bin/rrsync has no -munge option"
 [[ -x $PGBIN/pg_dump && -x $PGBIN/pg_restore && -x $PGBIN/psql ]] || die "PostgreSQL 16 client tools not found in $PGBIN"
 command -v nginx >/dev/null || die "nginx not found"
 command -v visudo >/dev/null || die "visudo not found"
@@ -112,6 +116,7 @@ step "Scripts, units and static files"
 put 0755 root:root usr/local/sbin/tenuro-activate
 put 0755 root:root usr/local/sbin/tenuro-activate-ssh
 put 0755 root:root usr/local/sbin/tenuro-retire
+put 0755 root:root usr/local/sbin/tenuro-boot
 put 0755 root:root usr/local/lib/tenuro/backup.sh
 put 0755 root:root usr/local/lib/tenuro/restore-test.sh
 put 0700 root:root usr/local/lib/tenuro/gen-secrets
@@ -120,7 +125,8 @@ put 0644 root:root srv/tenuro/shared/slot-green.env
 put 0644 root:root srv/tenuro/fallback/unavailable.html
 for u in tenuro@.service tenuro-migrate@.service tenuro-smoke@.service \
          tenuro-reset.service tenuro-reset.timer tenuro-backup.service tenuro-backup.timer \
-         tenuro-restore-test.service tenuro-restore-test.timer; do
+         tenuro-restore-test.service tenuro-restore-test.timer tenuro-boot.service \
+         tenuro-incoming-sweep.service tenuro-incoming-sweep.timer; do
   put 0644 root:root "etc/systemd/system/$u"
 done
 
@@ -206,9 +212,11 @@ step "systemd"
 systemctl daemon-reload
 systemd-analyze verify tenuro-backup.service tenuro-restore-test.service tenuro-reset.service \
   tenuro@blue.service tenuro@green.service tenuro-migrate@blue.service tenuro-smoke@blue.service \
-  2>&1 | indent "verify: " || true
-systemctl enable --now tenuro-backup.timer tenuro-restore-test.timer tenuro-reset.timer
-note "timers enabled; tenuro@blue and tenuro@green are started only by tenuro-activate"
+  tenuro-boot.service tenuro-incoming-sweep.service 2>&1 | indent "verify: " || true
+systemctl enable --now tenuro-backup.timer tenuro-restore-test.timer tenuro-reset.timer tenuro-incoming-sweep.timer
+systemctl enable --quiet tenuro-boot.service
+note "timers enabled; tenuro-boot enabled for boot (it does nothing until the first activation)"
+note "tenuro@blue and tenuro@green are enabled and started only by tenuro-activate and tenuro-boot"
 
 step "Done"
 note "Next: add DNS, then the first CI deploy activates release <sha> on the blue slot."
