@@ -115,11 +115,12 @@ const AttentionItem = builder.objectRef<AttentionRow>('AttentionItem').implement
   }),
 });
 
-interface AttentionWindow { label: number; count: number; rent: string }
+interface AttentionWindow { label: number; from: number | null; count: number; rent: string }
 const AttentionBucket = builder.objectRef<AttentionWindow>('AttentionBucket').implement({
-  description: 'Decisions due within a number of days (0 means already overdue).',
+  description: 'Decisions due in a band of days from today (fromDays null and withinDays 0: already overdue).',
   fields: (t) => ({
-    withinDays: t.int({ resolve: (b) => b.label }),
+    withinDays: t.int({ description: 'The band’s last day.', resolve: (b) => b.label }),
+    fromDays: t.int({ nullable: true, description: 'The band’s first day; null for the overdue bucket.', resolve: (b) => b.from }),
     count: t.exposeInt('count'),
     rentAtStake: t.field({ type: Money, resolve: async (b, _x, ctx) => money(b.rent, await reportingCurrency(ctx)) }),
   }),
@@ -163,7 +164,7 @@ const Portfolio = builder.objectRef<Record<string, never>>('Portfolio').implemen
       },
     }),
     overdueKeyDates: t.int({
-      description: 'Key dates still open after their due date.',
+      description: 'Key dates of every kind still open after their due date (attentionBuckets counts only the decisions among them).',
       resolve: async (_p, _a, ctx) => (await ctx.tx.selectFrom('v_key_date').select(sql<number>`count(*)::int`.as('n'))
         .where('status', '=', 'UPCOMING').where('due_on', '<', ctx.today).executeTakeFirstOrThrow()).n,
     }),
@@ -206,7 +207,7 @@ const Portfolio = builder.objectRef<Record<string, never>>('Portfolio').implemen
     }),
     attentionBuckets: t.field({
       type: [AttentionBucket],
-      description: 'Overdue decisions, then those due within 30, 60 and 90 days (cumulative).',
+      description: 'Overdue decisions, then exclusive bands: due in 0–30, 31–60 and 61–90 days.',
       resolve: async (_p, _a, ctx) => {
         const r = await sql<{ overdue: number; overdue_rent: string; d30: number; r30: string; d60: number; r60: string; d90: number; r90: string }>`
           SELECT
@@ -214,33 +215,36 @@ const Portfolio = builder.objectRef<Record<string, never>>('Portfolio').implemen
             coalesce(sum(l.annual_rent_reporting) FILTER (WHERE k.due_on < ${ctx.today}), 0)::text AS overdue_rent,
             count(*) FILTER (WHERE k.due_on >= ${ctx.today} AND k.due_on <= ${addDays(ctx.today, 30)})::int AS d30,
             coalesce(sum(l.annual_rent_reporting) FILTER (WHERE k.due_on >= ${ctx.today} AND k.due_on <= ${addDays(ctx.today, 30)}), 0)::text AS r30,
-            count(*) FILTER (WHERE k.due_on >= ${ctx.today} AND k.due_on <= ${addDays(ctx.today, 60)})::int AS d60,
-            coalesce(sum(l.annual_rent_reporting) FILTER (WHERE k.due_on >= ${ctx.today} AND k.due_on <= ${addDays(ctx.today, 60)}), 0)::text AS r60,
-            count(*) FILTER (WHERE k.due_on >= ${ctx.today} AND k.due_on <= ${addDays(ctx.today, 90)})::int AS d90,
-            coalesce(sum(l.annual_rent_reporting) FILTER (WHERE k.due_on >= ${ctx.today} AND k.due_on <= ${addDays(ctx.today, 90)}), 0)::text AS r90
+            count(*) FILTER (WHERE k.due_on > ${addDays(ctx.today, 30)} AND k.due_on <= ${addDays(ctx.today, 60)})::int AS d60,
+            coalesce(sum(l.annual_rent_reporting) FILTER (WHERE k.due_on > ${addDays(ctx.today, 30)} AND k.due_on <= ${addDays(ctx.today, 60)}), 0)::text AS r60,
+            count(*) FILTER (WHERE k.due_on > ${addDays(ctx.today, 60)} AND k.due_on <= ${addDays(ctx.today, 90)})::int AS d90,
+            coalesce(sum(l.annual_rent_reporting) FILTER (WHERE k.due_on > ${addDays(ctx.today, 60)} AND k.due_on <= ${addDays(ctx.today, 90)}), 0)::text AS r90
           FROM v_key_date k JOIN v_lease l ON l.lease_id = k.lease_id
           WHERE k.status = 'UPCOMING' AND k.kind IN ${DECISION_KINDS} AND k.due_on <= ${addDays(ctx.today, 90)}
         `.execute(ctx.tx);
         const x = r.rows[0]!;
         return [
-          { label: 0, count: x.overdue, rent: x.overdue_rent },
-          { label: 30, count: x.d30, rent: x.r30 },
-          { label: 60, count: x.d60, rent: x.r60 },
-          { label: 90, count: x.d90, rent: x.r90 },
+          { label: 0, from: null, count: x.overdue, rent: x.overdue_rent },
+          { label: 30, from: 0, count: x.d30, rent: x.r30 },
+          { label: 60, from: 31, count: x.d60, rent: x.r60 },
+          { label: 90, from: 61, count: x.d90, rent: x.r90 },
         ];
       },
     }),
     attention: t.field({
       type: [AttentionItem],
       args: { first: t.arg.int({ required: false, defaultValue: 6 }) },
-      description: 'The decisions to make first: overdue ones, then by deadline, larger rents first on the same day.',
+      description: 'The decisions to make first: overdue ones by rent at stake, then upcoming ones by deadline.',
       resolve: async (_p, args, ctx) => {
         const r = await sql<AttentionRow>`
           SELECT k.key_date_id, l.annual_rent_reporting::text AS rent,
             EXISTS (SELECT 1 FROM v_task t WHERE t.key_date_id = k.key_date_id AND t.status IN ('TODO', 'IN_PROGRESS')) AS has_task
           FROM v_key_date k JOIN v_lease l ON l.lease_id = k.lease_id
           WHERE k.status = 'UPCOMING' AND k.kind IN ${DECISION_KINDS} AND k.due_on <= ${addDays(ctx.today, 90)}
-          ORDER BY k.due_on, l.annual_rent_reporting DESC, k.key_date_id
+          -- Overdue first, the largest rent at stake leading; then upcoming by deadline.
+          ORDER BY (k.due_on < ${ctx.today}) DESC,
+            CASE WHEN k.due_on < ${ctx.today} THEN l.annual_rent_reporting END DESC NULLS LAST,
+            k.due_on, l.annual_rent_reporting DESC, k.key_date_id
           LIMIT ${Math.min(Math.max(args.first ?? 6, 1), 25)}
         `.execute(ctx.tx);
         return r.rows;

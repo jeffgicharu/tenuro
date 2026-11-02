@@ -321,7 +321,8 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
             id: kdId, tenant_id: tenantId, sandbox_id: null, origin_id: null, deleted_at: null, lease_id: leaseId,
             kind: k.kind, due_on: k.due, title: k.title,
             // A few recent dates are still open past their due date: every real portfolio has some.
-            status: past ? (daysBetween(k.due, today) <= 75 && r.chance(0.06) ? 'UPCOMING' : r.chance(0.92) ? 'ACTIONED' : 'DISMISSED') : 'UPCOMING',
+            // Slippage is mostly recent: the chance a date is still open falls away over about ten weeks.
+            status: past ? (daysBetween(k.due, today) <= 70 && r.chance(0.12 * Math.exp(-daysBetween(k.due, today) / 18)) ? 'UPCOMING' : r.chance(0.92) ? 'ACTIONED' : 'DISMISSED') : 'UPCOMING',
             owner_id: owner, generated: true,
           });
           if (!past && (!nextKey || k.due < nextKey.due)) nextKey = { due: k.due, kind: k.kind };
@@ -438,19 +439,21 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
         // recent activity reads as a few weeks of a team's work rather than one busy morning.
         // System events (indexation, holding over, expiry) have no person as actor.
         const recentKeep = Math.min(1, 60 / leaseTarget);
-        const act = (key: string, on: IsoDate, verb: string, summary: string, actor: string | null, diff: unknown = null) => {
+        // weight < 1 thins a routine kind of event further, so the feed mixes what people did.
+        const act = (key: string, on: IsoDate, verb: string, summary: string, actor: string | null, diff: unknown = null, weight = 1) => {
           if (on > today) return;
-          if (daysBetween(on, today) <= 45 && !r.chance(recentKeep)) return;
+          if (daysBetween(on, today) <= 45 && !r.chance(recentKeep * weight)) return;
           out.activity.push({
             id: stableId('activity', leaseId, key), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, actor_id: actor,
             verb, summary, diff: diff ? JSON.stringify(diff) : null, created_at: ts(on, r.int(7, 17), r.int(0, 59)),
           });
         };
-        act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', tx.activity.created(lesseeRow.reference), listedAdmin.id);
-        act('signed', commencement, 'DOCUMENT_ADDED', tx.activity.signed, owner);
+        // Leases are entered by whoever on the team handles them, not always the admin.
+        act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', tx.activity.created(lesseeRow.reference), r.chance(0.3) ? listedAdmin.id : r.pick(managers).id, null, 0.4);
+        act('signed', commencement, 'DOCUMENT_ADDED', tx.activity.signed, owner, null, 0.5);
         steps.forEach((s, i) => act(`step${i}`, escKind === 'CPI' ? s.startsOn : addDays(s.startsOn, r.int(5, 40)), 'RENT_CHANGED',
           escKind === 'CPI' ? tx.activity.indexation : r.chance(0.5) ? tx.activity.review : tx.activity.reviewAgreed,
-          escKind === 'CPI' ? null : owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }]));
+          escKind === 'CPI' ? null : owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }], escKind === 'CPI' ? 0.35 : 1));
         for (const o of options) {
           if (!o.notice_by || o.notice_by >= today) continue;
           if (o.kind === 'RENEWAL' && o.status === 'EXERCISED') act('renewal-served', addDays(o.notice_by, -r.int(3, 40)), 'NOTICE_SERVED', tx.activity.renewalServed, owner);

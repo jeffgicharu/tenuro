@@ -21,7 +21,7 @@ export function NeedsAttention({ portfolio: ref, canEdit, userId }: { portfolio:
   const p = useFragment(
     graphql`
       fragment NeedsAttention_portfolio on Portfolio {
-        attentionBuckets { withinDays count rentAtStake { amount currency } }
+        attentionBuckets { withinDays fromDays count rentAtStake { amount currency } }
         attention(first: 6) {
           hasOpenTask
           rentAtStake { amount currency }
@@ -116,7 +116,7 @@ export function NeedsAttention({ portfolio: ref, canEdit, userId }: { portfolio:
         </Button>
       </Box>
 
-      {/* Windows: overdue, then 30, 60 and 90 days (cumulative), each with the rent at stake. */}
+      {/* Overdue, then exclusive bands of 0–30, 31–60 and 61–90 days, each with the rent at stake. */}
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, borderTop: `1px solid ${t.rule}`, borderBottom: `1px solid ${t.rule}` }}>
         {[overdue, ...windows].filter(Boolean).map((b) => {
           const isOverdue = b!.withinDays === 0;
@@ -124,7 +124,7 @@ export function NeedsAttention({ portfolio: ref, canEdit, userId }: { portfolio:
           return (
             <Box component="li" key={b!.withinDays} sx={{ px: { xs: 4, md: 6 }, py: 3.5, borderInlineEnd: `1px solid ${t.rule}`, backgroundColor: hot ? t.dangerSoft : 'transparent', '&:last-of-type': { borderInlineEnd: 0 } }}>
               <Box sx={{ fontSize: '0.75rem', color: hot ? t.danger : t.inkSecondary, fontWeight: hot ? 600 : 400 }}>
-                {isOverdue ? <FormattedMessage id="dashboard.attention.overdue" /> : <FormattedMessage id="dashboard.attention.within" values={{ days: b!.withinDays }} />}
+                {isOverdue ? <FormattedMessage id="dashboard.attention.overdue" /> : <FormattedMessage id="dashboard.attention.band" values={{ from: b!.fromDays ?? 0, to: b!.withinDays }} />}
               </Box>
               <Box data-num sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mt: 0.5 }}>
                 <Box component="span" sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: '1.6rem', fontWeight: theme.direction === 'rtl' ? 600 : 500, color: hot ? t.danger : t.ink }}>{f.number(b!.count)}</Box>

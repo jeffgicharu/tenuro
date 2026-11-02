@@ -24,10 +24,10 @@ function Harness({ canEdit }: { canEdit: boolean }) {
 const resolver = (op: OperationDescriptor) => MockPayloadGenerator.generate(op, {
   Portfolio: () => ({
     attentionBuckets: [
-      { withinDays: 0, count: 3, rentAtStake: { amount: '1200000', currency: 'KES' } },
-      { withinDays: 30, count: 12, rentAtStake: { amount: '9000000', currency: 'KES' } },
-      { withinDays: 60, count: 20, rentAtStake: { amount: '15000000', currency: 'KES' } },
-      { withinDays: 90, count: 31, rentAtStake: { amount: '22000000', currency: 'KES' } },
+      { withinDays: 0, fromDays: null, count: 3, rentAtStake: { amount: '1200000', currency: 'KES' } },
+      { withinDays: 30, fromDays: 0, count: 12, rentAtStake: { amount: '9000000', currency: 'KES' } },
+      { withinDays: 60, fromDays: 31, count: 8, rentAtStake: { amount: '15000000', currency: 'KES' } },
+      { withinDays: 90, fromDays: 61, count: 11, rentAtStake: { amount: '22000000', currency: 'KES' } },
     ],
     attention: [
       { hasOpenTask: false, rentAtStake: { amount: '4800000', currency: 'KES' }, keyDate: { id: 'kd-1', kind: 'BREAK_NOTICE', dueOn: '2026-10-28', daysUntil: -5, lease: { id: 'lease-1', reference: 'KE-O-00012', propertyName: 'Nyandiko Plaza', city: 'Nairobi' } } },
@@ -43,7 +43,8 @@ describe('needs attention', () => {
     renderWithProviders(<Suspense fallback="…"><Harness canEdit /></Suspense>, { environment });
     const panel = await screen.findByRole('region', { name: 'Needs attention' });
     expect(within(panel).getByText('Overdue by 5 days')).toBeInTheDocument();
-    expect(within(panel).getByText('Overdue')).toBeInTheDocument();
+    expect(within(panel).getByText('Decisions overdue')).toBeInTheDocument();
+    expect(within(panel).getByText('Due in 31–60 days')).toBeInTheDocument();
     expect(within(panel).getByText('Task open')).toBeInTheDocument();
   });
 

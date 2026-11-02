@@ -48,10 +48,17 @@ enum Asc842Class {
   OPERATING
 }
 
-"""Decisions due within a number of days (0 means already overdue)."""
+"""
+Decisions due in a band of days from today (fromDays null and withinDays 0: already overdue).
+"""
 type AttentionBucket {
   count: Int!
+
+  """The band’s first day; null for the overdue bucket."""
+  fromDays: Int
   rentAtStake: Money!
+
+  """The band’s last day."""
   withinDays: Int!
 }
 
@@ -745,12 +752,12 @@ type Portfolio {
   areaSqm: Decimal!
 
   """
-  The decisions to make first: overdue ones, then by deadline, larger rents first on the same day.
+  The decisions to make first: overdue ones by rent at stake, then upcoming ones by deadline.
   """
   attention(first: Int = 6): [AttentionItem!]!
 
   """
-  Overdue decisions, then those due within 30, 60 and 90 days (cumulative).
+  Overdue decisions, then exclusive bands: due in 0–30, 31–60 and 61–90 days.
   """
   attentionBuckets: [AttentionBucket!]!
   expiringIn12Months: Int!
@@ -779,7 +786,9 @@ type Portfolio {
   """Leases active or holding over."""
   liveLeases: Int!
 
-  """Key dates still open after their due date."""
+  """
+  Key dates of every kind still open after their due date (attentionBuckets counts only the decisions among them).
+  """
   overdueKeyDates: Int!
 
   """Annual passing rent of live leases."""

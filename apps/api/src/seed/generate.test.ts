@@ -71,11 +71,31 @@ describe('seed realism', () => {
     const overdue = open.filter((k) => String(k.due_on) < today);
     expect(overdue.length).toBeGreaterThan(0);
     expect(overdue.length / open.length).toBeLessThan(0.06);
+    // Mostly recent slips, a few weeks old at most, with a short tail (not all ten weeks late).
+    const ages = overdue.map((k) => (Date.parse(today) - Date.parse(String(k.due_on))) / 86_400_000).sort((x, y) => x - y);
+    expect(ages[Math.floor(ages.length / 2)]!).toBeLessThan(30);
+    expect(ages.at(-1)!).toBeLessThanOrEqual(70);
   });
 
   it('records system events without a person, and a mix of what people did', () => {
     const verbs = new Set(data.activity.map((a) => a.verb));
     for (const v of ['NOTICE_SERVED', 'DECISION_RECORDED', 'DOCUMENT_ADDED', 'RENT_CHANGED', 'STATUS_CHANGED']) expect(verbs).toContain(v);
     expect(data.activity.filter((a) => a.verb === 'STATUS_CHANGED' && a.actor_id === null).length).toBeGreaterThan(0);
+  });
+
+  // Four of seven feed entries once read "Lease … created" by the same admin.
+  it('mixes kinds of event and people in the recent feed', () => {
+    const recent = data.activity.filter((a) => { const d = String(a.created_at).slice(0, 10); return d <= '2026-11-02' && d >= '2026-09-18'; });
+    const byVerb = new Map<string, number>();
+    const byActor = new Map<string, number>();
+    for (const a of recent) {
+      // By what the entry says: rent changes alone cover settled reviews, agreed reviews and indexation.
+      byVerb.set(String(a.summary).replace(/\S*\d\S*/g, '#'), (byVerb.get(String(a.summary).replace(/\S*\d\S*/g, '#')) ?? 0) + 1);
+      if (a.actor_id !== null) byActor.set(String(a.actor_id), (byActor.get(String(a.actor_id)) ?? 0) + 1);
+    }
+    expect(byVerb.size).toBeGreaterThanOrEqual(5);
+    expect(Math.max(...byVerb.values()) / recent.length).toBeLessThan(0.4);
+    const byPeople = [...byActor.values()].reduce((n, c) => n + c, 0);
+    expect(Math.max(...byActor.values()) / byPeople).toBeLessThan(0.35);
   });
 });
