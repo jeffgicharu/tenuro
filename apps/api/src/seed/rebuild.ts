@@ -57,6 +57,8 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
       }
     }
     log(`  ${batchCount} batches written`);
+    // The manifest a restore is checked against (ops.verify_integrity).
+    await sql`SELECT ops.record_manifest()`.execute(tx);
   });
   await sql`ANALYZE`.execute(db);
   return { rows, generateMs, writeMs: performance.now() - t0 - generateMs };

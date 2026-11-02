@@ -143,6 +143,18 @@ jobs:
           echo "nightly rebuild: $(cat rebuild.json)" >> "$GITHUB_STEP_SUMMARY"
           peak=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("rebuild.json","utf8")).peakRssMb)')
           [ "$peak" -lt 180 ]
+      - name: Back up and restore, then verify the restored copy
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: tenuro
+          PGPASSWORD: ci-owner
+        run: |
+          pg_dump --format=custom --no-owner --file=tenuro.dump tenuro
+          PGUSER=postgres PGPASSWORD=postgres createdb -O tenuro tenuro_restore_test
+          pg_restore --no-owner --no-privileges --exit-on-error -d tenuro_restore_test tenuro.dump
+          result=$(psql -d tenuro_restore_test -Atc "SELECT ops.verify_integrity()")
+          echo "restored copy: $result" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$result" = ok ]
       - name: Boot in production mode and run the smoke journeys
         env:
           PGHOST: 127.0.0.1
