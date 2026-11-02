@@ -30,7 +30,9 @@ export default defineConfig({
             // splitting, so a component used only by a lazy page (the form's Autocomplete, say)
             // ships with that page instead of weighing down the first one.
             { name: 'mui', test: /node_modules[\\/](@mui[\\/](system|utils|styled-engine|private-theming)|@emotion|stylis)[\\/]/ },
-            { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/ },
+            // Only the grid itself: by default a group also pulls in its dependencies, which took MUI X
+            // internals that the first page needs (date-picker localisation) into this lazy chunk.
+            { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/, includeDependenciesRecursively: false },
             { name: 'intl', test: /node_modules[\\/](react-intl|@formatjs|intl-messageformat)[\\/]/ },
           ],
         },
