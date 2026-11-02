@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
     "test": "pnpm run relay && vitest run",
-    "relay:watch": "node -e \"require('fs').existsSync('persisted-queries.json')||require('fs').writeFileSync('persisted-queries.json','{}')\" && FORCE_NO_WATCHMAN=1 relay-compiler --watch"
+    "relay:watch": "node -e \"require('fs').existsSync('persisted-queries.json')||require('fs').writeFileSync('persisted-queries.json','{}')\" && FORCE_NO_WATCHMAN=1 relay-compiler --watch",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build -o storybook-static --quiet && node scripts/externalize-inline.mjs storybook-static"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -41,6 +43,9 @@
   "devDependencies": {
     "@babel/core": "^8.0.10",
     "@rolldown/plugin-babel": "^0.3.0",
+    "@storybook/addon-a11y": "10.6.2",
+    "@storybook/addon-docs": "10.6.2",
+    "@storybook/react-vite": "10.6.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -56,6 +61,7 @@
     "relay-compiler": "^21.0.1",
     "relay-test-utils": "^21.0.1",
     "sharp": "^0.35.5",
+    "storybook": "10.6.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

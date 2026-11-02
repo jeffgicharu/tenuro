@@ -9,7 +9,7 @@
 #   apps/api/dist/rebuild.mjs     the nightly data reset
 #   apps/api/dist/ops/smoke-query.json   a persisted-query request body the activation script posts to /graphql
 #   apps/web/dist/                the SPA build; index.html becomes the server's template (it is never served as a file)
-#   packages/ui/storybook-static/ optional; published at /storybook/
+#   apps/web/storybook-static/   the component library; published at /storybook/
 #
 # Release layout:
 #   REVISION  runtime/{bin/node,LICENSE,SHA256}  server/  server/web/index.html  public/  ops/
@@ -37,8 +37,8 @@ cp apps/api/dist/ops/smoke-query.json "$out/ops/smoke-query.json"
 
 cp -R apps/web/dist/. "$out/public/"
 mv "$out/public/index.html" "$out/server/web/index.html"
-if [[ -d packages/ui/storybook-static ]]; then
-  cp -R packages/ui/storybook-static "$out/public/storybook"
+if [[ -d apps/web/storybook-static ]]; then
+  cp -R apps/web/storybook-static "$out/public/storybook"
 fi
 
 "$root/deploy/ci/fetch-node.sh" "$out/runtime"
