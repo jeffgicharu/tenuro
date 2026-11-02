@@ -210,9 +210,10 @@ export function LeaseFormEditor(props: EditorProps) {
   const applyServerIssues = (errors: readonly { path: string; code: string; message: string; step: string | null }[]) => {
     const issues: ServerIssue[] = serverIssuesFrom(errors);
     dispatch({ type: 'server', issues });
-    setBanner({ tone: 'error', text: m('leaseForm.submit.serverErrors', { count: issues.length }) });
     const first = issues[0];
-    if (first && first.step !== state.step) goto(first.step);
+    // Move to the step directly: goto() clears the banner, and this banner explains the jump.
+    if (first && first.step !== state.step) dispatch({ type: 'goto', step: first.step });
+    setBanner({ tone: 'error', text: m('leaseForm.submit.serverErrors', { count: issues.length }) });
     if (first) window.setTimeout(() => document.getElementById(fieldId(first.path))?.focus(), 80);
   };
 
