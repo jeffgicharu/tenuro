@@ -2,7 +2,10 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 // jsdom has no layout engine; MUI and the grid need these browser APIs to exist.
 class ResizeObserverStub {
@@ -12,7 +15,7 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver;
 
-// Tests opt into a narrow (phone) layout by setting window.__narrow before rendering.
+// Desktop layout by default; a test opts into the phone layout by setting window.__narrow first.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn((query: string) => {
@@ -26,3 +29,4 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+Element.prototype.scrollIntoView = () => undefined;

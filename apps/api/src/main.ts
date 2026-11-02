@@ -1,7 +1,13 @@
 import { config } from './config.ts';
 import { createDb } from './db/client.ts';
 import { startSweeper } from './maintenance.ts';
+import { selfcheck } from './selfcheck.ts';
 import { listen } from './server.ts';
+
+if (process.argv.includes('--selfcheck')) {
+  for (const line of selfcheck()) console.log(`ok ${line}`);
+  process.exit(0);
+}
 
 const db = createDb(config.databaseUrl, 6);
 const server = await listen(db);
