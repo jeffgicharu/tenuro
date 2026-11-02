@@ -170,6 +170,16 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 fail_idle() { systemctl stop "tenuro@$IDLE.service" || true; die "$*"; }
+# The tail of one failed unit's journal, so the reason reaches the CI log, which is public once
+# the repository is. Tenuro's units log no secrets, and anything shaped like one is redacted
+# anyway: connection strings, NAME=value pairs for secret-looking names, and long hex runs.
+redact() {
+  sed -E \
+    -e 's#(postgres|postgresql|mysql|redis|rediss|amqp|mongodb|https?)://[^[:space:]"'\'']+#[redacted url]#gI' \
+    -e 's#([A-Za-z_]*(SECRET|PASSWORD|PASSWD|TOKEN|KEY|PGPASS)[A-Za-z_]*)=[^[:space:]]+#\1=[redacted]#gI' \
+    -e 's#[0-9a-fA-F]{32,}#[redacted hex]#g'
+}
+show_journal() { journalctl -u "$1" -n 40 --no-pager -o cat 2>/dev/null | redact | sed 's/^/    | /' >&2 || true; }
 sha256_of() { sha256sum -- "$1" | cut -d' ' -f1; }
 
 # ---------------------------------------------------------------- 1. freeze
@@ -254,8 +264,8 @@ if [[ -d $REL/public/assets ]]; then
 fi
 ln -sfn -- "$REL" "$BASE/slots/.$IDLE.new"
 mv -Tf -- "$BASE/slots/.$IDLE.new" "$BASE/slots/$IDLE"
-systemctl start "tenuro-migrate@$IDLE.service" || fail_idle "migrations failed"
-systemctl restart "tenuro@$IDLE.service" || fail_idle "tenuro@$IDLE failed to start"
+systemctl start "tenuro-migrate@$IDLE.service" || { show_journal "tenuro-migrate@$IDLE.service"; fail_idle "migrations failed"; }
+systemctl restart "tenuro@$IDLE.service" || { show_journal "tenuro@$IDLE.service"; fail_idle "tenuro@$IDLE failed to start"; }
 
 # ---------------------------------------------------------------- 3. check it directly
 health_ok() { # $1 base url, then extra curl args
@@ -282,9 +292,9 @@ retry() { # $1 tries, then command
 }
 
 IDLE_URL=http://127.0.0.1:$IDLE_PORT
-retry "$TRIES_IDLE" health_ok "$IDLE_URL" || fail_idle "idle slot $IDLE never reported $SHA as healthy"
+retry "$TRIES_IDLE" health_ok "$IDLE_URL" || { show_journal "tenuro@$IDLE.service"; fail_idle "idle slot $IDLE never reported $SHA as healthy"; }
 page_ok "$IDLE_URL" || fail_idle "idle slot $IDLE is missing noindex or CSP"
-systemctl start "tenuro-smoke@$IDLE.service" || fail_idle "journey checks failed on $IDLE"
+systemctl start "tenuro-smoke@$IDLE.service" || { show_journal "tenuro-smoke@$IDLE.service"; show_journal "tenuro@$IDLE.service"; fail_idle "journey checks failed on $IDLE"; }
 
 # ---------------------------------------------------------------- 4. switch
 cp -p -- "$SNIPPET" "$SNIPPET.prev"
