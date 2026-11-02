@@ -304,6 +304,19 @@ describe('maintenance', () => {
   });
 });
 
+describe('restore integrity check', () => {
+  it('passes on the data a rebuild wrote, and names what changed when something is altered', async () => {
+    const { sql } = await import('kysely');
+    const check = async () => (await sql<{ v: string }>`SELECT ops.verify_integrity() AS v`.execute(app.owner)).rows[0]!.v;
+    expect(await check()).toBe('ok');
+    const lease = await app.owner.selectFrom('lease').select(['id', 'rent_per_period']).where('sandbox_id', 'is', null).executeTakeFirstOrThrow();
+    await app.owner.updateTable('lease').set({ rent_per_period: '1' }).where('id', '=', lease.id).execute();
+    expect(await check()).toBe('lease rent checksum differs from the manifest');
+    await app.owner.updateTable('lease').set({ rent_per_period: lease.rent_per_period }).where('id', '=', lease.id).execute();
+    expect(await check()).toBe('ok');
+  });
+});
+
 describe('query limits', () => {
   it('rejects too many aliases', async () => {
     const v = new Visitor(app);

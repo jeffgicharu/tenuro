@@ -8,6 +8,9 @@ vi.stubGlobal('jest', vi);
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  // jsdom keeps the URL between tests; a hash left behind (the form keeps its step there) would
+  // leak into the next test.
+  window.history.replaceState(null, '', '/');
 });
 
 // jsdom has no layout engine; MUI and the grid need these browser APIs to exist.

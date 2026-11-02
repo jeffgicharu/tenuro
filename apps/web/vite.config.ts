@@ -26,8 +26,10 @@ export default defineConfig({
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router)[\\/]/ },
             { name: 'relay', test: /node_modules[\\/](react-relay|relay-runtime)[\\/]/ },
-            // Only the MUI the first page uses; components that just a lazy route needs stay with it.
-            { name: 'mui', test: /node_modules[\\/](@mui[\\/](material|system|utils|styled-engine|private-theming|core-downloads-tracker)|@emotion|stylis)[\\/]/, tags: ['$initial'] },
+            // Only MUI's styling core is pinned to one chunk. Material components are left to normal
+            // splitting, so a component used only by a lazy page (the form's Autocomplete, say)
+            // ships with that page instead of weighing down the first one.
+            { name: 'mui', test: /node_modules[\\/](@mui[\\/](system|utils|styled-engine|private-theming)|@emotion|stylis)[\\/]/ },
             // Only the grid itself: by default a group also pulls in its dependencies, which took MUI X
             // internals that the first page needs (date-picker localisation) into this lazy chunk.
             { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/, includeDependenciesRecursively: false },
