@@ -11,5 +11,6 @@ test-results/
 !.env.example
 __generated__/
 incoming-media/
+.claude/
 .cache/
 .DS_Store
