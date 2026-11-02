@@ -22,7 +22,6 @@ export function RegisterCards({ rows }: { rows: readonly RegisterRow[] }) {
             <Box
               component={RouterLink}
               to={`/leases/${encodeURIComponent(r.id)}`}
-              aria-label={intl.formatMessage({ id: 'register.openLease' }, { reference: r.reference })}
               sx={{
                 display: 'grid', gridTemplateColumns: '1fr auto', gap: 1, px: 4, py: 3.5, color: 'inherit', textDecoration: 'none',
                 '&:hover, &:focus-visible': { backgroundColor: t.brandTint }, '&:focus-visible': { outline: `2px solid ${t.focus}`, outlineOffset: -2 },

@@ -10,6 +10,7 @@ import { useOperationLimits, usePersisted, useScopedTransaction } from './graphq
 import { schema } from './graphql/schema.ts';
 import { API_CSP, COMMON_HEADERS, newNonce, pageCsp } from './http/security.ts';
 import { serveDocument } from './http/documents.ts';
+import { serveStatic } from './http/static.ts';
 
 const CLIENT_HEADER = 'x-tenuro-client';
 
@@ -65,17 +66,18 @@ export function createApp(db: Db) {
   });
 
   let indexTemplate: string | null = null;
-  const renderIndex = async (res: ServerResponse) => {
+  const renderIndex = async (req: IncomingMessage, res: ServerResponse) => {
     indexTemplate ??= await readFile(`${config.webDist}/index.html`, 'utf8');
     const nonce = newNonce();
     const html = indexTemplate
       .replaceAll('<script', `<script nonce="${nonce}"`)
       .replaceAll('<link rel="stylesheet"', `<link nonce="${nonce}" rel="stylesheet"`)
       .replace('</head>', `<meta name="csp-nonce" content="${nonce}"></head>`);
+    const https = req.headers['x-forwarded-proto'] === 'https';
     res.writeHead(200, {
-      ...COMMON_HEADERS, 'content-security-policy': pageCsp(nonce), 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+      ...COMMON_HEADERS, 'content-security-policy': pageCsp(nonce, https), 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
     });
-    res.end(html);
+    res.end(req.method === 'HEAD' ? undefined : html);
   };
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
@@ -152,8 +154,13 @@ export function createApp(db: Db) {
 
       if (path.startsWith('/api/')) return send(res, 404, { error: 'not found' });
 
+      // nginx serves built files on the server; STATIC_DIR lets CI's end-to-end run do without it.
+      if (config.staticDir && (path.startsWith('/assets/') || path.startsWith('/static/'))) {
+        return serveStatic(config.staticDir, path, res);
+      }
+
       // Every other path is a page of the single-page app.
-      if (req.method === 'GET' || req.method === 'HEAD') return renderIndex(res);
+      if (req.method === 'GET' || req.method === 'HEAD') return renderIndex(req, res);
       return send(res, 405, { error: 'method not allowed' });
     } catch (err) {
       console.error(err);

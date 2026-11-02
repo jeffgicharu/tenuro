@@ -10,7 +10,7 @@ function Figure({ label, value, detail, tone }: { label: ReactNode; value: React
   const theme = useTheme();
   const t = theme.tokens;
   return (
-    <Box sx={{ minWidth: 0, py: 4, px: { xs: 0, md: 5 }, '&:first-of-type': { paddingInlineStart: { md: 0 } } }}>
+    <Box sx={{ minWidth: 0, py: 4, px: { xs: 0, md: 5 }, '&:first-of-type': { paddingInlineStart: { md: 0 }, gridColumn: { xs: '1 / -1', md: 'auto' } } }}>
       <Box component="dt" sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1.5 }}>{label}</Box>
       <Box
         component="dd"
@@ -22,8 +22,13 @@ function Figure({ label, value, detail, tone }: { label: ReactNode; value: React
         }}
       >
         {value}
+        {/* Inside the dd: a dl group may hold only dt and dd elements. */}
+        {detail && (
+          <Box component="span" sx={{ display: 'block', fontFamily: theme.typography.body1.fontFamily, fontWeight: 400, fontSize: '0.8125rem', lineHeight: 1.4, color: t.inkSecondary, mt: 1 }}>
+            {detail}
+          </Box>
+        )}
       </Box>
-      {detail && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 1 }}>{detail}</Box>}
     </Box>
   );
 }
@@ -59,7 +64,7 @@ export function LeaseFigures({ lease: ref }: { lease: LeaseFigures_lease$key }) 
       component="dl"
       sx={{
         m: 0, mt: 8, display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) minmax(0, 0.8fr)' },
+        gridTemplateColumns: { xs: 'minmax(0, 1fr) minmax(0, 1fr)', md: 'minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) minmax(0, 0.8fr)' },
         borderTop: `1px solid ${t.ruleStrong}`, borderBottom: `1px solid ${t.rule}`,
         columnGap: { xs: 4, md: 0 },
         '& > div + div': { borderInlineStart: { md: `1px solid ${t.rule}` } },

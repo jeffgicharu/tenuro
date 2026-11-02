@@ -37,6 +37,8 @@ export const config = {
   // Paths inside a release; overridable for local development and tests.
   webDist: env.WEB_DIST ?? new URL('./web/', import.meta.url).pathname,
   persistedQueries: env.PERSISTED_QUERIES ?? new URL('./persisted-queries.json', import.meta.url).pathname,
+  // Only CI's end-to-end run sets this; on the server nginx serves /assets and /static.
+  staticDir: env.STATIC_DIR ?? null,
   limits: {
     // Per-visitor sandbox quotas.
     sandboxWrites: 300,

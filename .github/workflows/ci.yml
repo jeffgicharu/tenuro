@@ -161,21 +161,28 @@ jobs:
         run: |
           cd release
           export NODE_ENV=production PORT=9000 SLOT=blue PGUSER=tenuro_app PGPASSWORD=ci-app PGDATABASE=tenuro SESSION_SECRET=ci-only-secret
-          runtime/bin/node --max-old-space-size=144 server/index.mjs > server.log 2>&1 &
+          # STATIC_DIR stands in for nginx, which serves /assets and /static on the server.
+          STATIC_DIR="$PWD/public" runtime/bin/node --max-old-space-size=144 server/index.mjs > server.log 2>&1 &
           for _ in $(seq 30); do curl -fsS http://127.0.0.1:9000/api/health >/dev/null && break; sleep 1; done
           # Exactly the environment tenuro-smoke@ gets: no database credentials, no secrets.
           env -i PATH="$PATH" NODE_ENV=production PORT=9000 SLOT=blue runtime/bin/node server/smoke.mjs --selfcheck
           rss=$(curl -fsS http://127.0.0.1:9000/api/health | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).rssMb))')
           echo "server memory after the smoke run: ${rss} MB (unit cap 224 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$rss" -lt 200 ]
-      - name: Boot the production bundle in a browser
+      - name: End-to-end journeys with accessibility checks (Playwright and axe)
         run: |
-          # The server-side smoke run never evaluates the browser bundle; this catches chunk
-          # evaluation failures and CSP violations that only show up in a real browser.
-          node apps/web/e2e/serve.mjs release/public 8080 > e2e-serve.log 2>&1 &
-          for _ in $(seq 20); do curl -fsS http://localhost:8080/api/health >/dev/null && break; sleep 1; done
-          pnpm --filter @tenuro/web exec playwright install --with-deps chromium
-          E2E_BASE_URL=http://localhost:8080 pnpm --filter @tenuro/web exec playwright test --config e2e/playwright.config.ts
+          pnpm --filter @tenuro/e2e exec playwright install --with-deps chromium
+          E2E_BASE_URL=http://127.0.0.1:9000 pnpm --filter @tenuro/e2e e2e
+      - name: Keep the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            e2e/test-results
+            e2e/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Server log
         if: always()
         run: cat release/server.log 2>/dev/null || true

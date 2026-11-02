@@ -122,7 +122,7 @@ export function SignInPage() {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mb: 4 }}>
                     <img src={tenant.theme.mark} alt="" width={40} height={40} style={{ flexShrink: 0 }} />
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="h3" component="h2" sx={{ fontSize: '1.15rem' }} lang={currentLanguage === 'ar' && tenant.nameLocal ? 'ar' : undefined}>
+                      <Typography id={`company-${tenant.id}`} variant="h3" component="h2" sx={{ fontSize: '1.15rem' }} lang={currentLanguage === 'ar' && tenant.nameLocal ? 'ar' : undefined}>
                         {name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" data-num>
@@ -142,7 +142,9 @@ export function SignInPage() {
                           onClick={() => void go(a)}
                           loading={pending === a.id}
                           disabled={pending !== null && pending !== a.id}
-                          aria-label={`${intl.formatMessage({ id: 'signin.as' })} ${intl.formatMessage({ id: `shell.role.${a.role}` })}, ${name}`}
+                          // The accessible name is the visible text (role and person), as WCAG 2.5.3 asks;
+                          // the company heading is announced as the description.
+                          aria-describedby={`company-${tenant.id}`}
                           sx={{
                             justifyContent: 'flex-start', alignItems: 'flex-start', textAlign: 'start', flexDirection: 'column', gap: 0.5,
                             py: 2.5, px: 3, minHeight: 64, backgroundColor: t.surface,

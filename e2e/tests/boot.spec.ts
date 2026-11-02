@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { signIn } from './helpers.ts';
 
 // Boots the real production bundle in a browser. The server-side smoke run cannot see failures
 // that only happen when the browser evaluates the chunks (a chunk import cycle once made the
@@ -40,15 +41,9 @@ test.afterEach(async ({ page }, info) => {
   console.log(`--- ${info.title}\nurl: ${page.url()}\nlang: ${await page.locator('html').getAttribute('lang')}\ncsp: ${JSON.stringify(csp, null, 1)}\ntext: ${text}\nconsole:\n  ${(consoleLog.get(page) ?? []).join('\n  ')}`);
 });
 
-async function signIn(page: Page, who: RegExp) {
-  await page.goto('/sign-in');
-  await page.getByRole('button', { name: who }).click();
-  await page.waitForURL('**/leases');
-}
-
 test('a manager signs in, reads the register and opens a lease without a single error', async ({ page }) => {
   const problems = watch(page);
-  await signIn(page, /lease manager, mbuyu/i);
+  await signIn(page, 'Mbuyu Court Holdings', 'Lease manager');
   await expect(page.getByRole('heading', { name: 'Leases', level: 1 })).toBeVisible();
   await expect(page.getByRole('grid')).toBeVisible();
   await expect(page.locator('.MuiDataGrid-row').first()).toBeVisible();
@@ -65,7 +60,7 @@ test('a manager signs in, reads the register and opens a lease without a single 
 
 test('the register renders right to left in Arabic without errors', async ({ page }) => {
   const problems = watch(page);
-  await signIn(page, /admin, sunbula/i);
+  await signIn(page, 'Sunbula Estates', 'Portfolio admin');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('عقود الإيجار');
   await expect(page.locator('.MuiDataGrid-row').first()).toBeVisible();

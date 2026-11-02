@@ -43,7 +43,10 @@ export function AccountMenu({ viewer: ref, collapsed }: { viewer: AccountMenu_vi
       onClick={(e: MouseEvent<HTMLElement>) => setAnchor(e.currentTarget)}
       aria-haspopup="menu"
       aria-expanded={open}
-      aria-label={intl.formatMessage({ id: 'shell.account' })}
+      // Expanded, the visible name and role are the button's name (WCAG 2.5.3: a separate "Account"
+      // label hid the words a speech user would say). Collapsed, only the initials show, and they
+      // are hidden from assistive technology, so the label spells the person out.
+      aria-label={collapsed ? `${viewer.user.displayName}, ${roleLabel}` : undefined}
       sx={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 3, p: 2, borderRadius: 1, textAlign: 'start',
         justifyContent: collapsed ? 'center' : 'flex-start', border: `1px solid ${open ? t.ruleStrong : 'transparent'}`,

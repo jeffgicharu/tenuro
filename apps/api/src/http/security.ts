@@ -4,7 +4,9 @@ export const newNonce = () => randomBytes(18).toString('base64');
 
 // The app's own pages: scripts and styles only from our origin or with this request's nonce.
 // No 'unsafe-inline', no third-party hosts. Emotion receives the nonce for the style tags it writes.
-export function pageCsp(nonce: string): string {
+// upgrade-insecure-requests only makes sense when the page itself came over HTTPS (through nginx);
+// on a plain-HTTP origin, such as CI's end-to-end run, it would break every subresource.
+export function pageCsp(nonce: string, https = true): string {
   return [
     "default-src 'none'",
     `script-src 'self' 'nonce-${nonce}'`,
@@ -19,7 +21,7 @@ export function pageCsp(nonce: string): string {
     "base-uri 'none'",
     "form-action 'self'",
     "object-src 'none'",
-    'upgrade-insecure-requests',
+    ...(https ? ['upgrade-insecure-requests'] : []),
     'report-uri /api/csp-report',
   ].join('; ');
 }
