@@ -90,11 +90,25 @@ function buildingName(rng: Rng, t: TenantSeed, market: Market, type: PropertyTyp
   return market.country === 'FR' ? `${rng.pick(list)} ${root}` : `${root} ${rng.pick(list)}`;
 }
 
+const emptySeed = (): SeedData => ({
+  tenant: [], app_user: [], property: [], lease: [], lease_party: [], rent_step: [], escalation: [], lease_option: [],
+  deposit: [], key_date: [], task: [], document: [], activity: [], saved_view: [], notification: [], fx_rate: [],
+});
+
+// The whole portfolio in memory, for tests and the self-check.
 export function generate(opts: SeedOptions): SeedData {
-  const out: SeedData = {
-    tenant: [], app_user: [], property: [], lease: [], lease_party: [], rent_step: [], escalation: [], lease_option: [],
-    deposit: [], key_date: [], task: [], document: [], activity: [], saved_view: [], notification: [], fx_rate: [],
-  };
+  const all = emptySeed();
+  for (const batch of generateBatches(opts)) {
+    for (const key of Object.keys(all) as (keyof SeedData)[]) (all[key] as unknown[]).push(...(batch[key] as unknown[]));
+  }
+  return all;
+}
+
+// Yields the portfolio in batches of about `batchLeases` leases with all their rows, so the
+// rebuild can write and drop each batch and its memory stays flat on the shared server. Rows in a
+// batch only reference rows in the same or an earlier batch.
+export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generator<SeedData> {
+  let out = emptySeed();
   const { today } = opts;
   const scale = opts.scale ?? 1;
 
@@ -102,8 +116,11 @@ export function generate(opts: SeedOptions): SeedData {
     out.fx_rate.push({ currency, on_date: today, per_usd: perUsd });
   }
 
-  TENANTS.forEach((t, tenantIndex) => {
-    if (opts.only && !opts.only.includes(t.slug)) return;
+  for (const [tenantIndex, t] of TENANTS.entries()) {
+    if (opts.only && !opts.only.includes(t.slug)) continue;
+    // Small indexes kept across batches for the end-of-company tasks and notifications.
+    const tenantLeases: { id: string; reference: string; property_name: string; city: string }[] = [];
+    const upcomingSoon: { lease_id: string; title: string }[] = [];
     const rng = new Rng(`tenuro:${t.slug}`);
     const tx = seedText(t.region);
     const tenantId = stableId('tenant', t.slug);
@@ -406,6 +423,15 @@ export function generate(opts: SeedOptions): SeedData {
         if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.holding, owner, [{ field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' }]);
         if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.expired, owner, [{ field: 'status', from: 'ACTIVE', to: 'EXPIRED' }]);
         if (status === 'TERMINATED') act('terminated', minIso(addMonths(commencement, r.int(12, 40)), today), 'STATUS_CHANGED', tx.activity.terminated, adminAccount.id, [{ field: 'status', from: 'ACTIVE', to: 'TERMINATED' }]);
+
+        tenantLeases.push({ id: leaseId, reference: lesseeRow.reference, property_name: lesseeRow.property_name, city: lesseeRow.city });
+        for (const k of keyDates) {
+          if (k.due >= today && k.due <= addDays(today, 30)) upcomingSoon.push({ lease_id: leaseId, title: k.title });
+        }
+      }
+      if (out.lease.length >= batchLeases) {
+        yield out;
+        out = emptySeed();
       }
     }
 
@@ -414,10 +440,9 @@ export function generate(opts: SeedOptions): SeedData {
     const general = t.region === 'GULF'
       ? ['مطابقة فواتير رسوم الخدمات', 'تحميل النسخة الموقعة من العقد', 'تأكيد بيانات الحساب البنكي للمؤجر', 'مراجعة شروط الصيانة']
       : ['Reconcile the service charge statement', 'Upload the signed counterpart', 'Confirm landlord bank details', 'Review repair obligations before handback', 'Check the insurance schedule'];
-    const leaseCount = out.lease.filter((l) => l.tenant_id === tenantId).length;
-    const leaseOffset = out.lease.length - leaseCount;
+    const leaseCount = tenantLeases.length;
     for (let i = 0; i < Math.round(leaseCount / 25); i++) {
-      const lease = out.lease[leaseOffset + taskRng.int(0, leaseCount - 1)]!;
+      const lease = tenantLeases[taskRng.int(0, leaseCount - 1)]!;
       const st = taskRng.weighted([['TODO', 40], ['IN_PROGRESS', 25], ['DONE', 35]] as const);
       const due = addDays(today, taskRng.int(-45, 75));
       out.task.push({
@@ -446,11 +471,11 @@ export function generate(opts: SeedOptions): SeedData {
 
     // Notifications for the sign-in accounts
     const notifRng = rng.fork('notifications');
-    const upcoming = out.key_date.filter((k) => k.tenant_id === tenantId && k.due_on >= today && k.due_on <= addDays(today, 30));
+    const leaseById = new Map(tenantLeases.map((l) => [l.id, l]));
     for (const accountUser of users.slice(0, 3)) {
-      for (let i = 0; i < 8 && upcoming.length; i++) {
-        const k = notifRng.pick(upcoming);
-        const lease = out.lease.find((l) => l.id === k.lease_id)!;
+      for (let i = 0; i < 8 && upcomingSoon.length; i++) {
+        const k = notifRng.pick(upcomingSoon);
+        const lease = leaseById.get(k.lease_id)!;
         out.notification.push({
           id: stableId('notif', accountUser.id, i), tenant_id: tenantId, sandbox_id: null, user_id: accountUser.id,
           kind: 'KEY_DATE_DUE', title: `${k.title}: ${lease.reference}`, body: `${lease.property_name}, ${lease.city}`,
@@ -458,9 +483,9 @@ export function generate(opts: SeedOptions): SeedData {
         });
       }
     }
-  });
-
-  return out;
+    yield out;
+    out = emptySeed();
+  }
 }
 
 const minIso = (a: IsoDate, b: IsoDate) => (a < b ? a : b);

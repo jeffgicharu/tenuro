@@ -127,7 +127,8 @@ jobs:
           GRANT CONNECT ON DATABASE tenuro TO tenuro_app;
           SQL
           cd release
-          PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro /usr/bin/time -v runtime/bin/node server/migrate.mjs 2> migrate-time.txt
+          # Same heap flag as tenuro-migrate@.service.
+          PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro /usr/bin/time -v runtime/bin/node --max-old-space-size=112 server/migrate.mjs 2> migrate-time.txt
           peak=$(awk '/Maximum resident set size/ {print int($6/1024)}' migrate-time.txt)
           echo "migrate and seed peak memory: ${peak} MB (unit cap 160 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$peak" -lt 150 ]
@@ -136,8 +137,11 @@ jobs:
           PGHOST: 127.0.0.1
         run: |
           cd release
-          PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro runtime/bin/node server/rebuild.mjs | tee rebuild.json
+          # Same heap flag as tenuro-reset.service; its unit cap is 192 MB.
+          PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro runtime/bin/node --max-old-space-size=144 server/rebuild.mjs | tee rebuild.json
           echo "nightly rebuild: $(cat rebuild.json)" >> "$GITHUB_STEP_SUMMARY"
+          peak=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("rebuild.json","utf8")).peakRssMb)')
+          [ "$peak" -lt 180 ]
       - name: Boot in production mode and run the smoke journeys
         env:
           PGHOST: 127.0.0.1
