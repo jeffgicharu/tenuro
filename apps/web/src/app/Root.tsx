@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { graphql } from 'react-relay';
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { useScrollToTopOnNavigate } from './useScrollToTop.ts';
 import type { RootQuery } from './__generated__/RootQuery.graphql';
 import { LocaleTheme, TENURO_LOOK, type TenantLook } from './LocaleTheme.tsx';
 import { queryLoader, useRouteQuery } from './relayRoute.ts';
@@ -28,6 +29,7 @@ const PUBLIC_PATHS = ['/sign-in'];
 export function Root() {
   const { viewer } = useRouteQuery<RootQuery>(rootQuery);
   const { pathname } = useLocation();
+  useScrollToTopOnNavigate(pathname);
   const isPublic = PUBLIC_PATHS.includes(pathname);
 
   if (!viewer && !isPublic) return <Navigate to="/sign-in" replace />;

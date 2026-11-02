@@ -163,13 +163,21 @@ export const Viewer = builder.objectRef<SessionInfo>('Viewer').implement({
       resolve: async (_s, args, ctx) => {
         let q = ctx.tx.selectFrom('property');
         const s = args.search?.trim();
-        if (s) {
-          const term = `%${s.slice(0, 80).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+        const term = s ? `%${s.slice(0, 80).replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+        if (term) {
           q = q.where((eb) => eb.or([eb('name', 'ilike', term), eb('city', 'ilike', term), eb('code', 'ilike', term), eb('address_line', 'ilike', term)]));
         }
         const [{ n }] = (await q.select(sql<number>`count(*)::int`.as('n')).execute()) as [{ n: number }];
-        const page = await resolveOffsetConnection({ args, defaultSize: 20, maxSize: 50, totalCount: n }, ({ limit, offset }) =>
-          q.selectAll().orderBy('name').orderBy('id').limit(limit).offset(offset).execute());
+        // Buildings whose name matches come first, then code and city matches, then those matching
+        // only on their street address; otherwise address matches crowd out what was typed.
+        // (Only with a term: a bare constant in ORDER BY would be read as a column position.)
+        const page = await resolveOffsetConnection({ args, defaultSize: 20, maxSize: 50, totalCount: n }, ({ limit, offset }) => {
+          let ordered = q.selectAll();
+          if (term) {
+            ordered = ordered.orderBy(sql`CASE WHEN name ILIKE ${term} THEN 0 WHEN code ILIKE ${term} THEN 1 WHEN city ILIKE ${term} THEN 2 ELSE 3 END`);
+          }
+          return ordered.orderBy('name').orderBy('id').limit(limit).offset(offset).execute();
+        });
         return { ...page, totalCount: n };
       },
     }),

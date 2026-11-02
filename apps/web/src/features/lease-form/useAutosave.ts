@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { graphql, useMutation } from 'react-relay';
 import type { LeaseFormData, LeaseFormStep } from '@tenuro/lease-rules';
+import { diffForms } from './model.ts';
 import type { useAutosaveSaveDraftMutation } from './__generated__/useAutosaveSaveDraftMutation.graphql';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'retrying' | 'local';
@@ -35,6 +36,16 @@ export function writeLocal(key: string, copy: LocalCopy) {
   } catch {
     // Full or unavailable storage: the server draft is still the backup.
   }
+}
+
+// The browser copy wins only when it is newer than the server's and actually holds different data.
+// It is written just after each server save, so after an ordinary reload it is newer but identical,
+// and restoring it (with a "restored" notice) would only confuse.
+export function chooseRestore(local: LocalCopy | null, serverData: LeaseFormData, serverUpdatedAt: string | null): LocalCopy | null {
+  if (!local) return null;
+  const serverAt = serverUpdatedAt ? Date.parse(serverUpdatedAt) : 0;
+  if (local.at <= serverAt) return null;
+  return diffForms(serverData, local.data).length > 0 ? local : null;
 }
 
 export function clearLocal(key: string) {

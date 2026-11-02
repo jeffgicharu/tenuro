@@ -1,4 +1,5 @@
 import { useIntl } from 'react-intl';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { Plus, X } from 'lucide-react';
 import { emptyParty } from '@tenuro/lease-rules';
@@ -48,18 +49,18 @@ export function PartiesStep() {
         </Fieldset>
       ) : null}
       {(!guarantor || !agent) && (
-        <FieldRow>
+        <Box data-testid="add-party-actions" sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-start' }}>
           {!guarantor && (
-            <Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => toggle('guarantor', true)} disabled={form.readOnly} sx={{ justifySelf: 'start' }}>
+            <Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => toggle('guarantor', true)} disabled={form.readOnly}>
               {intl.formatMessage({ id: 'leaseForm.section.addGuarantor' })}
             </Button>
           )}
           {!agent && (
-            <Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => toggle('agent', true)} disabled={form.readOnly} sx={{ justifySelf: 'start' }}>
+            <Button variant="outlined" startIcon={<Plus size={15} />} onClick={() => toggle('agent', true)} disabled={form.readOnly}>
               {intl.formatMessage({ id: 'leaseForm.section.addAgent' })}
             </Button>
           )}
-        </FieldRow>
+        </Box>
       )}
     </>
   );

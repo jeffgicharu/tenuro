@@ -114,6 +114,57 @@ describe('LeaseFormEditor', () => {
     expect(within(dialog).getByRole('button', { name: /load the newer version/i })).toBeInTheDocument();
   });
 
+  // Regression: the two buttons sat in separate grid columns, so "Add an agent" floated mid-row.
+  it('keeps the add-guarantor and add-agent buttons together', async () => {
+    setup();
+    const guarantor = await screen.findByRole('button', { name: /add a guarantor/i });
+    const agent = screen.getByRole('button', { name: /add an agent/i });
+    expect(guarantor.parentElement).toBe(agent.parentElement);
+    expect(getComputedStyle(guarantor.parentElement!).display).toBe('flex');
+  });
+
+  it('opens the step named in the hash when only the hash changes', async () => {
+    setup({ initialData: validLease() });
+    await screen.findByRole('heading', { name: 'Parties', level: 2 });
+    act(() => {
+      window.history.replaceState(null, '', '/leases/new#rent');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(await screen.findByRole('heading', { name: 'Rent', level: 2 })).toBeInTheDocument();
+  });
+
+  it('says "Section n of 8" once on narrow screens', async () => {
+    (window as unknown as { __narrow?: boolean }).__narrow = true;
+    try {
+      setup();
+      await screen.findByRole('heading', { name: 'Parties', level: 2 });
+      expect(screen.getAllByText('Section 1 of 8')).toHaveLength(1);
+    } finally {
+      (window as unknown as { __narrow?: boolean }).__narrow = false;
+    }
+  });
+
+  it('does not show a zero count when an amendment has no changes yet', async () => {
+    const original = validLease();
+    setup({ mode: 'amend', original, initialData: structuredClone(original), initialStep: 'review', lease: { id: 'TGVhc2U6MQ==', reference: 'KE-O-00001', version: 4 } });
+    const changes = await screen.findByRole('region', { name: /what changes/i });
+    expect(within(changes).getByText(/nothing has changed yet/i)).toBeInTheDocument();
+    expect(within(changes).queryByText(/0 fields/i)).toBeNull();
+  });
+
+  // Regression: after a successful save the button went idle while the lease page loaded, so the
+  // form looked stuck under the "created" notice.
+  it('keeps the save button busy after a successful save, until the lease page takes over', async () => {
+    const { environment } = setup({ initialData: validLease(), initialStep: 'review' });
+    await userEvent.click(await screen.findByRole('button', { name: /create lease/i }));
+    const op = await pendingMutation(environment, 'LeaseFormEditorSubmitMutation');
+    act(() => {
+      environment.mock.resolve(op, { data: { submitLease: { __typename: 'MutationSubmitLeaseSuccess', data: { lease: { id: 'TGVhc2U6bmV3', reference: 'KE-O-10001' } } } } });
+    });
+    expect(await screen.findByText(/lease KE-O-10001 created/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /saving/i })).toBeDisabled();
+  });
+
   it('shows every changed field before an amendment is saved', async () => {
     const original = validLease();
     const edited = structuredClone(original);

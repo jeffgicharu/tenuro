@@ -13,7 +13,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { useTheme } from '@mui/material/styles';
+import { keyframes, useTheme } from '@mui/material/styles';
 import { ArrowLeft, ArrowRight, Check, CloudOff, LoaderCircle, Trash2 } from 'lucide-react';
 import { LEASE_FORM_STEPS, validateLease, type LeaseFormData, type LeaseFormStep } from '@tenuro/lease-rules';
 import type { PropertyPicker_viewer$key } from '../../components/__generated__/PropertyPicker_viewer.graphql';
@@ -26,7 +26,7 @@ import type { LeaseDraftsDiscardMutation } from './__generated__/LeaseDraftsDisc
 import { discardDraftMutation } from './LeaseDrafts.tsx';
 import { fieldId, formToInput, labelKey } from './model.ts';
 import { FormProvider, initialState, serverIssuesFrom, translateIssue, useFormReducer, type ServerIssue } from './state.tsx';
-import { clearLocal, readLocal, useAutosave, writeLocal } from './useAutosave.ts';
+import { chooseRestore, clearLocal, readLocal, useAutosave, writeLocal } from './useAutosave.ts';
 import { PartiesStep } from './steps/PartiesStep.tsx';
 import { PropertyStep } from './steps/PropertyStep.tsx';
 import { TermStep } from './steps/TermStep.tsx';
@@ -35,6 +35,8 @@ import { OptionsStep } from './steps/OptionsStep.tsx';
 import { DepositsStep } from './steps/DepositsStep.tsx';
 import { AccountingStep } from './steps/AccountingStep.tsx';
 import { ReviewStep } from './steps/ReviewStep.tsx';
+
+const spin = keyframes`to { transform: rotate(360deg); }`;
 
 const submitMutation = graphql`
   mutation LeaseFormEditorSubmitMutation($input: SubmitLeaseInput!) {
@@ -119,11 +121,10 @@ export function LeaseFormEditor(props: EditorProps) {
 
   const baseKey = props.mode === 'amend' && props.lease ? `amend:${props.lease.id}` : props.draft ? `draft:${props.draft.id}` : 'new';
   // A browser copy newer than the server's is restored (it may hold work the server never got).
-  const restored = useMemo(() => {
-    const local = readLocal(baseKey);
-    const serverAt = props.draft ? Date.parse(props.draft.updatedAt) : 0;
-    return local && local.at > serverAt ? local : null;
-  }, [baseKey, props.draft]);
+  const restored = useMemo(
+    () => chooseRestore(readLocal(baseKey), props.initialData, props.draft?.updatedAt ?? null),
+    [baseKey, props.draft, props.initialData],
+  );
 
   const [draftId, setDraftId] = useState<string | null>(props.draft?.id ?? restored?.draftId ?? null);
   const storageKey = props.mode === 'amend' && props.lease ? `amend:${props.lease.id}` : draftId ? `draft:${draftId}` : 'new';
@@ -186,6 +187,17 @@ export function LeaseFormEditor(props: EditorProps) {
   }, [state.step]);
 
   const goto = useCallback((step: LeaseFormStep) => { setBanner(null); dispatch({ type: 'goto', step }); }, [dispatch]);
+
+  // Editing the hash, or following a link to "#rent", changes only the hash and does not reload,
+  // so follow it here too.
+  useEffect(() => {
+    const onHash = () => {
+      const step = stepFromHash();
+      if (step) goto(step);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [goto]);
   const index = LEASE_FORM_STEPS.indexOf(state.step);
   const nextStep = LEASE_FORM_STEPS[index + 1];
   const prevStep = LEASE_FORM_STEPS[index - 1];
@@ -205,7 +217,10 @@ export function LeaseFormEditor(props: EditorProps) {
   const [amend, amending] = useMutation<LeaseFormEditorAmendMutation>(amendMutation);
   const [discard, discarding] = useMutation<LeaseDraftsDiscardMutation>(discardDraftMutation);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const busy = submitting || amending;
+  // Stays true from a successful save until the lease page replaces the form, so the button keeps
+  // its spinner while that page loads instead of looking idle under a "created" notice.
+  const [leaving, setLeaving] = useState(false);
+  const busy = submitting || amending || leaving;
 
   const applyServerIssues = (errors: readonly { path: string; code: string; message: string; step: string | null }[]) => {
     const issues: ServerIssue[] = serverIssuesFrom(errors);
@@ -228,6 +243,7 @@ export function LeaseFormEditor(props: EditorProps) {
 
   const onSaved = (lease: { id: string; reference: string }, message: string) => {
     autosave.pause();
+    setLeaving(true);
     clearLocal(storageKey);
     clearLocal(baseKey);
     toast.show(message);
@@ -318,7 +334,7 @@ export function LeaseFormEditor(props: EditorProps) {
 
   return (
     <FormProvider state={state} dispatch={dispatch}>
-      <Box sx={{ px: { xs: 4, md: 8, xl: 12 }, pt: { xs: 5, md: 8 }, pb: { xs: 28, md: 16 }, maxWidth: 1240, '& input, & textarea, & .MuiSelect-select': { fontSize: { xs: 16, md: 14 } }, '@keyframes spin': { to: { transform: 'rotate(360deg)' } }, '& .spin': { animation: 'spin 900ms linear infinite' } }}>
+      <Box sx={{ px: { xs: 4, md: 8, xl: 12 }, pt: { xs: 5, md: 8 }, pb: { xs: 28, md: 16 }, maxWidth: 1240, '& input, & textarea, & .MuiSelect-select': { fontSize: { xs: 16, md: 14 } }, '& .spin': { animation: `${spin} 900ms linear infinite` } }}>
         <Box sx={{ mb: { xs: 5, md: 8 } }}>
           <Button
             component={RouterLink}
@@ -353,9 +369,12 @@ export function LeaseFormEditor(props: EditorProps) {
 
           <Box component="section" aria-labelledby="step-heading" sx={{ minWidth: 0, maxWidth: 780 }}>
             <Box sx={{ mb: 6 }}>
-              <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mb: 1 }} data-num>
-                {m('leaseForm.stepper.progress', { current: index + 1, total: LEASE_FORM_STEPS.length })}
-              </Box>
+              {/* The compact stepper already says "Section n of 8" right above. */}
+              {!compact && (
+                <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mb: 1 }} data-num>
+                  {m('leaseForm.stepper.progress', { current: index + 1, total: LEASE_FORM_STEPS.length })}
+                </Box>
+              )}
               <Typography variant="h2" id="step-heading" ref={headingRef} tabIndex={-1} sx={{ outline: 'none' }}>
                 {m(`leaseForm.step.${state.step}`)}
               </Typography>

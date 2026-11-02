@@ -119,7 +119,7 @@ export const leaseFormEn = {
   'leaseForm.field.rent.paymentFrequency': 'Payment frequency',
   'leaseForm.field.rent.paymentTiming': 'Paid',
   'leaseForm.field.rent.rentPerPeriod': 'Rent per payment',
-  'leaseForm.field.rent.rentPerPeriod.help': 'The rent due each {period} at commencement, before any increases.',
+  'leaseForm.field.rent.rentPerPeriod.help': 'The rent due {period} at commencement, before any increases.',
   'leaseForm.field.rent.serviceChargePerPeriod': 'Service charge per payment',
   'leaseForm.field.rent.escalation.kind': 'Rent changes',
   'leaseForm.field.rent.escalation.ratePercent': 'Uplift',

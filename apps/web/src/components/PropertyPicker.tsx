@@ -18,6 +18,7 @@ export interface PropertyOption {
   district: string | null | undefined;
   type: string;
   countryCode: string;
+  addressLine?: string | null | undefined;
 }
 
 export interface PropertyPickerProps {
@@ -47,7 +48,7 @@ export function PropertyPicker(props: PropertyPickerProps) {
       ) {
         properties(first: $first, after: $after, search: $search) @connection(key: "PropertyPicker_properties", filters: ["search"]) {
           totalCount
-          edges { node { id name code city district type countryCode } }
+          edges { node { id name code city district type countryCode addressLine } }
         }
       }
     `,
@@ -112,6 +113,8 @@ export function PropertyPicker(props: PropertyPickerProps) {
                   {' · '}{[o.district, o.city].filter(Boolean).join(', ')}
                   {' · '}{intl.formatMessage({ id: `propertyType.${o.type}` })}
                 </Box>
+                {/* The street is shown because a search also matches addresses. */}
+                {o.addressLine && <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary }}>{o.addressLine}</Box>}
               </Box>
             </Box>
           );

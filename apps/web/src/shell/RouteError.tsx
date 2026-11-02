@@ -23,9 +23,11 @@ export function RouteError() {
     if (!notFound) console.error(error);
   }, [error, notFound]);
   return (
-    <div role="alert" style={s.page}>
+    // dir="ltr": the document may still be right-to-left, which would put the English full stops at
+    // the wrong end. Each language line carries its own lang and direction.
+    <div role="alert" dir="ltr" lang="en" style={s.page}>
       <div style={s.card}>
-        <h1 style={s.title}>{notFound ? 'This page does not exist.' : 'Something went wrong.'}</h1>
+        <h1 lang="en" style={s.title}>{notFound ? 'This page does not exist.' : 'Something went wrong.'}</h1>
         <p style={s.text}>{notFound ? 'The link may be out of date.' : 'Your work is saved. Reload the page to continue.'}</p>
         <p lang="ar" dir="rtl" style={s.text}>{notFound ? 'قد يكون الرابط قديماً.' : 'حدث خطأ. أعد تحميل الصفحة للمتابعة.'}</p>
         <p lang="sw" style={s.last}>{notFound ? 'Huenda kiungo kimepitwa na wakati.' : 'Hitilafu imetokea. Pakia upya ukurasa ili kuendelea.'}</p>

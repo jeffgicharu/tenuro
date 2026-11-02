@@ -85,6 +85,23 @@ describe('sessions', () => {
   });
 });
 
+describe('property search', () => {
+  it('lists buildings whose name matches before those matching only on their address', async () => {
+    const v = new Visitor(app);
+    await v.signIn('mbuyu-court', 'MANAGER');
+    type R = { viewer: { properties: { edges: { node: { name: string; addressLine: string } }[] } } };
+    const all = await v.gql<R>('{ viewer { properties(first: 50) { edges { node { name addressLine } } } } }');
+    // A coined root used both in building names and in street names.
+    const roots = all.data!.viewer.properties.edges.map((e) => e.node.name.split(' ')[0]!);
+    const root = roots.find((r) => all.data!.viewer.properties.edges.some((e) => e.node.addressLine.includes(r))) ?? roots[0]!;
+    const r = await v.gql<R>('query($s: String) { viewer { properties(first: 50, search: $s) { edges { node { name addressLine } } } } }', { s: root });
+    const nameMatches = r.data!.viewer.properties.edges.map((e) => e.node.name.toLowerCase().includes(root.toLowerCase()));
+    expect(nameMatches[0]).toBe(true);
+    const firstMiss = nameMatches.indexOf(false);
+    if (firstMiss !== -1) expect(nameMatches.slice(firstMiss).every((m) => !m)).toBe(true);
+  });
+});
+
 describe('lease register', () => {
   it('pages with stable cursors and a total that matches the filter', async () => {
     const v = new Visitor(app);

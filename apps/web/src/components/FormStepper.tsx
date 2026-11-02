@@ -78,8 +78,12 @@ export function FormStepper({ items, current, onSelect, label, compact }: FormSt
               <ButtonBase
                 onClick={() => onSelect(item.key)}
                 aria-current={isCurrent ? 'step' : undefined}
+                data-step-row
                 sx={{
-                  width: '100%', display: 'flex', alignItems: 'flex-start', gap: 3, py: 2, px: 0, textAlign: 'start', borderRadius: 1,
+                  // A fixed first column keeps every circle on one centre line, whatever the label width.
+                  // (ButtonBase centres its content by default, which shifted each circle with its label.)
+                  width: '100%', display: 'grid', gridTemplateColumns: '31px minmax(0, 1fr)', justifyContent: 'start', justifyItems: 'start',
+                  alignItems: 'start', columnGap: 3, py: 2, px: 0, textAlign: 'start', borderRadius: 1,
                   '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: 2 },
                   '&:hover .step-label': { color: t.ink },
                 }}
@@ -87,6 +91,7 @@ export function FormStepper({ items, current, onSelect, label, compact }: FormSt
                 <Box
                   aria-hidden
                   data-num
+                  data-step-marker
                   sx={{
                     width: 31, height: 31, flexShrink: 0, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: '0.75rem', fontWeight: 600,
                     border: `1px solid ${isCurrent ? t.ink : done ? t.brand : hasIssues ? t.danger : t.ruleStrong}`,

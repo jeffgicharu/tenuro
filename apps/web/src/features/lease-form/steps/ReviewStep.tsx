@@ -170,7 +170,9 @@ function ChangesTable({ changes, currency }: { changes: FieldChange[]; currency:
         <Box component="h2" id="review-changes" sx={{ m: 0, fontFamily: (th) => th.typography.h3.fontFamily, fontSize: '1.2rem', fontWeight: 500 }}>
           {intl.formatMessage({ id: 'leaseForm.review.changes' })}
         </Box>
-        <Box data-num sx={{ fontSize: '0.8125rem', color: t.inkSecondary }}>{intl.formatMessage({ id: 'leaseForm.review.changesCount' }, { count: changes.length })}</Box>
+        {changes.length > 0 && (
+          <Box data-num sx={{ fontSize: '0.8125rem', color: t.inkSecondary }}>{intl.formatMessage({ id: 'leaseForm.review.changesCount' }, { count: changes.length })}</Box>
+        )}
       </Box>
       {changes.length === 0 ? (
         <Box sx={{ color: t.inkSecondary, fontSize: '0.875rem' }}>{intl.formatMessage({ id: 'leaseForm.review.noChanges' })}</Box>
