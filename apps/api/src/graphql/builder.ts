@@ -27,7 +27,9 @@ export const builder = new SchemaBuilder<{
   relay: {
     clientMutationId: 'omit',
     cursorType: 'String',
-    edgesFieldOptions: { nullable: false },
+    // Each connection field already multiplies by its page size, so the edges list inside it
+    // must not multiply again by the default list factor.
+    edgesFieldOptions: { nullable: false, complexity: { field: 1, multiplier: 1 } },
     nodeFieldOptions: { nullable: false },
   },
   errors: { defaultTypes: [] },
