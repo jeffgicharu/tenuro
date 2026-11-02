@@ -1,0 +1,34 @@
+{
+  "name": "@tenuro/ledger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lease accounting engine: IFRS 16 and ASC 842 schedules, remeasurement, journals and maturity analysis",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "bench": "LEDGER_BENCH=1 vitest run",
+    "fixtures": "python3 fixtures/generate.py"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "fast-check": "^4.3.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
