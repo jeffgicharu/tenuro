@@ -1,16 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import Alert from '@mui/material/Alert';
-import Button from '@mui/material/Button';
-import Snackbar from '@mui/material/Snackbar';
+import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
-type Tone = 'success' | 'info' | 'warning' | 'error';
+const ToastView = lazy(async () => ({ default: (await import('./ToastView.tsx')).ToastView }));
+
+export type Tone = 'success' | 'info' | 'warning' | 'error';
 
 export interface ToastAction {
   label: string;
   onClick(): void;
 }
 
-interface Toast {
+export interface Toast {
   id: number;
   message: string;
   tone: Tone;
@@ -54,32 +53,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      <Snackbar
-        key={current?.id}
-        open={current !== null}
-        autoHideDuration={current?.tone === 'error' || current?.action ? 8000 : 5000}
-        onClose={(_e, reason) => reason !== 'clickaway' && setCurrent(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {current ? (
-          <Alert
-            severity={current.tone}
-            variant="filled"
-            onClose={() => setCurrent(null)}
-            role={current.tone === 'error' ? 'alert' : 'status'}
-            sx={{ minWidth: 280, alignItems: 'center' }}
-            {...(current.action ? {
-              action: (
-                <>
-                  <Button color="inherit" size="small" sx={{ fontWeight: 700 }} onClick={() => { current.action!.onClick(); setCurrent(null); }}>{current.action.label}</Button>
-                </>
-              ),
-            } : {})}
-          >
-            {current.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      {/* The toast's code loads with the first toast, not with the page. */}
+      {current && (
+        <Suspense fallback={null}>
+          <ToastView toast={current} onClose={() => setCurrent(null)} />
+        </Suspense>
+      )}
     </Ctx.Provider>
   );
 }

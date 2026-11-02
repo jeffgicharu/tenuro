@@ -51,6 +51,7 @@ test.describe('main journeys', () => {
     const search = page.getByRole('searchbox', { name: 'Search leases' }).or(page.getByLabel('Search leases')).first();
     await expect(search).toBeFocused();
     await search.fill('Nairobi');
+    await expect(page).toHaveURL(/[?&]q=Nairobi/);
     await expect(grid.getByRole('row').nth(1)).toContainText(/Nairobi/);
 
     await grid.getByRole('row').nth(1).getByRole('link').first().click();

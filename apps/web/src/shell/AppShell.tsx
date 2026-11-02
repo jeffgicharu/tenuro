@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+
+// The phone's navigation drawer loads the first time it is opened.
+const Drawer = lazy(() => import('@mui/material/Drawer'));
 import { graphql, useFragment } from 'react-relay';
 import { NavLink, useLocation } from 'react-router';
 import { useIntl } from 'react-intl';
 import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -49,7 +51,9 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
   const t = theme.tokens;
   const desktop = useMediaQuery(theme.breakpoints.up('lg'), { noSsr: true });
   const { navCollapsed, setNavCollapsed, resolvedMode } = usePreferences();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileOpen, setMobileOpenState] = useState(false);
+  const [drawerUsed, setDrawerUsed] = useState(false);
+  const setMobileOpen = (v: boolean) => { if (v) setDrawerUsed(true); setMobileOpenState(v); };
   // Search anywhere: ⌘K / Ctrl+K, or the button under the account. The palette loads on first use.
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteLoaded, setPaletteLoaded] = useState(false);
@@ -231,14 +235,18 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
             {nav}
           </Box>
         ) : (
-          <Drawer
-            open={mobileOpen}
-            onClose={() => setMobileOpen(false)}
-            anchor={theme.direction === 'rtl' ? 'right' : 'left'}
-            slotProps={{ paper: { sx: { width: RAIL } } }}
-          >
-            {nav}
-          </Drawer>
+          drawerUsed && (
+            <Suspense fallback={null}>
+              <Drawer
+                open={mobileOpen}
+                onClose={() => setMobileOpen(false)}
+                anchor={theme.direction === 'rtl' ? 'right' : 'left'}
+                slotProps={{ paper: { sx: { width: RAIL } } }}
+              >
+                {nav}
+              </Drawer>
+            </Suspense>
+          )
         )}
         <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {!desktop && (

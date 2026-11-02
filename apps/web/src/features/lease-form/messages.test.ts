@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createIntl } from 'react-intl';
-import { leaseFormAr, leaseFormEn, leaseFormSw } from './messages.ts';
+import { leaseFormEn } from './messages.ts';
+import { leaseFormAr } from './messages.ar.ts';
+import { leaseFormSw } from './messages.sw.ts';
 import { en } from '../../i18n/messages/en.ts';
 
 describe('lease form messages', () => {

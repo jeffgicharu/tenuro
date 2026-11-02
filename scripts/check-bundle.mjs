@@ -4,9 +4,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-// First measured at 312.6 KB: MUI with emotion and RTL 103, React with the router 95, Relay 66,
-// our code 34, react-intl 14. The budget locks that in; tighten it as the first page gets lighter.
-const BUDGET_INITIAL_KB = 320;
+// First measured at 312.6 KB; 284 KB after the shell's menus, dialogs and toasts moved out of the
+// first page (November 2026). The budget locks that in; tighten it as the first page gets lighter.
+const BUDGET_INITIAL_KB = 295;
 const BUDGET_ROUTE_KB = 180;
 
 const dist = process.argv[2] ?? 'apps/web/dist';
@@ -40,16 +40,18 @@ for (const k of [...initial].sort((a, b) => sizeOf([b]) - sizeOf([a]))) {
 const rows = [['first page (entry and its static imports)', initialKb, BUDGET_INITIAL_KB]];
 
 // Each lazily loaded chunk is measured by what it adds to what is already loaded when it loads: the
-// first page, plus the chunk that loads it when that is itself lazy (the register's desktop table
-// loads from the register page, so the code they share is counted once, with the page).
+// first page, plus the chunks that load it when those are lazy (the register's desktop table loads
+// with the register page, so the code they share is counted once, with the page).
 const routes = new Set(Object.values(manifest).flatMap((e) => e.dynamicImports ?? []));
 for (const r of routes) {
   if (!manifest[r] || manifest[r].file.includes('catalogues')) continue;
   const loaded = new Set(initial);
-  const importers = Object.keys(manifest).filter((k) => manifest[k].dynamicImports?.includes(r));
-  if (importers.length && importers.every((k) => !initial.has(k))) for (const k of closure(importers[0])) loaded.add(k);
+  // A chunk that a lazy chunk imports always arrives with it (even when the first page also starts it
+  // early, as the register's loader does for its table), so the lazy importers count as loaded.
+  const lazyImporters = Object.keys(manifest).filter((k) => manifest[k].dynamicImports?.includes(r) && !initial.has(k));
+  for (const imp of lazyImporters) for (const k of closure(imp)) loaded.add(k);
   const extra = [...closure(r)].filter((k) => !loaded.has(k));
-  const via = importers.length && importers.every((k) => !initial.has(k)) ? ` (on top of ${importers[0].replace(/^src\//, '')})` : '';
+  const via = lazyImporters.length ? ` (on top of ${lazyImporters.map((k) => k.replace(/^src\//, '')).join(', ')})` : '';
   rows.push([r.replace(/^src\//, '') + via, sizeOf(extra) / 1024, BUDGET_ROUTE_KB]);
 }
 

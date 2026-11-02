@@ -1,19 +1,16 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { graphql, useFragment, useMutation } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { Eye, LockKeyhole, RotateCcw } from 'lucide-react';
 import type { SessionBanner_viewer$key } from './__generated__/SessionBanner_viewer.graphql';
 import type { SessionBannerResetMutation } from './__generated__/SessionBannerResetMutation.graphql';
 import { queueToastAfterReload, useToast } from './Toast.tsx';
+
+const ResetDialog = lazy(async () => ({ default: (await import('./ResetDialog.tsx')).ResetDialog }));
 
 export function SessionBanner({ viewer: ref }: { viewer: SessionBanner_viewer$key }) {
   const viewer = useFragment(
@@ -30,7 +27,10 @@ export function SessionBanner({ viewer: ref }: { viewer: SessionBanner_viewer$ke
   const t = theme.tokens;
   const toast = useToast();
   const narrow = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirmingState] = useState(false);
+  // Once opened, the dialog stays mounted so it can animate closed.
+  const [confirmed, setConfirmed] = useState(false);
+  const setConfirming = (v: boolean) => { if (v) setConfirmed(true); setConfirmingState(v); };
   const [commit, resetting] = useMutation<SessionBannerResetMutation>(graphql`
     mutation SessionBannerResetMutation {
       resetMySandbox {
@@ -92,18 +92,12 @@ export function SessionBanner({ viewer: ref }: { viewer: SessionBanner_viewer$ke
           </Button>
         </>
       )}
-      <Dialog open={confirming} onClose={() => !resetting && setConfirming(false)} aria-labelledby="reset-title" maxWidth="xs">
-        <DialogTitle id="reset-title" sx={{ fontFamily: theme.typography.h3.fontFamily }}>
-          <FormattedMessage id="workspace.resetConfirmTitle" />
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText><FormattedMessage id="workspace.resetConfirmBody" /></DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 6, pb: 5 }}>
-          <Button onClick={() => setConfirming(false)} disabled={resetting}><FormattedMessage id="common.cancel" /></Button>
-          <Button onClick={reset} variant="contained" color="error" loading={resetting}><FormattedMessage id="workspace.resetConfirm" /></Button>
-        </DialogActions>
-      </Dialog>
+      {/* The confirmation's code loads the first time it is asked for. */}
+      {confirmed && (
+        <Suspense fallback={null}>
+          <ResetDialog open={confirming} resetting={resetting} onCancel={() => setConfirming(false)} onConfirm={reset} />
+        </Suspense>
+      )}
     </Box>
   );
 }

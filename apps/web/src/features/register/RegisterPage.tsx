@@ -1,6 +1,6 @@
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { Link as RouterLink, useRevalidator, useSearchParams } from 'react-router';
+import { Link as RouterLink, UNSAFE_DataRouterNavigationContext, useRevalidator, useSearchParams } from 'react-router';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -89,7 +89,15 @@ export function RegisterView({ viewer }: { viewer: RegisterViewer }) {
   const [total, setTotal] = useState<number | null>(null);
   const apiRef = useRef(null) as ReturnType<typeof useGridApiRef>;
 
-  const commit = useCallback((next: RegisterState, replace = true) => setParams(toParams(next), { replace }), [setParams]);
+  // A late search update (the search box waits a moment after typing) must not pull someone back to
+  // the register after they have opened a lease: while a navigation elsewhere is under way, skip it.
+  // (Read from the router's state directly, so the view also renders outside a data router, as in tests.)
+  const navigation = useContext(UNSAFE_DataRouterNavigationContext)?.navigation;
+  const leaving = navigation != null && navigation.state !== 'idle' && navigation.location != null && navigation.location.pathname !== '/leases';
+  const commit = useCallback((next: RegisterState, replace = true) => {
+    if (leaving) return;
+    setParams(toParams(next), { replace });
+  }, [setParams, leaving]);
   const setFilter = useCallback((filter: RegisterFilter) => commit({ filter, orderBy: state.orderBy, view: null }), [commit, state.orderBy]);
   const setOrder = useCallback((orderBy: RegisterOrder[]) => commit({ ...state, orderBy }), [commit, state]);
   const changeColumns = useCallback((model: GridColumnVisibilityModel) => {
