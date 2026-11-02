@@ -5,9 +5,9 @@ import { annualRentAtStart, diffForms, fieldId, firstYearPayments, formToInput, 
 describe('paths', () => {
   it('updates nested values without touching the original', () => {
     const f = validLease();
-    const next = setAt(f, 'options.0.exerciseOn', '2029-01-01');
-    expect(next.options[0]!.exerciseOn).toBe('2029-01-01');
-    expect(f.options[0]!.exerciseOn).not.toBe('2029-01-01');
+    const next = setAt(f, 'options.0.exerciseOn', '2030-03-01');
+    expect(next.options[0]!.exerciseOn).toBe('2030-03-01');
+    expect(f.options[0]!.exerciseOn).toBe('2029-01-01');
     expect(next.rent).toBe(f.rent);
   });
 
