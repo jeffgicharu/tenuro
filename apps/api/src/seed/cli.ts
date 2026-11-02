@@ -9,7 +9,7 @@ console.log(`Building seed portfolio for ${today} (scale ${scale})`);
 try {
   const report = await rebuild(db, { today, scale });
   const total = Object.values(report.rows).reduce((a, b) => a + b, 0);
-  console.log(`${total} rows; generated in ${Math.round(report.generateMs)} ms, written in ${Math.round(report.writeMs)} ms`);
+  console.log(`${total} rows; generated in ${Math.round(report.generateMs)} ms (accounting for ${report.measuredLeases} leases: ${Math.round(report.accountingMs)} ms), written in ${Math.round(report.writeMs)} ms`);
 } finally {
   await db.destroy();
 }

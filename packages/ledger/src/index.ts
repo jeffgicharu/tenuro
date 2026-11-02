@@ -5,6 +5,6 @@ export { LedgerError, type LedgerErrorCode } from './errors.ts';
 export { scheduleJournals } from './journals.ts';
 export { carryingAmount, maturityAnalysis, type MaturityAnalysis, type MaturityBand, type MaturityBandKey } from './maturity.ts';
 export { effectiveTerm, type EffectiveTerm, periodsPerYear, type TermAssessment, type TermOption } from './payments.ts';
-export { remeasure } from './remeasure.ts';
+export { remeasure, remeasureSeries } from './remeasure.ts';
 export { buildSchedule } from './schedule.ts';
 export type * from './types.ts';

@@ -134,7 +134,13 @@ export function generate(opts: SeedOptions): SeedData {
 // Yields the portfolio in batches of about `batchLeases` leases with all their rows, so the
 // rebuild can write and drop each batch and its memory stays flat on the shared server. Rows in a
 // batch only reference rows in the same or an earlier batch.
+// How long measuring the live leases took in the last run, reported with the rebuild so the nightly
+// job's time can be followed part by part.
+export const generationStats = { accountingMs: 0, measuredLeases: 0 };
+
 export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generator<SeedData> {
+  generationStats.accountingMs = 0;
+  generationStats.measuredLeases = 0;
   let out = emptySeed();
   const { today } = opts;
   const scale = opts.scale ?? 1;
@@ -380,6 +386,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
 
         // Live leases are measured now, so the portfolio's accounting adds up stored figures.
         if (status === 'ACTIVE' || status === 'HOLDING_OVER') {
+          const measuredFrom = performance.now();
           try {
             const acc = leaseAccounting(
               { ...lesseeRow, rent_per_period: String(rentPerPeriod) } as AccountingLease,
@@ -407,6 +414,8 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           } catch {
             // A lease the engine cannot measure is left out of the totals, as the API leaves it out of the lease page.
           }
+          generationStats.accountingMs += performance.now() - measuredFrom;
+          generationStats.measuredLeases += 1;
         }
 
         escalations.forEach((e, i) => out.escalation.push({

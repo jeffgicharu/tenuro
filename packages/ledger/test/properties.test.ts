@@ -1,7 +1,8 @@
 import Decimal from 'decimal.js';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { ACCOUNTS, buildSchedule, maturityAnalysis, remeasure, scheduleJournals } from '../src/index.ts';
+import { ACCOUNTS, buildSchedule, maturityAnalysis, remeasure, remeasureSeries, scheduleJournals } from '../src/index.ts';
+import type { LeaseChange } from '../src/index.ts';
 import type { LeaseAccountingInput, Schedule } from '../src/index.ts';
 
 const D = Decimal.clone({ precision: 34, rounding: Decimal.ROUND_HALF_UP });
@@ -145,6 +146,67 @@ describe('properties of random leases', () => {
         expect(new D(m.current).plus(m.nonCurrent).equals(m.carryingAmount)).toBe(true);
       }),
       { numRuns: 200 },
+    );
+  });
+
+  it('gives the same remeasurements and journals from a copied schedule as from the original', () => {
+    // A schedule from the engine carries its exact rows forward; a copy (as from JSON or a cache)
+    // is re-read from its formatted figures. Both paths must agree to the last digit.
+    fc.assert(
+      fc.property(leaseArb.filter((l) => l.termPeriods >= 4 && (l.exemption ?? 'NONE') === 'NONE'), fc.integer({ min: 80, max: 140 }), (input, index) => {
+        const s = buildSchedule(input);
+        const copy = structuredClone(s);
+        const second = s.rows[1];
+        const third = s.rows[2];
+        if (!second || !third) throw new Error('short schedule');
+        const step = (x: Schedule) => {
+          const a = remeasure(x, { kind: 'INDEX_CHANGE', previousIndex: '100', newIndex: String(index) }, second.startDate).schedule;
+          return remeasure(a, { kind: 'INDEX_CHANGE', previousIndex: String(index), newIndex: '100' }, third.startDate).schedule;
+        };
+        const fromOriginal = step(s);
+        const fromCopy = step(copy);
+        expect(fromCopy).toEqual(fromOriginal);
+        expect(scheduleJournals(structuredClone(fromOriginal))).toEqual(scheduleJournals(fromOriginal));
+      }),
+      { numRuns: 150 },
+    );
+  });
+
+  it('applies a series of changes exactly as one remeasurement after another', () => {
+    fc.assert(
+      fc.property(
+        leaseArb.filter((l) => l.termPeriods >= 8 && (l.exemption ?? 'NONE') === 'NONE'),
+        fc.array(fc.record({ at: fc.integer({ min: 1, max: 1_000 }), index: fc.integer({ min: 80, max: 140 }), modify: fc.boolean(), rateBp: fc.integer({ min: 0, max: 2_500 }) }), { minLength: 1, maxLength: 5 }),
+        (input, raw) => {
+          const s = buildSchedule(input);
+          // Effective dates on period starts after the first, in order (repeats allowed).
+          const periods = raw.map((x) => 2 + (x.at % (input.termPeriods - 1))).sort((a, b) => a - b);
+          let previous = '100';
+          const changes = raw.map((x, i) => {
+            const row = s.rows[periods[i]! - 1]!;
+            let change: LeaseChange;
+            if (x.modify && i === raw.length - 1) {
+              change = { kind: 'MODIFICATION_OTHER', revisedAnnualDiscountRate: String(x.rateBp / 10_000), newTermPeriods: input.termPeriods + 3 };
+            } else {
+              change = { kind: 'INDEX_CHANGE', previousIndex: previous, newIndex: String(x.index) };
+              previous = String(x.index);
+            }
+            return { change, effectiveDate: row.startDate };
+          });
+          let one = s;
+          const each = changes.map(({ change, effectiveDate }) => {
+            const r = remeasure(one, change, effectiveDate);
+            one = r.schedule;
+            return r;
+          });
+          const series = remeasureSeries(s, changes);
+          expect(series.schedule).toEqual(one);
+          expect(scheduleJournals(series.schedule)).toEqual(scheduleJournals(one));
+          const strip = ({ schedule: _s, ...rest }: (typeof each)[number]) => rest;
+          expect(series.remeasurements.map(strip)).toEqual(each.map(strip));
+        },
+      ),
+      { numRuns: 250 },
     );
   });
 

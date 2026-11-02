@@ -1,6 +1,6 @@
 import { assertIsoDate } from './dates.ts';
 import { type Dec, D, dec, fmt, ONE, roundMoney, ZERO } from './decimal.ts';
-import { fromRow, periodRate, presentValue, runSegment } from './engine.ts';
+import { periodRate, presentValue, rawRows, runSegment } from './engine.ts';
 import { LedgerError } from './errors.ts';
 import { type Posting, remeasurementEntry } from './journals.ts';
 import { assertTerm, nonNegative } from './payments.ts';
@@ -23,6 +23,34 @@ const MEMO: Record<LeaseChange['kind'], string> = {
  * remeasured liability and the adjusted right-of-use asset.
  */
 export function remeasure(schedule: Schedule, change: LeaseChange, effectiveDate: string): Remeasurement {
+  return apply(schedule, change, effectiveDate, undefined);
+}
+
+/**
+ * Applies several changes in order, with the same result as calling `remeasure` on each in turn.
+ * Each change rebuilds the periods from its effective date to the end of the term, and the next
+ * change rebuilds them again from its own date, so each change here only runs as far as the next
+ * one's first period (the engine runs period by period, so the rows kept are identical). Each
+ * returned remeasurement carries the schedule after the whole series.
+ */
+export function remeasureSeries(
+  schedule: Schedule,
+  changes: readonly { change: LeaseChange; effectiveDate: string }[],
+): { schedule: Schedule; remeasurements: Remeasurement[] } {
+  let current = schedule;
+  const done: Remeasurement[] = [];
+  changes.forEach(({ change, effectiveDate }, i) => {
+    const next = changes[i + 1];
+    // Located on the original calendar; a date it does not hold (after an extension) runs to the end.
+    const stop = next ? schedule.rows.find((row) => row.startDate === next.effectiveDate)?.period : undefined;
+    const r = apply(current, change, effectiveDate, stop);
+    done.push(r);
+    current = r.schedule;
+  });
+  return { schedule: current, remeasurements: done.map((r) => ({ ...r, schedule: current })) };
+}
+
+function apply(schedule: Schedule, change: LeaseChange, effectiveDate: string, stopAfterPeriod: number | undefined): Remeasurement {
   assertIsoDate(effectiveDate);
   const dp = schedule.minorUnits;
 
@@ -198,10 +226,11 @@ export function remeasure(schedule: Schedule, change: LeaseChange, effectiveDate
     openingRou: rouAfter,
     skipPaymentAtStart: false,
     dp,
+    ...(stopAfterPeriod === undefined ? {} : { stopAfterPeriod }),
   });
 
   const journal = remeasurementEntry(p, effectiveDate, MEMO[change.kind], postings, dp);
-  const keptRows = schedule.rows.filter((r) => r.period < p).map(fromRow);
+  const keptRows = rawRows(schedule).filter((r) => r.period < p);
   const event: RemeasurementEvent = {
     kind: change.kind,
     effectiveDate,

@@ -1,4 +1,4 @@
-import { buildSchedule, carryingAmount, maturityAnalysis, remeasure, type LeaseAccountingInput, type MaturityAnalysis, type Remeasurement, type Schedule } from '@tenuro/ledger';
+import { buildSchedule, carryingAmount, maturityAnalysis, remeasureSeries, type LeaseAccountingInput, type LeaseChange, type MaturityAnalysis, type Remeasurement, type Schedule } from '@tenuro/ledger';
 import { addDays, monthsBetween, type IsoDate } from './dates.ts';
 
 // Turns a stored lease into its IFRS 16 / ASC 842 accounting: the schedule measured at commencement,
@@ -69,21 +69,19 @@ export function accountingInput(l: AccountingLease, escalations: readonly Accoun
 // already in the schedule, so its steps are not applied again.
 export function leaseAccounting(l: AccountingLease, steps: readonly AccountingStep[], escalations: readonly AccountingEscalation[], asOf: IsoDate): LeaseAccountingResult {
   const input = accountingInput(l, escalations);
-  let schedule = buildSchedule(input);
-  const remeasurements: Remeasurement[] = [];
-  if (input.rent.kind === 'INDEXED') {
-    let previous = String(l.rent_per_period);
-    for (const s of [...steps].sort((a, b) => (a.starts_on < b.starts_on ? -1 : 1))) {
-      if (s.starts_on > asOf || s.starts_on <= l.commencement_date || s.starts_on > l.expiry_date) continue;
-      const next = String(s.rent_per_period);
-      if (next === previous) continue;
-      const r = remeasure(schedule, { kind: 'INDEX_CHANGE', previousIndex: previous, newIndex: next }, s.starts_on);
-      remeasurements.push(r);
-      schedule = r.schedule;
-      previous = next;
-    }
+  const schedule = buildSchedule(input);
+  if (input.rent.kind !== 'INDEXED') return { schedule, remeasurements: [] };
+  const changes: { change: LeaseChange; effectiveDate: string }[] = [];
+  let previous = String(l.rent_per_period);
+  for (const s of [...steps].sort((a, b) => (a.starts_on < b.starts_on ? -1 : 1))) {
+    if (s.starts_on > asOf || s.starts_on <= l.commencement_date || s.starts_on > l.expiry_date) continue;
+    const next = String(s.rent_per_period);
+    if (next === previous) continue;
+    changes.push({ change: { kind: 'INDEX_CHANGE', previousIndex: previous, newIndex: next }, effectiveDate: s.starts_on });
+    previous = next;
   }
-  return { schedule, remeasurements };
+  // Applied as one series: the same figures as one remeasurement after another, at a fraction of the work.
+  return remeasureSeries(schedule, changes);
 }
 
 export interface FiguresAt {

@@ -1,6 +1,6 @@
 import { assertIsoDate } from './dates.ts';
 import { type Dec, dec, fmt, minorUnits, roundMoney, sum, ZERO } from './decimal.ts';
-import { type PeriodCalendar, periodDates, periodRate, presentValue, type RawRow, runSegment } from './engine.ts';
+import { type PeriodCalendar, periodDates, periodRate, presentValue, type RawRow, rememberRawRows, runSegment } from './engine.ts';
 import { LedgerError } from './errors.ts';
 import { assertTerm, extraStream, nonNegative, periodsPerYear, rentStream } from './payments.ts';
 import type { CommencementAmounts, LeaseAccountingInput, RemeasurementEvent, Schedule, ScheduleRow } from './types.ts';
@@ -201,7 +201,7 @@ export function assemble(a: AssembleArgs): Schedule {
     totals.leaseCost = totals.leaseCost.plus(r.leaseCost);
     return toRow(r, dp);
   });
-  return {
+  const schedule: Schedule = {
     input: a.input,
     currency: a.input.currency,
     minorUnits: dp,
@@ -222,9 +222,22 @@ export function assemble(a: AssembleArgs): Schedule {
     events: a.events,
     notes: a.notes,
   };
+  rememberRawRows(schedule, a.rows);
+  return schedule;
 }
 
+// A row kept unchanged through a remeasurement is formatted once, not again for every later change.
+const formatted = new WeakMap<RawRow, ScheduleRow>();
+
 function toRow(r: RawRow, dp: number): ScheduleRow {
+  const known = formatted.get(r);
+  if (known) return known;
+  const row = format(r, dp);
+  formatted.set(r, row);
+  return row;
+}
+
+function format(r: RawRow, dp: number): ScheduleRow {
   return {
     period: r.period,
     startDate: r.startDate,

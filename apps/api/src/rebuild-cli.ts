@@ -13,7 +13,7 @@ const wal = await sql<{ bytes: string }>`SELECT pg_wal_lsn_diff(pg_current_wal_l
 await db.destroy();
 const total = Object.values(report.rows).reduce((a, b) => a + b, 0);
 console.log(JSON.stringify({
-  event: 'rebuild', rows: total, generateMs: Math.round(report.generateMs), writeMs: Math.round(report.writeMs),
+  event: 'rebuild', rows: total, generateMs: Math.round(report.generateMs), accountingMs: Math.round(report.accountingMs), measuredLeases: report.measuredLeases, writeMs: Math.round(report.writeMs),
   totalMs: Math.round(performance.now() - started), walMb: Math.round(Number(wal.rows[0]!.bytes) / 1048576),
   peakRssMb: Math.round(process.resourceUsage().maxRSS / 1024),
 }));

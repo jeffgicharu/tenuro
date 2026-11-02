@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from '../src/config.ts';
 import { localId, prepareDatabase, startApp, Visitor, type TestApp } from './harness.ts';
@@ -348,6 +349,38 @@ describe('query limits', () => {
     const deep = '{ viewer { leases(first: 1) { edges { node { keyDates(first: 1) { edges { node { lease { keyDates(first: 1) { edges { node { lease { keyDates(first: 1) { edges { node { id } } } } } } } } } } } } } } } }';
     const r = await v.gql(deep);
     expect(r.errors?.[0]?.message).toMatch(/depth|complex/i);
+  });
+});
+
+describe('server timing', () => {
+  it('reports the session lookup, execution and the slowest fields', async () => {
+    const v = new Visitor(app);
+    await v.signIn('mbuyu-court', 'VIEWER');
+    const res = await fetch(`${app.url}/graphql`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-tenuro-client': 'web', 'x-real-ip': v.ip, cookie: v.cookie },
+      body: JSON.stringify({ query: '{ viewer { portfolio { liveLeases keyDatesDue } } }' }),
+    });
+    const header = res.headers.get('server-timing') ?? '';
+    expect(header).toMatch(/^session;dur=\d+\.\d, execute;dur=\d+\.\d/);
+    expect(header).toMatch(/desc="Viewer\.portfolio";dur=/);
+    expect(header).toMatch(/desc="Portfolio\.(liveLeases|keyDatesDue)";dur=/);
+  });
+});
+
+describe('lookups through the person\'s view', () => {
+  it('can find a lease, key date or task by its view id through an index', async () => {
+    // The test data is small enough that the planner may rightly prefer a scan, so scans are turned
+    // off: what matters is that the index matches the view's id once Postgres folds the view in.
+    const plan = (view: string, column: string, table: string) => app.owner.transaction().execute(async (tx) => {
+      await sql`SET LOCAL enable_seqscan = off`.execute(tx);
+      const id = (await sql<{ id: string }>`SELECT id FROM ${sql.table(table)} WHERE sandbox_id IS NULL LIMIT 1`.execute(tx)).rows[0]!.id;
+      const rows = (await sql<{ 'QUERY PLAN': string }>`EXPLAIN SELECT * FROM ${sql.table(view)} WHERE ${sql.ref(column)} = ${id}`.execute(tx)).rows;
+      return rows.map((r) => r['QUERY PLAN']).join('\n');
+    });
+    expect(await plan('v_lease', 'lease_id', 'lease')).toMatch(/lease_view_id/);
+    expect(await plan('v_key_date', 'key_date_id', 'key_date')).toMatch(/key_date_view_id/);
+    expect(await plan('v_task', 'task_id', 'task')).toMatch(/task_view_id/);
   });
 });
 

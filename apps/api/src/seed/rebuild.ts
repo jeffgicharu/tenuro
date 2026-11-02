@@ -1,7 +1,7 @@
 import { sql } from 'kysely';
 import type { Db } from '../db/client.ts';
 import type { Database } from '../db/types.ts';
-import { generateBatches, type SeedData, type SeedOptions } from './generate.ts';
+import { generateBatches, generationStats, type SeedData, type SeedOptions } from './generate.ts';
 
 const DELETE_ORDER: (keyof Database)[] = [
   'sandbox', 'session', 'notification', 'activity', 'document', 'task', 'key_date', 'lease_draft', 'lease_modification',
@@ -16,6 +16,9 @@ const INSERT_ORDER: (keyof SeedData)[] = [
 export interface RebuildReport {
   rows: Record<string, number>;
   generateMs: number;
+  /** Part of generateMs: measuring the live leases (IFRS 16 / ASC 842). */
+  accountingMs: number;
+  measuredLeases: number;
   writeMs: number;
 }
 
@@ -62,7 +65,7 @@ export async function rebuild(db: Db, opts: SeedOptions, log = console.log): Pro
     await sql`SELECT ops.record_manifest()`.execute(tx);
   });
   await sql`ANALYZE`.execute(db);
-  return { rows, generateMs, writeMs: performance.now() - t0 - generateMs };
+  return { rows, generateMs, accountingMs: generationStats.accountingMs, measuredLeases: generationStats.measuredLeases, writeMs: performance.now() - t0 - generateMs };
 }
 
 export async function seedIfEmpty(db: Db, today: string, log = console.log): Promise<boolean> {

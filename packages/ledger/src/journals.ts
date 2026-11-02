@@ -1,6 +1,6 @@
 import { ACCOUNTS, type AccountKey } from './accounts.ts';
 import { type Dec, D, fmt, sum, ZERO } from './decimal.ts';
-import { fromRow, type RawRow } from './engine.ts';
+import { rawRows, type RawRow } from './engine.ts';
 import type { AccountingStandard, CommencementAmounts, JournalEntry, JournalLine, Schedule } from './types.ts';
 
 /** A posting with a signed amount: positive debits the account, negative credits it. */
@@ -74,7 +74,7 @@ export function scheduleJournals(schedule: Schedule): JournalEntry[] {
     if (opening) out.push(opening);
   }
   for (const event of schedule.events) if (event.journal) out.push(event.journal);
-  for (const row of schedule.rows) out.push(...rowEntries(fromRow(row), schedule.input.standard, exempt, dp));
+  for (const row of rawRows(schedule)) out.push(...rowEntries(row, schedule.input.standard, exempt, dp));
   return out.sort(
     (a, b) => a.period - b.period || (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind],
   );

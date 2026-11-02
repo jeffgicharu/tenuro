@@ -41,6 +41,19 @@ function datesFrom(
   return { startDate, endDate, paymentDate: cal.timing === 'ADVANCE' ? startDate : endDate, nextStart };
 }
 
+// Rows as they came out of the engine, kept per schedule so a remeasurement (or the journals) can
+// carry on from exact decimals instead of re-reading every formatted row. Rows and decimals are never
+// mutated, so sharing them is safe; a schedule built elsewhere (or copied) simply falls back to parsing.
+const rawRowsOf = new WeakMap<object, readonly RawRow[]>();
+
+export function rememberRawRows(schedule: object, rows: readonly RawRow[]): void {
+  rawRowsOf.set(schedule, rows);
+}
+
+export function rawRows(schedule: { rows: readonly ScheduleRow[] }): readonly RawRow[] {
+  return rawRowsOf.get(schedule) ?? schedule.rows.map(fromRow);
+}
+
 export function fromRow(r: ScheduleRow): RawRow {
   return {
     period: r.period,
@@ -60,8 +73,19 @@ export function fromRow(r: ScheduleRow): RawRow {
   };
 }
 
+// A fractional power at 34 digits is the dearest step in building a schedule, and a portfolio uses a
+// handful of rates, so each (rate, frequency) pair is worked out once. The value is the same either way.
+const periodRates = new Map<string, Dec>();
+
 export function periodRate(annualRate: Dec, perYear: number): Dec {
-  return ONE.plus(annualRate).pow(ONE.div(perYear)).minus(ONE);
+  const key = `${annualRate.toString()}|${perYear}`;
+  let rate = periodRates.get(key);
+  if (rate === undefined) {
+    rate = ONE.plus(annualRate).pow(ONE.div(perYear)).minus(ONE);
+    if (periodRates.size > 10_000) periodRates.clear();
+    periodRates.set(key, rate);
+  }
+  return rate;
 }
 
 /**
@@ -102,6 +126,8 @@ export interface SegmentParams {
   /** True only at commencement of an advance lease: period 1's payment was made at commencement. */
   skipPaymentAtStart: boolean;
   dp: number;
+  /** Stop after this period (a later change will rebuild the rest). Rows up to it are unaffected. */
+  stopAfterPeriod?: number;
 }
 
 /**
@@ -136,7 +162,8 @@ export function runSegment(p: SegmentParams): RawRow[] {
   let liability = p.openingLiability;
   let rou = p.openingRou;
   let start = addMonths(p.calendar.commencementDate, (p.startPeriod - 1) * p.calendar.monthsPerPeriod);
-  for (let t = p.startPeriod; t <= lastRow; t++) {
+  const until = Math.min(lastRow, p.stopAfterPeriod ?? lastRow);
+  for (let t = p.startPeriod; t <= until; t++) {
     const { nextStart, ...dates } = datesFrom(p.calendar, t, start);
     start = nextStart;
     const inTerm = t <= n;

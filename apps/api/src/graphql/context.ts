@@ -17,6 +17,8 @@ export interface Context {
   ipHash: string;
   today: string;
   loaders: Loaders;
+  /** Per-request timings for the Server-Timing header (see timing.ts). */
+  timings?: Map<string, number>;
 }
 
 export type Loaders = ReturnType<typeof createLoaders>;

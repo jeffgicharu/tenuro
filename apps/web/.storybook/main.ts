@@ -8,6 +8,11 @@ const config: StorybookConfig = {
   core: { disableTelemetry: true, disableWhatsNewNotifications: true },
   typescript: { reactDocgen: false },
   // The app's public folder holds 25 MB of photographs the stories do not need.
-  viteFinal: (cfg) => ({ ...cfg, publicDir: false }),
+  // The app's catalogue preload belongs to the app's page; Storybook's bundle has no such chunk.
+  viteFinal: (cfg) => ({
+    ...cfg,
+    publicDir: false,
+    plugins: (cfg.plugins ?? []).flat().filter((p) => !(p && typeof p === 'object' && 'name' in p && p.name === 'tenuro:preload-default-catalogue')),
+  }),
 };
 export default config;

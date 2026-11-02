@@ -1,12 +1,46 @@
 import babel from '@rolldown/plugin-babel';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+// The message catalogue is a dynamic import, so the browser only asked for it once the app had booted
+// and rendered, and the first paint waited behind a second round trip. English, the default, is
+// preloaded from the page itself (with the chunks it needs), so it downloads alongside the app.
+function preloadDefaultCatalogue(): Plugin {
+  return {
+    name: 'tenuro:preload-default-catalogue',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const bundle = ctx.bundle;
+        if (!bundle) return html;
+        const chunks = Object.values(bundle).filter((c) => c.type === 'chunk');
+        const entry = chunks.find((c) => c.facadeModuleId?.replaceAll('\\', '/').endsWith('/src/i18n/catalogues/en.ts'));
+        if (!entry) throw new Error('The English catalogue chunk was not found; the preload would silently stop working');
+        const files = new Set<string>();
+        const visit = (file: string) => {
+          if (files.has(file)) return;
+          files.add(file);
+          const c = chunks.find((x) => x.fileName === file);
+          c?.imports.forEach(visit);
+        };
+        visit(entry.fileName);
+        const links = [...files]
+          .filter((f) => !html.includes(`/${f}"`))
+          .map((f) => `<link rel="modulepreload" crossorigin href="/${f}">`)
+          .join('\n    ');
+        return html.replace('</head>', `    ${links}\n  </head>`);
+      },
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
     // Compiles graphql`` tags to imports of the generated Relay artifacts.
     babel({ plugins: [['relay', { eagerEsModules: true }]] }),
+    preloadDefaultCatalogue(),
   ],
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),

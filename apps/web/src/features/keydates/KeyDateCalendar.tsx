@@ -88,7 +88,19 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
                     <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>{label}</Box>
                     <Box aria-hidden sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
                       <Box component="span" data-num sx={{ fontSize: '0.8125rem', fontWeight: isToday ? 700 : 500 }}>{Number(d.slice(8))}</Box>
-                      {info && <Box component="span" data-num sx={{ fontSize: { xs: '0.625rem', md: '0.75rem' }, fontWeight: 600, color: info.overdue ? t.danger : t.ink }}>{info.total}</Box>}
+                      {/* Overdue counts sit on a surface pill, so the danger colour keeps its contrast however strong the tint gets. */}
+                      {info && (
+                        <Box
+                          component="span"
+                          data-num
+                          sx={{
+                            fontSize: { xs: '0.625rem', md: '0.75rem' }, fontWeight: 600, lineHeight: 1.5,
+                            ...(info.overdue ? { color: t.danger, backgroundColor: t.surface, border: `1px solid ${t.danger}`, borderRadius: 999, px: 0.75 } : { color: t.ink }),
+                          }}
+                        >
+                          {info.total}
+                        </Box>
+                      )}
                     </Box>
                     {info && (
                       <Box aria-hidden sx={{ display: { xs: 'none', md: 'flex' }, flexWrap: 'wrap', gap: '3px', mt: 'auto' }}>

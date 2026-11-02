@@ -8,6 +8,7 @@ import { hashIp, LimitReached, readCookie, resolveSession, sessionCookie, signIn
 import { newContext, type Context } from './graphql/context.ts';
 import { useOperationLimits, usePersisted, useScopedTransaction } from './graphql/plugins.ts';
 import { schema } from './graphql/schema.ts';
+import { startTimings, useServerTiming } from './graphql/timing.ts';
 import { API_CSP, COMMON_HEADERS, newNonce, pageCsp } from './http/security.ts';
 import { serveDocument } from './http/documents.ts';
 import { serveStatic } from './http/static.ts';
@@ -57,11 +58,14 @@ export function createApp(db: Db) {
       useOperationLimits({ maxTokens: 3_000, maxAliases: 15 }),
       usePersisted(config.persistedQueries, !config.production),
       useScopedTransaction(),
+      useServerTiming(),
     ],
-    context: async ({ req }) => {
+    context: async ({ req, request }) => {
+      const started = performance.now();
       const token = readCookie(req.headers.cookie, config.cookieName);
       const session = await resolveSession(db, token);
-      return newContext(db, session, hashIp(clientIp(req))) as Context;
+      const timings = startTimings(request, performance.now() - started);
+      return { ...newContext(db, session, hashIp(clientIp(req))), timings } as Context;
     },
   });
 

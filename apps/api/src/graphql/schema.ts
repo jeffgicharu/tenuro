@@ -1,4 +1,5 @@
 import { builder } from './builder.ts';
+import { timeFields } from './timing.ts';
 import './errors.ts';
 import './types/common.ts';
 import './types/tenant.ts';
@@ -15,4 +16,4 @@ import './mutations/keydates.ts';
 import './mutations/views.ts';
 import './mutations/sandbox.ts';
 
-export const schema = builder.toSchema({ sortSchema: true });
+export const schema = timeFields(builder.toSchema({ sortSchema: true }));
