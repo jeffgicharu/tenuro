@@ -9,7 +9,7 @@ const asDate = (iso: string) => new Date(`${iso.slice(0, 10)}T00:00:00Z`);
 
 export interface Formatters {
   locale: string;
-  money(amount: string, currency: string, opts?: { compact?: boolean; showCode?: boolean }): string;
+  money(amount: string, currency: string, opts?: { compact?: boolean; showCode?: boolean; whole?: boolean }): string;
   number(value: string | number, opts?: { maxFractionDigits?: number; compact?: boolean }): string;
   percent(fraction: string | number, digits?: number): string;
   date(iso: string, style?: 'short' | 'medium' | 'long'): string;
@@ -28,8 +28,9 @@ export function makeFormatters(locale: string): Formatters {
   return {
     locale,
     money(amount, currency, opts = {}) {
-      const digits = opts.compact ? 1 : minorUnits(currency);
-      const f = nf(`m:${currency}:${opts.compact ? 'c' : 'f'}:${opts.showCode === false ? 'n' : 'y'}`, () => new Intl.NumberFormat(locale, {
+      // whole: rounded to the unit, for tables where cents on multi-million figures are noise.
+      const digits = opts.compact ? 1 : opts.whole ? 0 : minorUnits(currency);
+      const f = nf(`m:${currency}:${opts.compact ? 'c' : 'f'}:${opts.showCode === false ? 'n' : 'y'}:${opts.whole ? 'w' : ''}`, () => new Intl.NumberFormat(locale, {
         style: opts.showCode === false ? 'decimal' : 'currency',
         currency, currencyDisplay: 'code',
         notation: opts.compact ? 'compact' : 'standard',

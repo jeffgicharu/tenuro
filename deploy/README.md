@@ -1,7 +1,7 @@
 # Tenuro server install guide
 
 Everything Tenuro needs on the shared host (Ubuntu 22.04). It runs as two app
-slots behind nginx, with nightly jobs for the data rebuild, backups and a weekly restore
+slots behind nginx, with nightly jobs for the data reset, backups and a weekly restore
 test. The files under `deploy/server/` mirror their target paths. `deploy/install.sh`
 installs them, and running it again is safe.
 
@@ -76,7 +76,7 @@ deploys only from `main`, with the three secrets below.
 | `/etc/systemd/system/tenuro@.service` | root 0644 | The app, one instance per slot, running as `tenuro-blue` / `tenuro-green`. |
 | `/etc/systemd/system/tenuro-migrate@.service` | root 0644 | Expand-only migrations for a slot's release, as `tenuro-jobs` with owner credentials. |
 | `/etc/systemd/system/tenuro-smoke@.service` | root 0644 | Journey checks against a slot's port, plus the CPU self-check on this machine's CPU. It gets no credentials. |
-| `/etc/systemd/system/tenuro-reset.{service,timer}` | root 0644 | The nightly data rebuild at 03:00 Nairobi time. It runs at `Nice=10`, `IOSchedulingClass=idle` and `CPUQuota=50%`. |
+| `/etc/systemd/system/tenuro-reset.{service,timer}` | root 0644 | The nightly data reset at 03:00 Nairobi time. It runs at `Nice=10`, `IOSchedulingClass=idle` and `CPUQuota=50%`. |
 | `/etc/systemd/system/tenuro-backup.{service,timer}` | root 0644 | `pg_dump` nightly at 02:00 Nairobi time, keeping 10. |
 | `/etc/systemd/system/tenuro-restore-test.{service,timer}` | root 0644 | Every Sunday at 04:00, restores the newest dump into `tenuro_restore_test`, verifies it and records the result. |
 | `/etc/systemd/system/tenuro-boot.service` | root 0644 | Runs once at boot, after PostgreSQL and nginx (it does nothing before the first activation). It starts the slot named in `state/active` and keeps it the only one enabled. If the nginx snippet names another slot, or a switch was interrupted, it rewrites the snippet, runs `nginx -t`, and reloads nginx only if the snippet changed and nginx is running. |
@@ -247,7 +247,7 @@ Cloudflare ranges). `127.0.0.1` and `::1` are never limited.
 
 | Path | Rate, burst | Body limit |
 |---|---|---|
-| `/api/session` (sign-in, which creates sessions and sandboxes) | 10/min, burst 5 | 4 KB |
+| `/api/session` (sign-in, which creates sessions and sandboxes; sign-out shares the limit) | 10/min, burst 5 | 4 KB |
 | `/api/uploads` | 1/s, burst 3 | 12 MB |
 | `/api/vitals` (Web Vitals beacons) | 2/s, burst 10 | 16 KB |
 | `/api/csp-report` | 1/s, burst 5 | 16 KB |
@@ -264,7 +264,7 @@ sandbox cookie can't grow disk use without bound. The API's test suite hits each
 | Cap | Limit |
 |---|---|
 | New sandboxes per IP | 20 per day |
-| New sign-in sessions per IP | 60 per hour |
+| New sessions per IP | 60 per hour |
 | Live sessions, all visitors | 2,000 |
 | Sandboxes, all visitors | 2,000 |
 | Writes per sandbox | 300 |

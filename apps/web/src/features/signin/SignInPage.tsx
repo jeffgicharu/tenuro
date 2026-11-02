@@ -7,12 +7,12 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
-import { ArrowRight, Eye, PenLine, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, Eye, LogOut, PenLine, ShieldCheck } from 'lucide-react';
 import type { SignInPageQuery } from './__generated__/SignInPageQuery.graphql';
 import { signInQuery } from './loader.ts';
 import { useRouteQuery } from '../../app/relayRoute.ts';
 import { usePreferences } from '../../app/preferences.tsx';
-import { SignInError, signInAs } from '../../app/session.ts';
+import { SignInError, signInAs, signOut } from '../../app/session.ts';
 import { LANGUAGES, type Language } from '../../i18n/locale.ts';
 
 type Account = SignInPageQuery['response']['signInAccounts'][number];
@@ -20,7 +20,7 @@ type Account = SignInPageQuery['response']['signInAccounts'][number];
 const ROLE_ICON = { ADMIN: ShieldCheck, MANAGER: PenLine, VIEWER: Eye } as const;
 
 export function SignInPage() {
-  const { signInAccounts } = useRouteQuery<SignInPageQuery>(signInQuery);
+  const { signInAccounts, viewer } = useRouteQuery<SignInPageQuery>(signInQuery);
   const intl = useIntl();
   const theme = useTheme();
   const t = theme.tokens;
@@ -108,6 +108,35 @@ export function SignInPage() {
             <FormattedMessage id="signin.lede" />
           </Typography>
 
+          {viewer && (
+            <Box
+              role="status"
+              sx={{
+                display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3, mb: 6, px: 4, py: 3,
+                border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.brandTint,
+              }}
+            >
+              <Box sx={{ flex: '1 1 240px', fontSize: '0.875rem' }}>
+                <FormattedMessage
+                  id="signin.current"
+                  values={{
+                    name: <strong>{viewer.user.displayName}</strong>,
+                    role: intl.formatMessage({ id: `shell.role.${viewer.user.role}` }),
+                    company: currentLanguage === 'ar' && viewer.tenant.nameLocal ? viewer.tenant.nameLocal : viewer.tenant.name,
+                  }}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button size="small" variant="text" startIcon={<LogOut size={14} aria-hidden />} onClick={() => void signOut()}>
+                  <FormattedMessage id="shell.signOut" />
+                </Button>
+                <Button size="small" variant="contained" href="/leases" endIcon={<ArrowRight size={14} aria-hidden style={rtl ? { transform: 'scaleX(-1)' } : undefined} />}>
+                  <FormattedMessage id="signin.continue" />
+                </Button>
+              </Box>
+            </Box>
+          )}
+
           {error && (
             <Alert severity={error === 'limit' ? 'warning' : 'error'} sx={{ mb: 5 }} role="alert">
               <FormattedMessage id={error === 'limit' ? 'signin.limit' : 'signin.error'} />
@@ -135,11 +164,13 @@ export function SignInPage() {
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
                     {accounts.map((a) => {
                       const Icon = ROLE_ICON[a.role];
+                      const current = viewer?.user.id === a.id;
                       return (
                         <Button
                           key={a.id}
                           variant="outlined"
-                          onClick={() => void go(a)}
+                          aria-current={current ? 'true' : undefined}
+                          onClick={() => (current ? window.location.assign('/leases') : void go(a))}
                           loading={pending === a.id}
                           disabled={pending !== null && pending !== a.id}
                           // The accessible name is the visible text (role and person), as WCAG 2.5.3 asks;
@@ -147,13 +178,15 @@ export function SignInPage() {
                           aria-describedby={`company-${tenant.id}`}
                           sx={{
                             justifyContent: 'flex-start', alignItems: 'flex-start', textAlign: 'start', flexDirection: 'column', gap: 0.5,
-                            py: 2.5, px: 3, minHeight: 64, backgroundColor: t.surface,
+                            py: 2.5, px: 3, minHeight: 64, backgroundColor: current ? t.brandSoft : t.surface,
+                            borderColor: current ? t.brand : undefined,
                             '&:hover .arrow': { opacity: 1, transform: 'translateX(0)' },
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', fontWeight: 600 }}>
                             <Icon size={15} strokeWidth={1.8} aria-hidden />
                             <span><FormattedMessage id={`signin.roleShort.${a.role}`} /></span>
+                            {current && <Check size={14} strokeWidth={2.2} aria-hidden />}
                             <Box
                               className="arrow"
                               component="span"
@@ -186,9 +219,6 @@ export function SignInPage() {
               );
             })}
           </Box>
-          <Typography variant="caption" component="p" sx={{ mt: 6 }}>
-            <FormattedMessage id="signin.footnote" />
-          </Typography>
         </Box>
       </Box>
     </Box>

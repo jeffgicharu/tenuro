@@ -48,16 +48,16 @@ export class LimitReached extends Error {
   }
 }
 
-// Signs a visitor in as a listed account. An existing sandbox is kept, so a visitor can switch role or
-// company and still see their own changes; otherwise a new sandbox is made, within the per-IP and
-// global caps.
-export async function signInAccount(db: Db, opts: { accountId: string; existingToken: string | null; ip: string }): Promise<{ token: string } | null> {
+// Signs in to one of the accounts listed on the sign-in page. An existing sandbox is kept, so a
+// person can switch role or company and still see their own changes; otherwise a new sandbox is
+// made, within the per-IP and global caps.
+export async function signIn(db: Db, opts: { accountId: string; existingToken: string | null; ip: string }): Promise<{ token: string } | null> {
   const ipHash = hashIp(opts.ip);
   const { limits } = config;
   return db.transaction().execute(async (tx) => {
     // Serialise sign-ins per address so concurrent requests cannot slip past the per-IP caps.
     await sql`SELECT pg_advisory_xact_lock(hashtext(${ipHash}))`.execute(tx);
-    const account = await tx.selectFrom('app_user').select(['id']).where('id', '=', opts.accountId).where('is_listed', '=', true).executeTakeFirst();
+    const account = await tx.selectFrom('app_user').select(['id']).where('id', '=', opts.accountId).where('listed_for_sign_in', '=', true).executeTakeFirst();
     if (!account) return null;
 
     let sandboxId: string | null = null;

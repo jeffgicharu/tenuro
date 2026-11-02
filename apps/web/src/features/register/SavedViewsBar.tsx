@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { graphql, useFragment, useMutation } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import Box from '@mui/material/Box';
@@ -15,7 +15,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
-import { BookmarkPlus, Users, X } from 'lucide-react';
+import { Bookmark, BookmarkPlus, X } from 'lucide-react';
 import type { SavedViewsBar_viewer$key } from './__generated__/SavedViewsBar_viewer.graphql';
 import type { SavedViewsBarSaveMutation } from './__generated__/SavedViewsBarSaveMutation.graphql';
 import type { SavedViewsBarDeleteMutation } from './__generated__/SavedViewsBarDeleteMutation.graphql';
@@ -45,7 +45,8 @@ export function SavedViewsBar({ viewer: ref, activeViewId, onSelect, currentConf
     ref,
   );
   const intl = useIntl();
-  const t = useTheme().tokens;
+  const theme = useTheme();
+  const t = theme.tokens;
   const toast = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
@@ -134,19 +135,25 @@ export function SavedViewsBar({ viewer: ref, activeViewId, onSelect, currentConf
         <ButtonBase
           role="tab"
           aria-selected={active}
+          data-active={active || undefined}
           onClick={() => onSelect(id && opts.config !== undefined ? { id, config: opts.config } : null)}
           sx={{
             gap: 1.5, px: 1, py: 2.5, fontSize: '0.875rem', fontWeight: active ? 600 : 500, whiteSpace: 'nowrap',
-            color: active ? t.ink : t.inkSecondary, borderBottom: `2px solid ${active ? t.ink : 'transparent'}`, marginBottom: '-1px',
+            color: active ? t.ink : t.inkSecondary, transition: 'color 120ms ease',
             '&:hover': { color: t.ink }, '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: 2, borderRadius: 0.5 },
           }}
         >
-          {opts.shared && (
-            <Tooltip title={intl.formatMessage({ id: 'register.views.shared' })}>
-              <Box component="span" sx={{ display: 'inline-flex', color: t.inkTertiary }}>
-                <Users size={14} strokeWidth={1.8} aria-label={intl.formatMessage({ id: 'register.views.shared' })} />
-              </Box>
-            </Tooltip>
+          {id && (
+            // Every saved view carries a bookmark; a shared one says so on hover and to screen readers.
+            opts.shared ? (
+              <Tooltip title={intl.formatMessage({ id: 'register.views.shared' })}>
+                <Box component="span" sx={{ display: 'inline-flex', color: t.inkTertiary }}>
+                  <Bookmark size={14} strokeWidth={1.8} fill="currentColor" aria-label={intl.formatMessage({ id: 'register.views.shared' })} />
+                </Box>
+              </Tooltip>
+            ) : (
+              <Box component="span" sx={{ display: 'inline-flex', color: t.inkTertiary }}><Bookmark size={14} strokeWidth={1.8} aria-hidden /></Box>
+            )
           )}
           {label}
         </ButtonBase>
@@ -161,9 +168,54 @@ export function SavedViewsBar({ viewer: ref, activeViewId, onSelect, currentConf
 
   const company = intl.locale.startsWith('ar') && viewer.tenant.nameLocal ? viewer.tenant.nameLocal : viewer.tenant.name;
 
+  // One indicator slides under the active tab, and the row fades at whichever edge has more tabs.
+  const listRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  const [fade, setFade] = useState({ start: false, end: false });
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const tab = list.querySelector<HTMLElement>('[data-active]');
+      setIndicator(tab ? { left: tab.offsetLeft, width: tab.offsetWidth } : null);
+      const max = list.scrollWidth - list.clientWidth;
+      const x = Math.abs(list.scrollLeft);
+      setFade({ start: x > 1, end: max > 1 && x < max - 1 });
+    };
+    measure();
+    list.querySelector<HTMLElement>('[data-active]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    list.addEventListener('scroll', measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(list);
+    return () => { list.removeEventListener('scroll', measure); ro.disconnect(); };
+  }, [activeViewId, viewer.savedViews.edges.length, intl.locale]);
+  const endSide = theme.direction === 'rtl' ? 'left' : 'right';
+  const mask = `linear-gradient(to ${endSide}, ${fade.start ? 'transparent 0, #000 24px' : '#000 0'}, ${fade.end ? '#000 calc(100% - 32px), transparent 100%' : '#000 100%'})`;
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 4, borderBottom: `1px solid ${t.rule}` }}>
-      <Box role="tablist" aria-label={intl.formatMessage({ id: 'register.views.label' })} sx={{ display: 'flex', gap: 5, overflowX: 'auto', flex: 1, minWidth: 0, scrollbarWidth: 'thin' }}>
+      <Box
+        ref={listRef}
+        role="tablist"
+        aria-label={intl.formatMessage({ id: 'register.views.label' })}
+        sx={{
+          display: 'flex', gap: 5, overflowX: 'auto', flex: 1, minWidth: 0, scrollbarWidth: 'none', position: 'relative',
+          '&::-webkit-scrollbar': { display: 'none' }, maskImage: mask, WebkitMaskImage: mask,
+        }}
+      >
+        {indicator && (
+          <Box
+            aria-hidden
+            sx={{
+              // offsetLeft and a physical left: 0 share one coordinate space in either direction.
+              position: 'absolute', bottom: 0, left: 0, height: 2, backgroundColor: t.ink, borderRadius: 1,
+              width: indicator.width,
+              transform: `translateX(${indicator.left}px)`,
+              transition: 'transform 220ms cubic-bezier(0.2, 0, 0, 1), width 220ms cubic-bezier(0.2, 0, 0, 1)',
+              '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+            }}
+          />
+        )}
         {tab(null, intl.formatMessage({ id: 'register.views.all' }))}
         {viewer.savedViews.edges.map(({ node }) => tab(node.id, node.name, { shared: node.shared, deletable: !node.shared || viewer.isAdmin, config: node.config }))}
       </Box>

@@ -5,7 +5,7 @@ import { rebuild } from './rebuild.ts';
 const db = createDb(process.env.OWNER_DATABASE_URL, 2);
 const today = process.env.SEED_TODAY ?? todayIso();
 const scale = process.env.SEED_SCALE ? Number(process.env.SEED_SCALE) : 1;
-console.log(`Building the portfolio for ${today} (scale ${scale})`);
+console.log(`Building seed portfolio for ${today} (scale ${scale})`);
 try {
   const report = await rebuild(db, { today, scale });
   const total = Object.values(report.rows).reduce((a, b) => a + b, 0);

@@ -7,6 +7,7 @@ import { LocaleTheme, TENURO_LOOK, type TenantLook } from './LocaleTheme.tsx';
 import { queryLoader, useRouteQuery } from './relayRoute.ts';
 import { AppShell } from '../shell/AppShell.tsx';
 import { PageFallback } from '../shell/PageFallback.tsx';
+import { BootShell } from '../shell/BootShell.tsx';
 
 export const rootQuery = graphql`
   query RootQuery {
@@ -33,9 +34,11 @@ export function Root() {
   const isPublic = PUBLIC_PATHS.includes(pathname);
 
   if (!viewer && !isPublic) return <Navigate to="/sign-in" replace />;
-  if (viewer && isPublic) return <Navigate to="/leases" replace />;
+  // A signed-in person may open the sign-in page to switch company or role: it renders in Tenuro's
+  // own look, outside the company shell, and offers to continue with the current account.
+  const inShell = viewer != null && !isPublic;
 
-  const look: TenantLook = viewer
+  const look: TenantLook = viewer && inShell
     ? {
         brandHue: viewer.tenant.theme.brandHue,
         accentHue: viewer.tenant.theme.accentHue,
@@ -46,9 +49,9 @@ export function Root() {
     : TENURO_LOOK;
 
   return (
-    <Suspense fallback={null}>
-      <LocaleTheme look={look} userLocale={viewer?.user.locale ?? null}>
-        {viewer ? (
+    <Suspense fallback={<BootShell />}>
+      <LocaleTheme look={look} userLocale={inShell ? viewer.user.locale ?? null : null}>
+        {inShell ? (
           <AppShell viewer={viewer}>
             <Suspense fallback={<PageFallback />}>
               <Outlet />

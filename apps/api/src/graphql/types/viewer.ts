@@ -106,11 +106,11 @@ interface SandboxShape {
 }
 
 const Sandbox = builder.objectRef<SandboxShape>('Sandbox').implement({
-  description: 'The visitor’s private copy of the data.',
+  description: 'The signed-in person’s private workspace: their changes, kept apart from everyone else’s.',
   fields: (t) => ({
     writesUsed: t.exposeInt('writesUsed'),
     writesLimit: t.int({ resolve: () => config.limits.sandboxWrites }),
-    nextResetAt: t.field({ type: 'DateTime', description: 'When the nightly rebuild clears every private copy (03:00 Nairobi time).', resolve: () => nextReset() }),
+    nextResetAt: t.field({ type: 'DateTime', description: 'When the nightly reset clears every private workspace (03:00 Nairobi time).', resolve: () => nextReset() }),
   }),
 });
 
@@ -204,10 +204,10 @@ builder.queryFields((t) => ({
   }),
   signInAccounts: t.field({
     type: [User],
-    description: 'The one-click sign-ins: one per role in each company.',
+    description: 'The accounts offered on the sign-in page: one per role in each company.',
     resolve: async (_r, _a, ctx) => {
       return ctx.tx.selectFrom('app_user').innerJoin('tenant', 'tenant.id', 'app_user.tenant_id')
-        .selectAll('app_user').where('app_user.is_listed', '=', true)
+        .selectAll('app_user').where('app_user.listed_for_sign_in', '=', true)
         .orderBy('tenant.sort_order').orderBy(sql`array_position(array['ADMIN','MANAGER','VIEWER']::user_role[], app_user.role)`).execute();
     },
   }),

@@ -125,7 +125,7 @@ export async function rentTermsFor(ctx: Context, lease: LeaseRow): Promise<RentT
 }
 
 export const Lease = builder.node(builder.objectRef<LeaseRow>('Lease'), {
-  description: 'One lease of one set of premises. Its id is stable across a visitor’s private edits.',
+  description: 'One lease of one set of premises. Its id is stable across private edits in a session.',
   id: { resolve: (l) => l.lease_id },
   loadMany: (ids, ctx) => ctx.loaders.lease.loadMany(ids).then((rows) => rows.map((r) => (r instanceof Error ? null : r))),
   fields: (t) => ({
@@ -152,7 +152,7 @@ export const Lease = builder.node(builder.objectRef<LeaseRow>('Lease'), {
     serviceChargePerPeriod: t.field({ type: Money, resolve: (l) => money(l.service_charge_per_period, l.currency) }),
     annualRent: t.field({ type: Money, description: 'Passing rent today, annualised.', resolve: (l) => money(l.annual_rent, l.currency) }),
     annualRentReporting: t.field({
-      type: Money, description: 'Passing rent today in the company’s reporting currency, at indicative exchange rates.',
+      type: Money, description: 'Passing rent today in the company’s reporting currency, at the company’s exchange rates.',
       resolve: async (l, _a, ctx) => money(l.annual_rent_reporting, (await ctx.loaders.tenant.load(l.tenant_id))!.reporting_currency),
     }),
     discountRate: t.field({ type: 'Decimal', description: 'Incremental borrowing rate, effective annual, as a fraction.', resolve: (l) => l.discount_rate }),
@@ -169,7 +169,7 @@ export const Lease = builder.node(builder.objectRef<LeaseRow>('Lease'), {
     notes: t.exposeString('notes', { nullable: true }),
     nextKeyDate: t.field({ type: 'Date', nullable: true, resolve: (l) => l.next_key_date }),
     nextKeyKind: t.field({ type: KeyDateKindEnum, nullable: true, resolve: (l) => l.next_key_kind }),
-    changedInSandbox: t.boolean({ description: 'True when this is the visitor’s private copy.', resolve: (l) => l.sandbox_id !== null }),
+    changedInSandbox: t.boolean({ description: 'True when the signed-in person changed this lease in their private workspace.', resolve: (l) => l.sandbox_id !== null }),
     parties: t.field({ type: [LeaseParty], resolve: (l, _a, ctx) => ctx.loaders.parties.load(l.id) }),
     escalations: t.field({ type: [Escalation], resolve: (l, _a, ctx) => ctx.loaders.escalations.load(l.id) }),
     rentSteps: t.field({ type: [RentStep], resolve: (l, _a, ctx) => ctx.loaders.rentSteps.load(l.id) }),

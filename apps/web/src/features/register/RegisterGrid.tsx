@@ -125,6 +125,33 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
     return field ? [{ field, sort: o.direction === 'DESC' ? 'desc' : 'asc' }] : [];
   }, [state.orderBy]);
 
+  // Horizontal overflow (when someone adds columns): the reference column stays put and the edges
+  // with more columns beyond them carry a shadow, so a clipped grid always shows it scrolls.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+  useEffect(() => {
+    const scroller = wrapRef.current?.querySelector<HTMLElement>('.MuiDataGrid-virtualScroller');
+    if (!scroller) return;
+    const update = () => {
+      const max = scroller.scrollWidth - scroller.clientWidth;
+      const x = Math.abs(scroller.scrollLeft); // negative in right-to-left
+      setEdges((prev) => {
+        const next = { start: x > 1, end: max > 1 && x < max - 1 };
+        return prev.start === next.start && prev.end === next.end ? prev : next;
+      });
+    };
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(scroller);
+    const content = scroller.firstElementChild;
+    if (content) ro.observe(content);
+    return () => {
+      scroller.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [narrow, total, columns]);
+
   if (total === 0) {
     return (
       <EmptyState
@@ -190,7 +217,20 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 360, border: `1px solid ${t.rule}`, borderRadius: 1, overflow: 'hidden', backgroundColor: t.surface }}>
-      <Box sx={{ flex: 1, minHeight: 0, opacity: isPending ? 0.55 : 1, transition: 'opacity 150ms ease' }}>
+      <Box
+        ref={wrapRef}
+        data-scroll-start={edges.start || undefined}
+        data-scroll-end={edges.end || undefined}
+        sx={{
+          flex: 1, minHeight: 0, position: 'relative', opacity: isPending ? 0.55 : 1, transition: 'opacity 150ms ease',
+          // Fade at the far edge while more columns lie beyond it.
+          '&::after': {
+            content: '""', position: 'absolute', top: 0, bottom: 0, insetInlineEnd: 0, width: 28, pointerEvents: 'none', zIndex: 4,
+            background: `linear-gradient(to ${rtl ? 'right' : 'left'}, ${t.mode === 'dark' ? 'rgba(0,0,0,0.35)' : 'rgba(60,45,20,0.12)'}, transparent)`,
+            opacity: edges.end ? 1 : 0, transition: 'opacity 150ms ease',
+          },
+        }}
+      >
         <DataGrid<RegisterRow>
           apiRef={apiRef}
           // The grid writes its CSS variables into its own <style> tag, which the CSP refuses without the nonce.
@@ -221,7 +261,22 @@ export function RegisterGrid({ viewer, state, reportingCurrency, columns, onColu
           }}
           aria-label={intl.formatMessage({ id: 'register.gridLabel' })}
           localeText={{ noRowsLabel: intl.formatMessage({ id: 'register.empty.title' }) }}
-          sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' }, '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center' } }}
+          sx={{
+            '& .MuiDataGrid-row': { cursor: 'pointer', transition: 'background-color 120ms ease' },
+            '& .MuiDataGrid-row:hover': { backgroundColor: t.brandTint },
+            '& .MuiDataGrid-row:active': { backgroundColor: t.brandSoft },
+            '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center' },
+            // The reference column sticks to the start edge (the free grid has no pinned columns).
+            // Its background layers the row's hover tint over the surface, so it stays opaque.
+            '& .MuiDataGrid-cell[data-field="reference"], & .MuiDataGrid-columnHeader[data-field="reference"]': {
+              position: 'sticky', insetInlineStart: 0, zIndex: 3, backgroundColor: t.surface,
+              boxShadow: edges.start ? `${rtl ? '-' : ''}6px 0 8px -6px ${t.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(60,45,20,0.25)'}` : 'none',
+              transition: 'box-shadow 150ms ease',
+            },
+            '& .MuiDataGrid-row:hover .MuiDataGrid-cell[data-field="reference"]': { background: `linear-gradient(${t.brandTint}, ${t.brandTint}), ${t.surface}` },
+            '& .MuiDataGrid-row:active .MuiDataGrid-cell[data-field="reference"]': { background: `linear-gradient(${t.brandSoft}, ${t.brandSoft}), ${t.surface}` },
+            '@media (prefers-reduced-motion: reduce)': { '& .MuiDataGrid-row, & .MuiDataGrid-cell': { transition: 'none' } },
+          }}
         />
       </Box>
       {footer}

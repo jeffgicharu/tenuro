@@ -4,7 +4,6 @@ export const ar: Catalogue = {
   'app.name': 'تينورو',
   'app.skipToContent': 'انتقل إلى المحتوى الرئيسي',
   'app.loading': 'جارٍ التحميل',
-  'app.indicativeRates': 'أسعار استرشادية',
 
   'nav.main': 'القائمة الرئيسية',
   'nav.leases': 'عقود الإيجار',
@@ -16,6 +15,8 @@ export const ar: Catalogue = {
 
   'shell.account': 'الحساب',
   'shell.switchAccount': 'تبديل الحساب',
+  'shell.switchCompany': 'تبديل الشركة أو الدور',
+  'shell.allAccounts': 'كل الحسابات',
   'shell.signOut': 'تسجيل الخروج',
   'shell.language': 'اللغة',
   'shell.appearance': 'المظهر',
@@ -27,7 +28,7 @@ export const ar: Catalogue = {
   'shell.role.VIEWER': 'مطّلع (قراءة فقط)',
 
   'workspace.banner': 'تبقى تغييراتك خاصة بجلستك، وتُعاد كل ليلة عند {time}.',
-  'workspace.bannerShort': 'جلسة خاصة',
+  'workspace.bannerShort': 'جلسة خاصة · تُعاد عند {time}',
   'workspace.writes': 'استُخدم {used} من {limit} تغيير',
   'workspace.reset': 'إلغاء تغييراتي',
   'workspace.resetConfirmTitle': 'إلغاء تغييراتك؟',
@@ -38,6 +39,9 @@ export const ar: Catalogue = {
 
   'signin.title': 'تسجيل الدخول إلى تينورو',
   'signin.lede': 'اختر حساباً لتسجيل الدخول. لكل شركة مسؤول ومدير ومطّلع بصلاحية القراءة فقط.',
+  'signin.current': 'أنت مسجّل الدخول باسم {name}، {role} في {company}.',
+  'signin.continue': 'متابعة',
+  'signin.currentAccount': 'الحساب الحالي',
   'signin.leases': '{count, number} عقد إيجار',
   'signin.countries': '{countries}',
   'signin.as': 'الدخول بصفة',
@@ -50,7 +54,6 @@ export const ar: Catalogue = {
   'signin.signingIn': 'جارٍ تسجيل الدخول…',
   'signin.error': 'تعذّر تسجيل الدخول. حاول مجدداً بعد قليل.',
   'signin.limit': 'محاولات دخول كثيرة من شبكتك خلال وقت قصير. حاول لاحقاً.',
-  'signin.footnote': 'يعمل كل زائر في نسخة خاصة تُعاد كل ليلة.',
 
   'status.ACTIVE': 'ساري',
   'status.HOLDING_OVER': 'ممتد بعد الانتهاء',

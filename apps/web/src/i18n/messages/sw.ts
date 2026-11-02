@@ -4,7 +4,6 @@ export const sw: Catalogue = {
   'app.name': 'Tenuro',
   'app.skipToContent': 'Ruka hadi maudhui makuu',
   'app.loading': 'Inapakia',
-  'app.indicativeRates': 'Viwango elekezi',
 
   'nav.main': 'Menyu kuu',
   'nav.leases': 'Mikataba ya upangishaji',
@@ -16,6 +15,8 @@ export const sw: Catalogue = {
 
   'shell.account': 'Akaunti',
   'shell.switchAccount': 'Badilisha akaunti',
+  'shell.switchCompany': 'Badilisha kampuni au jukumu',
+  'shell.allAccounts': 'Akaunti zote',
   'shell.signOut': 'Ondoka',
   'shell.language': 'Lugha',
   'shell.appearance': 'Mwonekano',
@@ -27,7 +28,7 @@ export const sw: Catalogue = {
   'shell.role.VIEWER': 'Mtazamaji pekee',
 
   'workspace.banner': 'Mabadiliko unayofanya yanabaki kwenye kipindi chako pekee na yanarudishwa kila usiku saa {time}.',
-  'workspace.bannerShort': 'Kipindi binafsi',
+  'workspace.bannerShort': 'Kipindi binafsi · kinarudishwa {time}',
   'workspace.writes': 'Mabadiliko {used} kati ya {limit} yametumika',
   'workspace.reset': 'Futa mabadiliko yangu',
   'workspace.resetConfirmTitle': 'Futa mabadiliko yako?',
@@ -38,6 +39,9 @@ export const sw: Catalogue = {
 
   'signin.title': 'Ingia kwenye Tenuro',
   'signin.lede': 'Chagua akaunti ya kuingia. Kila kampuni ina msimamizi, meneja na mtazamaji wa kusoma pekee.',
+  'signin.current': 'Umeingia kama {name}, {role} katika {company}.',
+  'signin.continue': 'Endelea',
+  'signin.currentAccount': 'Akaunti ya sasa',
   'signin.leases': 'Mikataba {count, number}',
   'signin.countries': '{countries}',
   'signin.as': 'Ingia kama',
@@ -50,7 +54,6 @@ export const sw: Catalogue = {
   'signin.signingIn': 'Inaingia…',
   'signin.error': 'Kuingia hakukufanikiwa. Jaribu tena baada ya muda mfupi.',
   'signin.limit': 'Majaribio mengi ya kuingia kutoka mtandao wako kwa muda mfupi. Jaribu baadaye.',
-  'signin.footnote': 'Kila mgeni anafanya kazi kwenye nakala yake binafsi inayorudishwa kila usiku.',
 
   'status.ACTIVE': 'Unatumika',
   'status.HOLDING_OVER': 'Umepita muda',

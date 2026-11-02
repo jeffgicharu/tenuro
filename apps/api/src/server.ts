@@ -4,7 +4,7 @@ import { createYoga } from 'graphql-yoga';
 import { sql } from 'kysely';
 import type { Db } from './db/client.ts';
 import { config } from './config.ts';
-import { hashIp, LimitReached, readCookie, resolveSession, sessionCookie, signInAccount, signOut } from './auth/session.ts';
+import { hashIp, LimitReached, readCookie, resolveSession, sessionCookie, signIn, signOut } from './auth/session.ts';
 import { newContext, type Context } from './graphql/context.ts';
 import { useOperationLimits, usePersisted, useScopedTransaction } from './graphql/plugins.ts';
 import { schema } from './graphql/schema.ts';
@@ -71,6 +71,7 @@ export function createApp(db: Db) {
     const nonce = newNonce();
     const html = indexTemplate
       .replaceAll('<script', `<script nonce="${nonce}"`)
+      .replaceAll('<style', `<style nonce="${nonce}"`)
       .replaceAll('<link rel="stylesheet"', `<link nonce="${nonce}" rel="stylesheet"`)
       .replace('</head>', `<meta name="csp-nonce" content="${nonce}"></head>`);
     const https = req.headers['x-forwarded-proto'] === 'https';
@@ -104,7 +105,7 @@ export function createApp(db: Db) {
         const body = (await readJson(req, 1024)) as { accountId?: unknown } | null;
         if (typeof body?.accountId !== 'string' || !/^[0-9a-f-]{36}$/.test(body.accountId)) return send(res, 400, { error: 'accountId required' });
         try {
-          const result = await signInAccount(db, { accountId: body.accountId, existingToken: readCookie(req.headers.cookie, config.cookieName), ip: clientIp(req) });
+          const result = await signIn(db, { accountId: body.accountId, existingToken: readCookie(req.headers.cookie, config.cookieName), ip: clientIp(req) });
           if (!result) return send(res, 404, { error: 'unknown account' });
           return send(res, 204, null, { 'set-cookie': sessionCookie(result.token) });
         } catch (err) {

@@ -34,7 +34,7 @@ export const Tenant = builder.node(builder.objectRef<TenantRow>('Tenant'), {
     direction: t.string({ description: 'Text direction of the default language.', resolve: (r) => (r.languages[0] === 'ar' ? 'rtl' : 'ltr') }),
     theme: t.field({ type: TenantTheme, resolve: (r) => r.theme }),
     leaseCount: t.int({
-      description: 'Leases in the shared portfolio (excludes any visitor’s private changes).',
+      description: 'Leases in the company’s shared portfolio (excludes anyone’s private changes).',
       resolve: async (r, _a, ctx) => (await ctx.loaders.tenantSummary.load(r.id))?.lease_count ?? 0,
     }),
     countries: t.field({

@@ -95,16 +95,33 @@ describe('lease register', () => {
     const user = userEvent.setup();
     const env = setup();
     resolveInitial(env);
-    await user.click(await screen.findByRole('button', { name: 'Open break option' }));
+    await user.click(await screen.findByRole('button', { name: /^Filters/ }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Open break option' }));
     const op = await waitFor(() => lastOperation(env));
     expect(op.request.node.operation.name).toBe('RegisterGridPaginationQuery');
     expect(op.request.variables).toMatchObject({ first: 100, filter: { hasOpenBreak: true } });
+  });
+
+  // The filter bar used to be ten buttons that filled a phone's first screen; filters now sit behind
+  // one control and each active one shows as a chip that removes it.
+  it('shows an active filter as a chip whose remove button clears it', async () => {
+    const user = userEvent.setup();
+    const env = setup();
+    resolveInitial(env);
+    await user.click(await screen.findByRole('button', { name: /^Filters/ }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Open break option' }));
+    await user.click(await screen.findByRole('button', { name: 'Show results' }));
+    expect(await screen.findByRole('button', { name: /^Filters\s*1$/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear Open break option' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Clear Open break option' })).toBeNull());
+    expect(screen.getByRole('button', { name: /^Filters$/ })).toBeInTheDocument();
   });
 
   it('filters by status from the facet list', async () => {
     const user = userEvent.setup();
     const env = setup();
     resolveInitial(env);
+    await user.click(await screen.findByRole('button', { name: /^Filters/ }));
     await user.click(await screen.findByRole('button', { name: 'Status' }));
     act(() => {
       env.mock.resolveMostRecentOperation((op: OperationDescriptor) => MockPayloadGenerator.generate(op, {

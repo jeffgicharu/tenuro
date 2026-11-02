@@ -6,7 +6,7 @@
 #   apps/api/dist/index.mjs       the server; `index.mjs --selfcheck` must run offline and exit 0
 #   apps/api/dist/migrate.mjs     expand-only migrations, run as the owner role
 #   apps/api/dist/smoke.mjs       journey checks against $PORT; `--selfcheck` also runs the offline self-check
-#   apps/api/dist/rebuild.mjs     the nightly data rebuild
+#   apps/api/dist/rebuild.mjs     the nightly data reset
 #   apps/api/dist/ops/smoke-query.json   a persisted-query request body the activation script posts to /graphql
 #   apps/web/dist/                the SPA build; index.html becomes the server's template (it is never served as a file)
 #   packages/ui/storybook-static/ optional; published at /storybook/

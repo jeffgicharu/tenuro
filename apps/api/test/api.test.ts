@@ -296,7 +296,7 @@ describe('limits on what visitors can create', () => {
 
   it('caps the global number of live sessions', async () => {
     const v = new Visitor(app, '198.51.100.1');
-    const user = await app.owner.selectFrom('app_user').select('id').where('is_listed', '=', true).executeTakeFirstOrThrow();
+    const user = await app.owner.selectFrom('app_user').select('id').where('listed_for_sign_in', '=', true).executeTakeFirstOrThrow();
     await app.owner.insertInto('session').values(Array.from({ length: config.limits.maxSessions }, (_, i) => ({
       token_hash: `filler-${i}`, user_id: user.id, sandbox_id: null, ip_hash: 'filler', expires_at: '2099-01-01T00:00:00Z',
     }))).execute();

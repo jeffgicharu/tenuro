@@ -8,12 +8,16 @@ export interface MoneyValue {
 }
 
 // Exact amount, tabular figures, negatives in accounting brackets. Direction is isolated so the
-// currency code never jumps sides inside right-to-left text.
-export function Money({ value, compact = false, sx }: { value: MoneyValue; compact?: boolean; sx?: SxProps<Theme> }) {
+// currency code never jumps sides inside right-to-left text. Compact or whole amounts (tables) keep
+// the exact figure, with its currency, in a tooltip; accounting screens show the exact figure.
+export function Money({ value, compact = false, whole = false, showCode = true, sx }: {
+  value: MoneyValue; compact?: boolean; whole?: boolean; showCode?: boolean; sx?: SxProps<Theme>;
+}) {
   const f = useFormat();
+  const rounded = compact || whole || !showCode;
   return (
-    <Box component="bdi" data-num sx={{ whiteSpace: 'nowrap', ...sx }} title={compact ? f.money(value.amount, value.currency) : undefined}>
-      {f.money(value.amount, value.currency, { compact })}
+    <Box component="bdi" data-num sx={{ whiteSpace: 'nowrap', ...sx }} title={rounded ? f.money(value.amount, value.currency) : undefined}>
+      {f.money(value.amount, value.currency, { compact, whole, showCode })}
     </Box>
   );
 }

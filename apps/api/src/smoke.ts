@@ -42,6 +42,9 @@ async function main() {
   ok('page has meta robots noindex', /<meta name="robots" content="noindex/.test(html));
   const csp = page.headers.get('content-security-policy') ?? '';
   ok('page has a nonce CSP without unsafe-inline', /script-src 'self' 'nonce-/.test(csp) && !csp.includes('unsafe-inline'));
+  // The first-paint skeleton's inline style and script must carry the nonce, or the CSP blanks the page.
+  const nonce = /'nonce-([^']+)'/.exec(csp)?.[1] ?? '-';
+  ok('inline boot style and script carry the nonce', html.includes(`<style nonce="${nonce}"`) && html.includes(`<script nonce="${nonce}">`) && html.includes('class="boot"'));
 
   const adhoc = await fetch(`${base}/graphql`, { method: 'POST', headers, body: JSON.stringify({ query: '{ signInAccounts { id } }' }) });
   const adhocJson = (await adhoc.json()) as { errors?: unknown[] };
@@ -49,7 +52,7 @@ async function main() {
 
   const { signInAccounts } = await gql<{ signInAccounts: { id: string; role: string; tenant: { leaseCount: number } }[] }>('SignInPageQuery');
   ok('nine sign-in accounts', signInAccounts.length === 9);
-  ok('portfolio data is present', signInAccounts.every((a) => a.tenant.leaseCount > 0));
+  ok('every company has leases', signInAccounts.every((a) => a.tenant.leaseCount > 0));
 
   const signIn = async (role: string) => {
     const account = signInAccounts.find((a) => a.role === role)!;

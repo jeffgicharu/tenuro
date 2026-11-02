@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 
-// People are shown by their initials only; the seed data has no portraits.
+// People are shown by their initials only; accounts carry no portraits.
 export function Initials({ text, size = 32, title }: { text: string; size?: number; title?: string }) {
   const t = useTheme().tokens;
   return (

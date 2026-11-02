@@ -95,7 +95,7 @@ const emptySeed = (): SeedData => ({
   deposit: [], key_date: [], task: [], document: [], activity: [], saved_view: [], notification: [], fx_rate: [],
 });
 
-// The whole portfolio in memory, for tests and the self-check.
+// The whole seed portfolio in memory, for tests and the self-check.
 export function generate(opts: SeedOptions): SeedData {
   const all = emptySeed();
   for (const batch of generateBatches(opts)) {
@@ -136,7 +136,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
       users.push({ id, role: p.role, name: p.name });
       out.app_user.push({
         id, tenant_id: tenantId, email: `${p.role.toLowerCase()}@${t.emailDomain}`, display_name: p.name,
-        job_title: p.title, role: p.role, locale: i === 2 && t.slug === 'mbuyu-court' ? 'sw' : null, is_listed: true,
+        job_title: p.title, role: p.role, locale: i === 2 && t.slug === 'mbuyu-court' ? 'sw' : null, listed_for_sign_in: true,
       });
     });
     const staffRng = rng.fork('staff');
@@ -147,12 +147,12 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
       users.push({ id, role, name });
       out.app_user.push({
         id, tenant_id: tenantId, email: `staff${i + 1}@${t.emailDomain}`, display_name: name,
-        job_title: staffRng.pick(t.staffTitles), role, locale: null, is_listed: false,
+        job_title: staffRng.pick(t.staffTitles), role, locale: null, listed_for_sign_in: false,
       });
     }
     const managers = users.filter((u) => u.role !== 'VIEWER');
-    const managerAccount = users[1]!;
-    const adminAccount = users[0]!;
+    const listedManager = users[1]!;
+    const listedAdmin = users[0]!;
 
     // Properties -------------------------------------------------------------
     const leaseTarget = Math.round(t.leases * scale);
@@ -310,10 +310,10 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
             out.task.push({
               id: stableId('task', kdId), tenant_id: tenantId, sandbox_id: null, origin_id: null, deleted_at: null,
               lease_id: leaseId, key_date_id: kdId, title: taskTitles[k.kind], description: null,
-              assignee_id: r.chance(0.12) ? managerAccount.id : owner,
+              assignee_id: r.chance(0.12) ? listedManager.id : owner,
               due_on: addDays(k.due, -r.int(7, 30)),
               priority: (daysOut < 30 ? r.weighted([['URGENT', 30], ['HIGH', 50], ['NORMAL', 20]] as const) : r.weighted([['HIGH', 30], ['NORMAL', 60], ['LOW', 10]] as const)) as TaskPriority,
-              status: st, created_by: adminAccount.id, created_at: ts(created < today ? created : today, 8),
+              status: st, created_by: listedAdmin.id, created_at: ts(created < today ? created : today, 8),
               completed_at: st === 'DONE' ? ts(addDays(k.due, -r.int(1, 10)), 15) : null,
             });
           }
@@ -344,7 +344,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           annual_rent_reporting: toReporting(annual, currency, t.reportingCurrency).toFixed(2),
           next_key_date: (nextKey as { due: IsoDate } | null)?.due ?? null,
           next_key_kind: (nextKey as { kind: KeyDateKind } | null)?.kind ?? null,
-          created_by: adminAccount.id, updated_by: adminAccount.id,
+          created_by: listedAdmin.id, updated_by: listedAdmin.id,
           created_at: ts(addDays(commencement, -r.int(14, 60))), updated_at: ts(minIso(addDays(commencement, r.int(0, 400)), today)),
         } satisfies Insertable<LeaseTable>;
         out.lease.push(lesseeRow);
@@ -386,7 +386,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           id: stableId('doc', leaseId, 'lease'), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, kind: 'LEASE',
           title: t.region === 'GULF' ? 'عقد الإيجار الموقع' : 'Signed lease agreement',
           filename: `${lesseeRow.reference}-lease.pdf`, mime_type: 'application/pdf', size_bytes: r.int(180_000, 420_000),
-          page_count: null, template: 'lease-agreement', content: null, uploaded_by: adminAccount.id, created_at: ts(commencement, 10),
+          page_count: null, template: 'lease-agreement', content: null, uploaded_by: listedAdmin.id, created_at: ts(commencement, 10),
         });
         if (steps.length && r.chance(0.6)) out.document.push({
           id: stableId('doc', leaseId, 'memo'), tenant_id: tenantId, sandbox_id: null, lease_id: leaseId, kind: 'AMENDMENT',
@@ -415,14 +415,14 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
             verb, summary, diff: diff ? JSON.stringify(diff) : null, created_at: ts(on, r.int(7, 17), r.int(0, 59)),
           });
         };
-        act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', tx.activity.created(lesseeRow.reference), adminAccount.id);
+        act('created', addDays(commencement, -r.int(14, 60)), 'LEASE_CREATED', tx.activity.created(lesseeRow.reference), listedAdmin.id);
         act('signed', commencement, 'DOCUMENT_ADDED', tx.activity.signed, owner);
         steps.forEach((s, i) => act(`step${i}`, s.startsOn, 'RENT_CHANGED',
           escKind === 'CPI' ? tx.activity.indexation : tx.activity.review,
           owner, [{ field: 'rent.rentPerPeriod', from: i === 0 ? String(rentPerPeriod) : steps[i - 1]!.rentPerPeriod, to: s.rentPerPeriod }]));
         if (status === 'HOLDING_OVER') act('holding', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.holding, owner, [{ field: 'status', from: 'ACTIVE', to: 'HOLDING_OVER' }]);
         if (status === 'EXPIRED') act('expired', addDays(expiry, 1), 'STATUS_CHANGED', tx.activity.expired, owner, [{ field: 'status', from: 'ACTIVE', to: 'EXPIRED' }]);
-        if (status === 'TERMINATED') act('terminated', minIso(addMonths(commencement, r.int(12, 40)), today), 'STATUS_CHANGED', tx.activity.terminated, adminAccount.id, [{ field: 'status', from: 'ACTIVE', to: 'TERMINATED' }]);
+        if (status === 'TERMINATED') act('terminated', minIso(addMonths(commencement, r.int(12, 40)), today), 'STATUS_CHANGED', tx.activity.terminated, listedAdmin.id, [{ field: 'status', from: 'ACTIVE', to: 'TERMINATED' }]);
 
         tenantLeases.push({ id: leaseId, reference: lesseeRow.reference, property_name: lesseeRow.property_name, city: lesseeRow.city });
         for (const k of keyDates) {
@@ -448,9 +448,9 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
       out.task.push({
         id: stableId('task', t.slug, 'general', i), tenant_id: tenantId, sandbox_id: null, origin_id: null, deleted_at: null,
         lease_id: lease.id!, key_date_id: null, title: taskRng.pick(general), description: null,
-        assignee_id: taskRng.chance(0.15) ? managerAccount.id : taskRng.pick(managers).id, due_on: due,
+        assignee_id: taskRng.chance(0.15) ? listedManager.id : taskRng.pick(managers).id, due_on: due,
         priority: taskRng.weighted([['LOW', 15], ['NORMAL', 60], ['HIGH', 25]] as const), status: st,
-        created_by: adminAccount.id, created_at: ts(addDays(due, -taskRng.int(10, 40)) < today ? addDays(due, -taskRng.int(10, 40)) : today, 8),
+        created_by: listedAdmin.id, created_at: ts(addDays(due, -taskRng.int(10, 40)) < today ? addDays(due, -taskRng.int(10, 40)) : today, 8),
         completed_at: st === 'DONE' ? ts(minIso(due, today), 16) : null,
       });
     }
@@ -469,15 +469,15 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
       owner_id: null, scope: 'LEASE_REGISTER', name, config: JSON.stringify(config), position: i, created_at: ts(addYears(today, -1)),
     }));
 
-    // Notifications for the sign-in accounts
+    // Notifications for the people on the sign-in page
     const notifRng = rng.fork('notifications');
     const leaseById = new Map(tenantLeases.map((l) => [l.id, l]));
-    for (const accountUser of users.slice(0, 3)) {
+    for (const listedUser of users.slice(0, 3)) {
       for (let i = 0; i < 8 && upcomingSoon.length; i++) {
         const k = notifRng.pick(upcomingSoon);
         const lease = leaseById.get(k.lease_id)!;
         out.notification.push({
-          id: stableId('notif', accountUser.id, i), tenant_id: tenantId, sandbox_id: null, user_id: accountUser.id,
+          id: stableId('notif', listedUser.id, i), tenant_id: tenantId, sandbox_id: null, user_id: listedUser.id,
           kind: 'KEY_DATE_DUE', title: `${k.title}: ${lease.reference}`, body: `${lease.property_name}, ${lease.city}`,
           link: `/leases/${lease.id}`, read_at: i > 3 ? ts(addDays(today, -1)) : null, created_at: ts(addDays(today, -notifRng.int(0, 6)), notifRng.int(6, 18)),
         });

@@ -1,5 +1,5 @@
 [Unit]
-Description=Tenuro nightly rebuild of the data and visitor sandboxes
+Description=Tenuro nightly reset of the shared data and private sessions
 Documentation=https://github.com/jeffgicharu/tenuro/blob/main/deploy/README.md
 After=postgresql.service
 Wants=postgresql.service

@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Link as RouterLink } from 'react-router';
 import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
 import type { GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid';
 import { Money } from '../../components/Money.tsx';
@@ -48,8 +49,10 @@ export function sortModelToOrder(model: readonly { field: string; sort?: 'asc' |
   return s && field ? [{ field, direction: s.sort === 'desc' ? 'DESC' : 'ASC' }] : DEFAULT_ORDER;
 }
 
+// The defaults fit a 1440 px screen with the navigation open; the rest are a click away in Columns.
+// Premises also shows under the property name, and passing rent on the lease page.
 export const DEFAULT_COLUMNS: GridColumnVisibilityModel = {
-  premises: true, landlord: true, commencementDate: false, annualRent: true, areaSqm: false,
+  premises: false, landlord: true, commencementDate: false, annualRent: false, areaSqm: false,
   propertyType: false, countryCode: false, costCentre: false,
 };
 
@@ -58,9 +61,21 @@ const Secondary = ({ children }: { children: React.ReactNode }) => {
   return <Box component="span" sx={{ display: 'block', fontSize: '0.75rem', color: t.inkSecondary, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis' }}>{children}</Box>;
 };
 
-const Ellipsis = ({ children }: { children: string }) => (
-  <Box component="span" title={children} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{children}</Box>
-);
+// Truncated text gets a tooltip with the full value, but only when it is actually cut off.
+function Ellipsis({ children }: { children: string }) {
+  const [clipped, setClipped] = useState(false);
+  return (
+    <Tooltip title={clipped ? children : ''} placement="top-start" enterDelay={300} disableInteractive>
+      <Box
+        component="span"
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => setClipped(e.currentTarget.scrollWidth > e.currentTarget.clientWidth)}
+        sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+      >
+        {children}
+      </Box>
+    </Tooltip>
+  );
+}
 
 const Stack = ({ children }: { children: React.ReactNode }) => (
   <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, height: '100%', lineHeight: 1.35 }}>{children}</Box>
@@ -76,7 +91,7 @@ export function useRegisterColumns(reportingCurrency: string): GridColDef<Regist
     const m = (id: string, values?: Record<string, string>) => intl.formatMessage({ id }, values);
     return [
       {
-        field: 'reference', headerName: m('register.col.reference'), width: 132, sortable: true,
+        field: 'reference', headerName: m('register.col.reference'), width: 120, sortable: true,
         renderCell: ({ row, tabIndex }) => (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, height: '100%' }}>
             <Box
@@ -99,7 +114,7 @@ export function useRegisterColumns(reportingCurrency: string): GridColDef<Regist
         renderCell: ({ row }) => (
           <Stack>
             <Box component="span" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.propertyName}</Box>
-            <Secondary>{row.district ? `${row.city} · ${row.district}` : row.city}</Secondary>
+            <Secondary>{[row.premises, row.city].filter(Boolean).join(' · ')}</Secondary>
           </Stack>
         ),
       },
@@ -108,11 +123,11 @@ export function useRegisterColumns(reportingCurrency: string): GridColDef<Regist
         renderCell: ({ row }) => <Ellipsis>{row.premises}</Ellipsis>,
       },
       {
-        field: 'landlord', headerName: m('register.col.landlord'), flex: 1, minWidth: 150, valueGetter: (_v, row) => row.landlordName,
+        field: 'landlord', headerName: m('register.col.landlord'), flex: 1, minWidth: 140, valueGetter: (_v, row) => row.landlordName,
         renderCell: ({ row }) => <Ellipsis>{row.landlordName}</Ellipsis>,
       },
       {
-        field: 'status', headerName: m('register.col.status'), width: 128,
+        field: 'status', headerName: m('register.col.status'), width: 124,
         renderCell: ({ row }) => <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}><StatusChip status={row.status} size="small" /></Box>,
       },
       {
@@ -134,16 +149,17 @@ export function useRegisterColumns(reportingCurrency: string): GridColDef<Regist
         },
       },
       {
-        field: 'annualRentReporting', headerName: m('register.col.annualRent', { currency: reportingCurrency }), width: 160,
+        field: 'annualRentReporting', headerName: m('register.col.annualRent', { currency: reportingCurrency }), width: 136,
         type: 'number', align: 'right', headerAlign: 'right',
         valueGetter: (_v, row) => row.annualRentReporting.amount,
-        renderCell: ({ row }) => <Money value={row.annualRentReporting} sx={{ fontWeight: 500 }} />,
+        // The header names the currency, so cells show whole units without repeating it.
+        renderCell: ({ row }) => <Money value={row.annualRentReporting} whole showCode={false} sx={{ fontWeight: 500 }} />,
       },
       {
-        field: 'annualRent', headerName: m('register.col.passingRent'), width: 156, sortable: false,
+        field: 'annualRent', headerName: m('register.col.passingRent'), width: 148, sortable: false,
         type: 'number', align: 'right', headerAlign: 'right',
         valueGetter: (_v, row) => row.annualRent.amount,
-        renderCell: ({ row }) => <Money value={row.annualRent} sx={{ color: t.inkSecondary }} />,
+        renderCell: ({ row }) => <Money value={row.annualRent} whole sx={{ color: t.inkSecondary }} />,
       },
       {
         field: 'areaSqm', headerName: m('register.col.area'), width: 110, type: 'number', align: 'right', headerAlign: 'right',
@@ -151,7 +167,7 @@ export function useRegisterColumns(reportingCurrency: string): GridColDef<Regist
         renderCell: ({ row }) => <span data-num>{f.area(row.areaSqm)}</span>,
       },
       {
-        field: 'nextKeyDate', headerName: m('register.col.nextKey'), width: 168,
+        field: 'nextKeyDate', headerName: m('register.col.nextKey'), width: 156,
         renderCell: ({ row }) => row.nextKeyDate ? (
           <Stack>
             <span data-num>{f.date(row.nextKeyDate)}</span>

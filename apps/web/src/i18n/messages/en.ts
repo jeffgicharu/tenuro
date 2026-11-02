@@ -3,7 +3,6 @@ export const en = {
   'app.name': 'Tenuro',
   'app.skipToContent': 'Skip to main content',
   'app.loading': 'Loading',
-  'app.indicativeRates': 'Indicative rates',
 
   'nav.main': 'Main',
   'nav.leases': 'Leases',
@@ -15,6 +14,8 @@ export const en = {
 
   'shell.account': 'Account',
   'shell.switchAccount': 'Switch account',
+  'shell.switchCompany': 'Switch company or role',
+  'shell.allAccounts': 'All accounts',
   'shell.signOut': 'Sign out',
   'shell.language': 'Language',
   'shell.appearance': 'Appearance',
@@ -26,7 +27,7 @@ export const en = {
   'shell.role.VIEWER': 'Read-only viewer',
 
   'workspace.banner': 'Changes you make are kept private to your session and reset nightly at {time}.',
-  'workspace.bannerShort': 'Private session',
+  'workspace.bannerShort': 'Private session · resets {time}',
   'workspace.writes': '{used} of {limit} changes used',
   'workspace.reset': 'Reset my changes',
   'workspace.resetConfirmTitle': 'Reset your changes?',
@@ -37,6 +38,9 @@ export const en = {
 
   'signin.title': 'Sign in to Tenuro',
   'signin.lede': 'Choose an account to sign in. Each company has an admin, a manager and a read-only viewer.',
+  'signin.current': 'Signed in as {name}, {role} at {company}.',
+  'signin.continue': 'Continue',
+  'signin.currentAccount': 'Current account',
   'signin.leases': '{count, number} leases',
   'signin.countries': '{countries}',
   'signin.as': 'Sign in as',
@@ -49,7 +53,6 @@ export const en = {
   'signin.signingIn': 'Signing in…',
   'signin.error': 'Sign-in did not work. Try again in a moment.',
   'signin.limit': 'Too many sign-ins from your network in a short time. Try again later.',
-  'signin.footnote': 'Each visitor works in a private copy that resets every night.',
 
   'status.ACTIVE': 'Active',
   'status.HOLDING_OVER': 'Holding over',

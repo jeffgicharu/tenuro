@@ -1,19 +1,24 @@
-import { lazy, startTransition, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, startTransition, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import dayjs, { type Dayjs } from 'dayjs';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
 import Checkbox from '@mui/material/Checkbox';
+import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
+import Drawer from '@mui/material/Drawer';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Popover from '@mui/material/Popover';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Skeleton from '@mui/material/Skeleton';
 import TextField from '@mui/material/TextField';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
+import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import type { FilterBarFacetsQuery } from './__generated__/FilterBarFacetsQuery.graphql';
-import { FilterChip } from '../../components/FilterChip.tsx';
 import { SearchField } from '../../components/SearchField.tsx';
 import { useFormat } from '../../i18n/format.ts';
 import {
@@ -46,12 +51,30 @@ const without = <K extends keyof RegisterFilter>(f: RegisterFilter, ...keys: K[]
   return next;
 };
 
+interface Section {
+  key: string;
+  label: string;
+  summary: string | null;
+  clear(): void;
+  // The editor; receives a close function for "Apply"-style forms. Absent for a plain toggle.
+  editor?: (close: () => void) => React.ReactNode;
+  toggle?: () => void;
+}
+
+// Search stays inline; every other filter lives behind one "Filters" control (a popover on wide
+// screens, a bottom sheet on phones), and each active filter shows as a removable chip.
 export function FilterBar({ filter, onChange, reportingCurrency }: Props) {
   const intl = useIntl();
   const f = useFormat();
+  const theme = useTheme();
+  const t = theme.tokens;
+  const narrow = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
   const country = useMemo(() => new Intl.DisplayNames([intl.locale], { type: 'region' }), [intl.locale]);
   const m = (id: string, values?: Record<string, string | number>) => intl.formatMessage({ id }, values);
   const set = (patch: RegisterFilter) => onChange({ ...filter, ...patch });
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const filtersButton = useRef<HTMLButtonElement>(null);
 
   const listSummary = (values: readonly string[] | undefined, label: (v: string) => string) => {
     if (!values?.length) return null;
@@ -66,33 +89,27 @@ export function FilterBar({ filter, onChange, reportingCurrency }: Props) {
     currency: (v) => v,
   };
 
-  const listChip = (key: FacetKey, labelId: string, fixed?: readonly string[], searchable = false) => {
+  const listSection = (key: FacetKey, labelId: string, fixed?: readonly string[], searchable = false): Section => {
     const values = filter[key] as readonly string[] | undefined;
-    const name = m(labelId);
-    return (
-      <FilterChip
-        key={key}
-        label={name}
-        summary={listSummary(values, labels[key])}
-        clearLabel={m('register.clearFilter', { name })}
-        onClear={() => onChange(without(filter, key))}
-        width={searchable ? 300 : 260}
-      >
-        {() => (
-          <Suspense fallback={<FacetSkeleton />}>
-            <FacetList
-              facet={key}
-              filter={filter}
-              fixed={fixed}
-              label={labels[key]}
-              selected={values ?? []}
-              searchable={searchable}
-              onChange={(next) => onChange(next.length ? { ...filter, [key]: next } : without(filter, key))}
-            />
-          </Suspense>
-        )}
-      </FilterChip>
-    );
+    return {
+      key,
+      label: m(labelId),
+      summary: listSummary(values, labels[key]),
+      clear: () => onChange(without(filter, key)),
+      editor: () => (
+        <Suspense fallback={<FacetSkeleton />}>
+          <FacetList
+            facet={key}
+            filter={filter}
+            fixed={fixed}
+            label={labels[key]}
+            selected={values ?? []}
+            searchable={searchable}
+            onChange={(next) => onChange(next.length ? { ...filter, [key]: next } : without(filter, key))}
+          />
+        </Suspense>
+      ),
+    };
   };
 
   const expirySummary = filter.expiresWithinDays
@@ -111,6 +128,53 @@ export function FilterBar({ filter, onChange, reportingCurrency }: Props) {
       .filter(Boolean).join(' · ')
     : null;
 
+  const sections: Section[] = [
+    listSection('status', 'register.filter.status', STATUSES),
+    {
+      key: 'expiry', label: m('register.filter.expiry'), summary: expirySummary,
+      clear: () => onChange(without(filter, 'expiresWithinDays', 'expiry')),
+      editor: (close) => <ExpiryForm filter={filter} onApply={(next) => { onChange(next); close(); }} />,
+    },
+    {
+      key: 'nextKey', label: m('register.filter.nextKey'), summary: keySummary,
+      clear: () => onChange(without(filter, 'nextKeyWithinDays', 'nextKeyKind')),
+      editor: (close) => <NextKeyForm filter={filter} onApply={(next) => { onChange(next); close(); }} />,
+    },
+    {
+      key: 'openBreak', label: m('register.filter.openBreak'), summary: filter.hasOpenBreak ? '' : null,
+      clear: () => onChange(without(filter, 'hasOpenBreak')),
+      toggle: () => (filter.hasOpenBreak ? onChange(without(filter, 'hasOpenBreak')) : set({ hasOpenBreak: true })),
+    },
+    listSection('countryCode', 'register.filter.country'),
+    listSection('city', 'register.filter.city', undefined, true),
+    listSection('propertyType', 'register.filter.type', TYPES),
+    listSection('currency', 'register.filter.currency'),
+    {
+      key: 'rent', label: m('register.filter.rent'), summary: rentSummary,
+      clear: () => onChange(without(filter, 'annualRent')),
+      editor: (close) => <RentForm filter={filter} currency={reportingCurrency} onApply={(next) => { onChange(next); close(); }} />,
+    },
+  ];
+  const active = sections.filter((s) => s.summary !== null);
+  const count = activeFilterCount(filter);
+
+  const open = (section: string | null) => {
+    setExpanded(section);
+    setAnchor(filtersButton.current);
+  };
+  const close = () => setAnchor(null);
+
+  const panel = (
+    <FilterPanel
+      sections={sections}
+      expanded={expanded}
+      onExpand={setExpanded}
+      onClose={close}
+      {...(count > 0 ? { onClearAll: () => onChange({}) } : {})}
+      narrow={narrow}
+    />
+  );
+
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
       <SearchField
@@ -119,53 +183,150 @@ export function FilterBar({ filter, onChange, reportingCurrency }: Props) {
         label={m('register.search')}
         placeholder={m('register.searchPlaceholder')}
         clearLabel={m('common.clear')}
-        width={300}
-      />
-      {listChip('status', 'register.filter.status', STATUSES)}
-      {listChip('countryCode', 'register.filter.country')}
-      {listChip('city', 'register.filter.city', undefined, true)}
-      {listChip('propertyType', 'register.filter.type', TYPES)}
-      {listChip('currency', 'register.filter.currency')}
-      <FilterChip
-        label={m('register.filter.expiry')}
-        summary={expirySummary}
-        clearLabel={m('register.clearFilter', { name: m('register.filter.expiry') })}
-        onClear={() => onChange(without(filter, 'expiresWithinDays', 'expiry'))}
         width={320}
-      >
-        {(close) => <ExpiryForm filter={filter} onApply={(next) => { onChange(next); close(); }} />}
-      </FilterChip>
-      <FilterChip
-        label={m('register.filter.rent')}
-        summary={rentSummary}
-        clearLabel={m('register.clearFilter', { name: m('register.filter.rent') })}
-        onClear={() => onChange(without(filter, 'annualRent'))}
-        width={300}
-      >
-        {(close) => <RentForm filter={filter} currency={reportingCurrency} onApply={(next) => { onChange(next); close(); }} />}
-      </FilterChip>
-      <FilterChip
-        label={m('register.filter.nextKey')}
-        summary={keySummary}
-        clearLabel={m('register.clearFilter', { name: m('register.filter.nextKey') })}
-        onClear={() => onChange(without(filter, 'nextKeyWithinDays', 'nextKeyKind'))}
-        width={300}
-      >
-        {(close) => <NextKeyForm filter={filter} onApply={(next) => { onChange(next); close(); }} />}
-      </FilterChip>
-      <FilterChip
-        label={m('register.filter.openBreak')}
-        summary={filter.hasOpenBreak ? '' : null}
-        clearLabel={m('register.clearFilter', { name: m('register.filter.openBreak') })}
-        onClear={() => onChange(without(filter, 'hasOpenBreak'))}
-        onToggle={() => (filter.hasOpenBreak ? onChange(without(filter, 'hasOpenBreak')) : set({ hasOpenBreak: true }))}
       />
-      {activeFilterCount(filter) > 0 && (
+      <Button
+        ref={filtersButton}
+        variant="outlined"
+        onClick={() => open(null)}
+        aria-haspopup="dialog"
+        aria-expanded={Boolean(anchor)}
+        startIcon={<SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden />}
+        sx={{ height: 40, borderColor: count ? t.brand : t.ruleStrong, color: t.ink, backgroundColor: count ? t.brandSoft : t.surface }}
+      >
+        <FormattedMessage id="register.filters" />
+        {count > 0 && (
+          <Box component="span" data-num sx={{ marginInlineStart: 1.5, minWidth: 20, height: 20, px: 1, borderRadius: 10, display: 'inline-grid', placeItems: 'center', fontSize: '0.75rem', fontWeight: 600, backgroundColor: t.brand, color: t.brandContrast }}>
+            {count}
+          </Box>
+        )}
+      </Button>
+      {active.map((s) => (
+        <ActiveFilter
+          key={s.key}
+          label={s.summary ? `${s.label}: ${s.summary}` : s.label}
+          removeLabel={m('register.clearFilter', { name: s.label })}
+          onOpen={() => (s.toggle ? undefined : open(s.key))}
+          onRemove={s.clear}
+        />
+      ))}
+      {count > 1 && (
         <Button size="small" variant="text" onClick={() => onChange({})} sx={{ color: 'text.secondary' }}>
           <FormattedMessage id="register.clearAll" />
         </Button>
       )}
+      {narrow ? (
+        <Drawer
+          anchor="bottom"
+          open={Boolean(anchor)}
+          onClose={close}
+          slotProps={{ paper: { 'aria-label': m('register.filters'), sx: { maxHeight: '85dvh', borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: t.surface } } }}
+        >
+          {panel}
+        </Drawer>
+      ) : (
+        <Popover
+          open={Boolean(anchor)}
+          anchorEl={anchor}
+          onClose={close}
+          anchorOrigin={{ vertical: 'bottom', horizontal: theme.direction === 'rtl' ? 'right' : 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: theme.direction === 'rtl' ? 'right' : 'left' }}
+          slotProps={{ paper: { 'aria-label': m('register.filters'), role: 'dialog', sx: { width: 380, maxHeight: 'min(640px, 75dvh)', mt: 1, display: 'flex', flexDirection: 'column' } } }}
+        >
+          {panel}
+        </Popover>
+      )}
     </Box>
+  );
+}
+
+function ActiveFilter({ label, removeLabel, onOpen, onRemove }: { label: string; removeLabel: string; onOpen(): void; onRemove(): void }) {
+  const t = useTheme().tokens;
+  return (
+    <Box
+      sx={{
+        display: 'inline-flex', alignItems: 'stretch', height: 32, borderRadius: 16, overflow: 'hidden', maxWidth: '100%',
+        border: `1px solid ${t.brand}`, backgroundColor: t.brandSoft, color: t.ink, fontSize: '0.8125rem',
+        '@media (prefers-reduced-motion: no-preference)': { animation: 'chip-in 160ms ease-out', '@keyframes chip-in': { from: { opacity: 0, transform: 'scale(0.96)' } } },
+      }}
+    >
+      <ButtonBase onClick={onOpen} sx={{ px: 3, fontWeight: 500, minWidth: 0, '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: -2 } }}>
+        <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</Box>
+      </ButtonBase>
+      <ButtonBase
+        onClick={onRemove}
+        aria-label={removeLabel}
+        sx={{ px: 2, borderInlineStart: `1px solid ${t.brand}`, '&:hover': { backgroundColor: t.brandTint }, '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: -2 } }}
+      >
+        <X size={14} strokeWidth={2} aria-hidden />
+      </ButtonBase>
+    </Box>
+  );
+}
+
+function FilterPanel({ sections, expanded, onExpand, onClose, onClearAll, narrow }: {
+  sections: Section[];
+  expanded: string | null;
+  onExpand(key: string | null): void;
+  onClose(): void;
+  onClearAll?: () => void;
+  narrow: boolean;
+}) {
+  const t = useTheme().tokens;
+  const idBase = useId();
+  return (
+    <>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 4, py: 3, borderBottom: `1px solid ${t.rule}` }}>
+        {narrow && <Box aria-hidden sx={{ position: 'absolute', top: 6, insetInline: 0, mx: 'auto', width: 36, height: 4, borderRadius: 2, backgroundColor: t.ruleStrong }} />}
+        <Box component="h2" sx={{ m: 0, flex: 1, fontSize: '1rem', fontWeight: 600 }}><FormattedMessage id="register.filters" /></Box>
+        {onClearAll && <Button size="small" onClick={onClearAll}><FormattedMessage id="register.clearAll" /></Button>}
+      </Box>
+      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, overflowY: 'auto', flex: 1 }}>
+        {sections.map((s) => {
+          const isOpen = expanded === s.key;
+          const regionId = `${idBase}-${s.key}`;
+          return (
+            <Box component="li" key={s.key} sx={{ borderBottom: `1px solid ${t.rule}` }}>
+              {s.toggle ? (
+                <FormControlLabel
+                  control={<Checkbox size="small" checked={s.summary !== null} onChange={s.toggle} />}
+                  label={s.label}
+                  sx={{ m: 0, px: 3, py: 1, width: '100%', fontSize: '0.875rem' }}
+                />
+              ) : (
+                <>
+                  <ButtonBase
+                    onClick={() => onExpand(isOpen ? null : s.key)}
+                    aria-expanded={isOpen}
+                    aria-controls={regionId}
+                    sx={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 2, px: 4, minHeight: 48, textAlign: 'start', fontSize: '0.875rem',
+                      '&:hover': { backgroundColor: t.brandTint }, '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: -2 },
+                    }}
+                  >
+                    <Box component="span" sx={{ fontWeight: 500 }}>{s.label}</Box>
+                    <Box component="span" sx={{ flex: 1, minWidth: 0, textAlign: 'end', color: t.brand, fontSize: '0.8125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.summary}
+                    </Box>
+                    <ChevronDown size={16} aria-hidden style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : undefined, transition: 'transform 160ms ease' }} />
+                  </ButtonBase>
+                  <Collapse in={isOpen} unmountOnExit timeout={160}>
+                    <Box id={regionId} role="region" aria-label={s.label} sx={{ backgroundColor: t.paper }}>
+                      {s.editor?.(() => onExpand(null))}
+                    </Box>
+                  </Collapse>
+                </>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+      {narrow && (
+        <Box sx={{ p: 3, borderTop: `1px solid ${t.rule}` }}>
+          <Button fullWidth variant="contained" onClick={onClose} sx={{ minHeight: 44 }}><FormattedMessage id="register.done" /></Button>
+        </Box>
+      )}
+    </>
   );
 }
 

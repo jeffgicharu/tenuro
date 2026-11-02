@@ -10,7 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
-import { Check, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, ChevronsUpDown, LogOut, Monitor, Moon, Sun, Users } from 'lucide-react';
 import type { AccountMenu_viewer$key } from './__generated__/AccountMenu_viewer.graphql';
 import type { AccountMenuAccountsQuery } from './__generated__/AccountMenuAccountsQuery.graphql';
 import { usePreferences, type ModePreference } from '../app/preferences.tsx';
@@ -49,7 +49,7 @@ export function AccountMenu({ viewer: ref, collapsed }: { viewer: AccountMenu_vi
       aria-label={collapsed ? `${viewer.user.displayName}, ${roleLabel}` : undefined}
       sx={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 3, p: 2, borderRadius: 1, textAlign: 'start',
-        justifyContent: collapsed ? 'center' : 'flex-start', border: `1px solid ${open ? t.ruleStrong : 'transparent'}`,
+        justifyContent: collapsed ? 'center' : 'flex-start', border: `1px solid ${open ? t.ruleStrong : t.rule}`, backgroundColor: t.paper,
         '&:hover': { backgroundColor: t.brandTint },
         '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: 1 },
       }}
@@ -63,6 +63,7 @@ export function AccountMenu({ viewer: ref, collapsed }: { viewer: AccountMenu_vi
           <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{roleLabel}</Box>
         </Box>
       )}
+      {!collapsed && <ChevronsUpDown size={15} strokeWidth={1.7} aria-hidden style={{ marginInlineStart: 'auto', flexShrink: 0, color: t.inkTertiary }} />}
     </ButtonBase>
   );
 
@@ -72,13 +73,15 @@ export function AccountMenu({ viewer: ref, collapsed }: { viewer: AccountMenu_vi
 
   return (
     <>
-      {collapsed ? <Tooltip title={`${viewer.user.displayName} · ${roleLabel}`} placement="right">{trigger}</Tooltip> : trigger}
+      {collapsed ? <Tooltip title={`${viewer.user.displayName} · ${roleLabel}`} placement={theme.direction === 'rtl' ? 'left' : 'right'}>{trigger}</Tooltip> : trigger}
       <Menu
         anchorEl={anchor}
         open={open}
         onClose={() => setAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: theme.direction === 'rtl' ? 'left' : 'right' }}
-        transformOrigin={{ vertical: 'bottom', horizontal: theme.direction === 'rtl' ? 'left' : 'right' }}
+        // The trigger sits at the top of the rail: the menu opens below it, aligned to its start edge.
+        // Popover edges are physical, so the start edge flips in right-to-left.
+        anchorOrigin={{ vertical: 'bottom', horizontal: (theme.direction === 'rtl') !== collapsed ? 'right' : 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: theme.direction === 'rtl' ? 'right' : 'left' }}
         slotProps={{ paper: { sx: { width: 300, maxHeight: '80dvh' } }, list: { dense: true, sx: { py: 1 } } }}
       >
         <Box sx={{ px: 4, py: 3 }}>
@@ -90,13 +93,18 @@ export function AccountMenu({ viewer: ref, collapsed }: { viewer: AccountMenu_vi
         </Box>
         <Divider />
         <ListSubheader disableSticky sx={{ lineHeight: '32px', backgroundColor: 'transparent' }}>
-          <FormattedMessage id="shell.switchAccount" />
+          <FormattedMessage id="shell.switchCompany" />
         </ListSubheader>
         {open && (
           <Suspense fallback={<Box sx={{ px: 4, py: 1 }}><Skeleton height={28} /><Skeleton height={28} /><Skeleton height={28} /></Box>}>
             <AccountItems currentUserId={viewer.user.id} />
           </Suspense>
         )}
+        <MenuItem component="a" href="/sign-in">
+          <Box sx={{ width: 22, display: 'inline-flex' }} />
+          <Users size={15} strokeWidth={1.7} style={{ marginInlineEnd: 8 }} aria-hidden />
+          <FormattedMessage id="shell.allAccounts" />
+        </MenuItem>
         <Divider />
         <ListSubheader disableSticky sx={{ lineHeight: '32px', backgroundColor: 'transparent' }}>
           <FormattedMessage id="shell.language" />

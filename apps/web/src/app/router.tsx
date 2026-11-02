@@ -2,6 +2,7 @@ import { createBrowserRouter, redirect } from 'react-router';
 import { Root, rootLoader } from './Root.tsx';
 import { RouteError } from '../shell/RouteError.tsx';
 import { NotFound } from '../shell/NotFound.tsx';
+import { BootShell } from '../shell/BootShell.tsx';
 import { signInLoader } from '../features/signin/loader.ts';
 import { registerLoader, registerShouldRevalidate } from '../features/register/loader.ts';
 import { leaseLoader } from '../features/lease/loader.ts';
@@ -16,7 +17,7 @@ export const router = createBrowserRouter([
     loader: rootLoader,
     Component: Root,
     ErrorBoundary: RouteError,
-    HydrateFallback: () => null,
+    HydrateFallback: BootShell,
     children: [
       { index: true, loader: () => redirect('/leases') },
       { path: 'sign-in', loader: signInLoader, lazy: { Component: async () => (await import('../features/signin/SignInPage.tsx')).SignInPage } },

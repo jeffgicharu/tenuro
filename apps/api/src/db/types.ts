@@ -68,7 +68,7 @@ export interface AppUserTable {
   job_title: string;
   role: UserRole;
   locale: string | null;
-  is_listed: Generated<boolean>;
+  listed_for_sign_in: Generated<boolean>;
 }
 
 export interface SandboxTable {

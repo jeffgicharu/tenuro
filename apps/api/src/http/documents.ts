@@ -19,7 +19,7 @@ export async function serveDocument(db: Db, session: SessionInfo, id: string, do
     return;
   }
   if (!doc.content) {
-    // Template documents are rendered from the lease data by the document service.
+    // Generated documents are rendered from the lease data by the document service.
     res.writeHead(404, { ...COMMON_HEADERS, 'content-security-policy': API_CSP }).end();
     return;
   }

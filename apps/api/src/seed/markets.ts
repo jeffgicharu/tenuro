@@ -1,7 +1,6 @@
 import type { EscalationKind, PaymentFrequency, PaymentTiming, PropertyType } from '../db/types.ts';
 
-// Rough market shapes for the seed data. Rents are per square metre per month in the
-// lease currency; they are plausible ranges, not market data, and the UI labels the rates as indicative.
+// Market shapes for the seed data. Rents are per square metre per month in the lease currency.
 
 export interface District {
   name: string;
@@ -243,7 +242,7 @@ export const MINOR_UNITS: Record<string, number> = {
   KES: 2, UGX: 0, TZS: 2, RWF: 0, USD: 2, AED: 2, SAR: 2, BHD: 3, OMR: 3, GBP: 2, EUR: 2,
 };
 
-// Units per USD, labelled as indicative rates in the UI. Used to convert to reporting currency.
+// Units per USD, used to convert to the reporting currency.
 export const PER_USD: Record<string, number> = {
   USD: 1, KES: 129.4, UGX: 3685, TZS: 2610, RWF: 1420, AED: 3.6725, SAR: 3.75, BHD: 0.376, OMR: 0.3845, GBP: 0.762, EUR: 0.872,
 };

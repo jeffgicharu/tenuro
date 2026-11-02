@@ -132,7 +132,7 @@ server {
         add_header Cache-Control "public, max-age=300" always;
     }
 
-    # Sign-in creates sessions and sandboxes: a tight per-visitor limit on top of the
+    # Sign-in (POST) creates sessions and sandboxes: a tight per-client limit on top of the
     # app's own daily cap.
     # In the proxied locations below, nginx sets X-Robots-Tag itself (and hides the app's copy),
     # so its own 413 and 429 responses carry noindex too.

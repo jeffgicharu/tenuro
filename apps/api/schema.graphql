@@ -244,7 +244,7 @@ enum KeyDateStatus {
 }
 
 """
-One lease of one set of premises. Its id is stable across a visitor’s private edits.
+One lease of one set of premises. Its id is stable across private edits in a session.
 """
 type Lease implements Node {
   activity(after: String, before: String, first: Int, last: Int): LeaseActivityConnection!
@@ -253,7 +253,7 @@ type Lease implements Node {
   annualRent: Money!
 
   """
-  Passing rent today in the company’s reporting currency, at indicative exchange rates.
+  Passing rent today in the company’s reporting currency, at the company’s exchange rates.
   """
   annualRentReporting: Money!
   areaSqm: Decimal!
@@ -262,7 +262,9 @@ type Lease implements Node {
   """People in this company who can own tasks."""
   assignableUsers: [User!]!
 
-  """True when this is the visitor’s private copy."""
+  """
+  True when the signed-in person changed this lease in their private workspace.
+  """
   changedInSandbox: Boolean!
   city: String!
   commencementDate: Date!
@@ -562,7 +564,7 @@ type Mutation {
   discardLeaseDraft(input: DiscardLeaseDraftInput!): MutationDiscardLeaseDraftResult!
 
   """
-  Discards every change the visitor made, returning their copy to the company’s shared data.
+  Discards every change the signed-in person made, returning their workspace to the shared company data.
   """
   resetMySandbox: MutationResetMySandboxResult!
   saveLeaseDraft(input: SaveLeaseDraftInput!): MutationSaveLeaseDraftResult!
@@ -711,10 +713,13 @@ enum PropertyType {
 }
 
 type Query {
-  """The one-click sign-ins: one per role in each company."""
-  signInAccounts: [User!]!
   node(id: ID!): Node
   nodes(ids: [ID!]!): [Node]!
+
+  """
+  The accounts offered on the sign-in page: one per role in each company.
+  """
+  signInAccounts: [User!]!
 
   """Null when nobody is signed in."""
   viewer: Viewer
@@ -753,9 +758,13 @@ type ResetMySandboxPayload {
   viewer: Viewer!
 }
 
-"""The visitor’s private copy of the data."""
+"""
+The signed-in person’s private workspace: their changes, kept apart from everyone else’s.
+"""
 type Sandbox {
-  """When the nightly rebuild clears every private copy (03:00 Nairobi time)."""
+  """
+  When the nightly reset clears every private workspace (03:00 Nairobi time).
+  """
   nextResetAt: DateTime!
   writesLimit: Int!
   writesUsed: Int!
@@ -864,7 +873,7 @@ type Tenant implements Node {
   languages: [String!]!
 
   """
-  Leases in the shared portfolio (excludes any visitor’s private changes).
+  Leases in the company’s shared portfolio (excludes anyone’s private changes).
   """
   leaseCount: Int!
 

@@ -92,14 +92,14 @@ export async function chargeWrite(ctx: Context, rows = 1): Promise<void> {
   // Each charged write is one overlay row or fewer, so the sum is an upper bound on overlay rows.
   const total = await ctx.tx.selectFrom('sandbox').select(sql<number>`coalesce(sum(write_count), 0)::int`.as('n')).executeTakeFirstOrThrow();
   if (total.n + rows > config.limits.maxOverlayRows) {
-    throw new QuotaExceeded('overlay-total', 'The site is busy right now and is not accepting more changes. Try again after the nightly reset.');
+    throw new QuotaExceeded('overlay-total', 'Tenuro is not accepting more changes right now. Try again after the nightly reset.');
   }
   const updated = await ctx.tx.updateTable('sandbox')
     .set({ write_count: sql`write_count + ${rows}`, last_active_at: sql`now()` })
     .where('id', '=', sandboxId).where('write_count', '<=', config.limits.sandboxWrites - rows)
     .returning('write_count').executeTakeFirst();
   if (!updated) {
-    throw new QuotaExceeded('sandbox-writes', `Your private copy has reached its limit of ${config.limits.sandboxWrites} changes. Use "Reset my changes" to start again.`);
+    throw new QuotaExceeded('sandbox-writes', `Your workspace has reached its limit of ${config.limits.sandboxWrites} changes. Use "Reset my changes" to start again.`);
   }
 }
 

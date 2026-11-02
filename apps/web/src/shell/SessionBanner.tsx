@@ -10,7 +10,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { Eye, FlaskConical, RotateCcw } from 'lucide-react';
+import { Eye, LockKeyhole, RotateCcw } from 'lucide-react';
 import type { SessionBanner_viewer$key } from './__generated__/SessionBanner_viewer.graphql';
 import type { SessionBannerResetMutation } from './__generated__/SessionBannerResetMutation.graphql';
 import { queueToastAfterReload, useToast } from './Toast.tsx';
@@ -64,15 +64,15 @@ export function SessionBanner({ viewer: ref }: { viewer: SessionBanner_viewer$ke
   return (
     <Box
       role="region"
-      aria-label={intl.formatMessage({ id: 'workspace.bannerShort' })}
+      aria-label={intl.formatMessage({ id: 'workspace.bannerShort' }, { time })}
       sx={{
         display: 'flex', alignItems: 'center', gap: 3, px: { xs: 3, md: 6 }, minHeight: 36, py: 1,
         backgroundColor: t.sunken, borderBottom: `1px solid ${t.rule}`, color: t.inkSecondary, fontSize: '0.8125rem',
       }}
     >
-      <FlaskConical size={15} strokeWidth={1.7} aria-hidden style={{ flexShrink: 0, color: t.accent }} />
+      <LockKeyhole size={15} strokeWidth={1.7} aria-hidden style={{ flexShrink: 0, color: t.accent }} />
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 3, rowGap: 0.5, lineHeight: 1.4 }}>
-        <span>{narrow ? <FormattedMessage id="workspace.bannerShort" /> : <FormattedMessage id="workspace.banner" values={{ time }} />}</span>
+        <span>{narrow ? <FormattedMessage id="workspace.bannerShort" values={{ time }} /> : <FormattedMessage id="workspace.banner" values={{ time }} />}</span>
         {!viewer.canEdit && !narrow && (
           <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, color: t.ink }}>
             <Eye size={14} strokeWidth={1.7} aria-hidden />

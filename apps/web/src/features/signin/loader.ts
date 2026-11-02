@@ -4,6 +4,7 @@ import type { SignInPageQuery } from './__generated__/SignInPageQuery.graphql';
 
 export const signInQuery = graphql`
   query SignInPageQuery {
+    viewer { user { id displayName role } tenant { name nameLocal } }
     signInAccounts {
       id
       displayName

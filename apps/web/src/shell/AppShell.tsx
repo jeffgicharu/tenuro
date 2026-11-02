@@ -8,7 +8,9 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { styled, useTheme } from '@mui/material/styles';
-import { FilePlus2, Menu, PanelLeftClose, PanelLeftOpen, ScrollText } from 'lucide-react';
+import ButtonBase from '@mui/material/ButtonBase';
+import { FilePlus2, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ScrollText } from 'lucide-react';
+import { signOut } from '../app/session.ts';
 import type { AppShell_viewer$key } from './__generated__/AppShell_viewer.graphql';
 import { usePreferences } from '../app/preferences.tsx';
 import { AccountMenu } from './AccountMenu.tsx';
@@ -60,12 +62,16 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
 
   const nav = (
     <Box component="nav" aria-label={intl.formatMessage({ id: 'nav.main' })} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ px: collapsed ? 2 : 5, pt: 5, pb: 4, display: 'flex', alignItems: 'center', minHeight: 76 }}>
+      <Box sx={{ px: collapsed ? 2 : 5, pt: 6, pb: 4, display: 'flex', alignItems: 'center', minHeight: 88 }}>
         {collapsed ? (
-          <img src={viewer.tenant.theme.mark} alt={tenantName} width={32} height={32} style={{ display: 'block', margin: '0 auto' }} />
+          <img src={viewer.tenant.theme.mark} alt={tenantName} width={36} height={36} style={{ display: 'block', margin: '0 auto' }} />
         ) : (
-          <img src={logo} alt={tenantName} height={40} style={{ display: 'block', maxWidth: '100%', objectFit: 'contain', objectPosition: 'left' }} />
+          <img src={logo} alt={tenantName} height={52} style={{ display: 'block', maxWidth: '100%', objectFit: 'contain', objectPosition: theme.direction === 'rtl' ? 'right' : 'left' }} />
         )}
+      </Box>
+      {/* Who is signed in, and the way to switch company or role, sit at the top where people look. */}
+      <Box sx={{ px: collapsed ? 2 : 3, pb: 4, mb: 3, borderBottom: `1px solid ${t.rule}` }}>
+        <AccountMenu viewer={viewer} collapsed={collapsed} />
       </Box>
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, px: collapsed ? 2 : 3, display: 'grid', gap: 0.5 }}>
         {items.map((item) => {
@@ -114,7 +120,22 @@ export function AppShell({ viewer: viewerRef, children }: { viewer: AppShell_vie
             </IconButton>
           </Tooltip>
         )}
-        <AccountMenu viewer={viewer} collapsed={collapsed} />
+        <Tooltip title={collapsed ? intl.formatMessage({ id: 'shell.signOut' }) : ''} placement={theme.direction === 'rtl' ? 'left' : 'right'}>
+          <ButtonBase
+            onClick={() => void signOut()}
+            aria-label={collapsed ? intl.formatMessage({ id: 'shell.signOut' }) : undefined}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 3, minHeight: 40, px: collapsed ? 0 : 3, borderRadius: 1,
+              justifyContent: collapsed ? 'center' : 'flex-start', color: t.inkSecondary, fontSize: '0.875rem', fontWeight: 500,
+              transition: 'background-color 120ms ease, color 120ms ease',
+              '&:hover': { backgroundColor: t.brandTint, color: t.ink },
+              '&.Mui-focusVisible': { outline: `2px solid ${t.focus}`, outlineOffset: 1 },
+            }}
+          >
+            <LogOut size={18} strokeWidth={1.6} aria-hidden style={theme.direction === 'rtl' ? { transform: 'scaleX(-1)' } : undefined} />
+            {!collapsed && <span>{intl.formatMessage({ id: 'shell.signOut' })}</span>}
+          </ButtonBase>
+        </Tooltip>
       </Box>
     </Box>
   );

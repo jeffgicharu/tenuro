@@ -15,7 +15,7 @@ const ResetMySandboxPayload = builder.objectRef<{ ok: true }>('ResetMySandboxPay
 builder.mutationField('resetMySandbox', (t) =>
   t.field({
     type: ResetMySandboxPayload,
-    description: 'Discards every change the visitor made, returning their copy to the company’s shared data.',
+    description: 'Discards every change the signed-in person made, returning their workspace to the shared company data.',
     errors: { types: WRITE_ERRORS },
     resolve: async (_root, _args, ctx) => {
       const session = requireSession(ctx);

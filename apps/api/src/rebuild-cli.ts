@@ -3,7 +3,7 @@ import { createDb } from './db/client.ts';
 import { todayIso } from './domain/dates.ts';
 import { rebuild } from './seed/rebuild.ts';
 
-// The nightly rebuild (tenuro-reset.service): new data anchored to today, every sandbox
+// The nightly rebuild (tenuro-reset.service): new seed data anchored to today, every sandbox
 // cleared. Reports run time, WAL written and peak memory so the cost on the shared box is visible.
 const db = createDb(process.env.OWNER_DATABASE_URL, 2);
 const started = performance.now();

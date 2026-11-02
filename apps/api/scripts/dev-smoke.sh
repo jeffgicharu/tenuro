@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Signs in as a listed account against a running dev API and runs one query.
+# Signs in to a listed account against a running dev API and runs one query.
 # Usage: scripts/dev-smoke.sh <tenant-slug> <ROLE> '<graphql query>'
 set -euo pipefail
 API=${API:-http://localhost:4000}

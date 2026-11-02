@@ -14,9 +14,70 @@
     <link rel="icon" href="/static/brand/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/static/brand/favicon-180.png" />
     <title>Tenuro</title>
+    <!-- Before the first paint: the saved mode, direction and which shell to draw, so the page never
+         flashes white or the wrong way round while the app loads. -->
+    <script>
+      (function () {
+        var d = document.documentElement, s = {};
+        try { s.mode = localStorage.getItem('tenuro.mode'); s.lang = localStorage.getItem('tenuro.language'); s.nav = localStorage.getItem('tenuro.navCollapsed'); } catch (e) {}
+        var dark = s.mode === 'dark' || (s.mode !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        d.dataset.mode = dark ? 'dark' : 'light';
+        if (s.lang === 'ar') { d.dir = 'rtl'; d.lang = 'ar'; }
+        d.dataset.shell = location.pathname === '/sign-in' ? 'signin' : 'app';
+        if (s.nav === '1') d.dataset.nav = 'collapsed';
+      })();
+    </script>
+    <style>
+      :root { --paper: #F4F0E7; --surface: #FBF9F4; --sunken: #ECE6DA; --rule: #DED7C9; color-scheme: light; }
+      :root[data-mode='dark'] { --paper: #16150F; --surface: #1E1C16; --sunken: #26231C; --rule: #2E2B23; color-scheme: dark; }
+      html, body { margin: 0; background: var(--paper); }
+      .boot { position: fixed; inset: 0; display: flex; }
+      .boot-rail { width: 248px; flex-shrink: 0; background: var(--surface); border-inline-end: 1px solid var(--rule); padding: 24px 20px; box-sizing: border-box; }
+      :root[data-nav='collapsed'] .boot-rail { width: 64px; padding-inline: 14px; }
+      .boot-main { flex: 1; min-width: 0; }
+      .boot-band { height: 36px; background: var(--sunken); border-bottom: 1px solid var(--rule); }
+      .boot-page { padding: 32px; max-width: 1400px; }
+      .boot i { display: block; border-radius: 4px; background: var(--sunken); }
+      .boot-logo { width: 140px; height: 44px; margin-bottom: 28px; }
+      .boot-acct { height: 52px; margin-bottom: 24px; }
+      .boot-nav { height: 36px; margin-bottom: 6px; }
+      .boot-h1 { width: 160px; height: 36px; margin-bottom: 12px; }
+      .boot-sub { width: 110px; height: 14px; margin-bottom: 36px; }
+      .boot-table { border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+      .boot-row { height: 48px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 24px; padding: 0 16px; }
+      .boot-row i { height: 12px; flex: 1; }
+      .boot-row i:first-child { flex: 0 0 84px; }
+      :root[data-nav='collapsed'] .boot-rail i:not(.boot-nav) { display: none; }
+      :root[data-shell='signin'] .boot { display: none; }
+      @media (max-width: 1199.98px) { .boot-rail { display: none; } .boot-band { height: 56px; background: var(--surface); } }
+      @media (max-width: 599.98px) { .boot-page { padding: 20px 16px; } .boot-row i:nth-child(n + 3) { display: none; } }
+      @media (prefers-reduced-motion: no-preference) {
+        .boot i { animation: boot-pulse 1.4s ease-in-out infinite; }
+        @keyframes boot-pulse { 50% { opacity: 0.55; } }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Replaced by the app on its first render. Shaped like the signed-in shell and register. -->
+      <div class="boot" aria-hidden="true">
+        <div class="boot-rail"><i class="boot-logo"></i><i class="boot-acct"></i><i class="boot-nav"></i><i class="boot-nav"></i></div>
+        <div class="boot-main">
+          <div class="boot-band"></div>
+          <div class="boot-page">
+            <i class="boot-h1"></i><i class="boot-sub"></i>
+            <div class="boot-table">
+              <div class="boot-row"><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="boot-row"><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="boot-row"><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="boot-row"><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="boot-row"><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="boot-row"><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <noscript>Tenuro needs JavaScript to run.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

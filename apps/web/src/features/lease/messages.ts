@@ -7,7 +7,7 @@ export const leaseEn = {
 
   'lease.figure.passingRent': 'Passing rent',
   'lease.figure.perYear': 'a year',
-  'lease.figure.reporting': '{amount} in reporting currency',
+  'lease.figure.reporting': 'a year · {amount} in reporting currency',
   'lease.figure.term': 'Term',
   'lease.figure.termValue': '{years, plural, one {# year} other {# years}}{months, plural, =0 {} one { # month} other { # months}}',
   'lease.figure.expires': 'Expires',
@@ -96,7 +96,7 @@ export const leaseEn = {
   'lease.keyDates.status.DISMISSED': 'Dismissed',
 
   'lease.documents.none': 'No documents yet.',
-  'lease.documents.template': 'Template',
+  'lease.documents.template': 'From template',
   'lease.documents.uploadedBy': 'Added by {name}',
   'lease.documents.open': 'Open {title}',
   'lease.documents.download': 'Download',
@@ -142,7 +142,7 @@ export const leaseAr: Record<LeaseKey, string> = {
 
   'lease.figure.passingRent': 'الإيجار الحالي',
   'lease.figure.perYear': 'سنوياً',
-  'lease.figure.reporting': '{amount} بعملة التقارير',
+  'lease.figure.reporting': 'سنوياً · {amount} بعملة التقارير',
   'lease.figure.term': 'المدة',
   'lease.figure.termValue': '{years, plural, zero {} one {سنة واحدة} two {سنتان} few {# سنوات} many {# سنة} other {# سنة}}{months, plural, =0 {} one { وشهر} two { وشهران} few { و# أشهر} many { و# شهراً} other { و# شهر}}',
   'lease.figure.expires': 'ينتهي',
@@ -231,7 +231,7 @@ export const leaseAr: Record<LeaseKey, string> = {
   'lease.keyDates.status.DISMISSED': 'مستبعد',
 
   'lease.documents.none': 'لا توجد مستندات بعد.',
-  'lease.documents.template': 'قالب',
+  'lease.documents.template': 'من قالب',
   'lease.documents.uploadedBy': 'أضافه {name}',
   'lease.documents.open': 'فتح {title}',
   'lease.documents.download': 'تنزيل',
@@ -275,7 +275,7 @@ export const leaseSw: Record<LeaseKey, string> = {
 
   'lease.figure.passingRent': 'Kodi ya sasa',
   'lease.figure.perYear': 'kwa mwaka',
-  'lease.figure.reporting': '{amount} kwa sarafu ya ripoti',
+  'lease.figure.reporting': 'kwa mwaka · {amount} kwa sarafu ya ripoti',
   'lease.figure.term': 'Muda',
   'lease.figure.termValue': '{years, plural, one {mwaka #} other {miaka #}}{months, plural, =0 {} one { na mwezi #} other { na miezi #}}',
   'lease.figure.expires': 'Unaisha',
@@ -364,7 +364,7 @@ export const leaseSw: Record<LeaseKey, string> = {
   'lease.keyDates.status.DISMISSED': 'Imepuuzwa',
 
   'lease.documents.none': 'Bado hakuna hati.',
-  'lease.documents.template': 'Kiolezo',
+  'lease.documents.template': 'Kutoka kiolezo',
   'lease.documents.uploadedBy': 'Imeongezwa na {name}',
   'lease.documents.open': 'Fungua {title}',
   'lease.documents.download': 'Pakua',
