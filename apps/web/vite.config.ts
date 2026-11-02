@@ -26,7 +26,10 @@ export default defineConfig({
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router)[\\/]/ },
             { name: 'relay', test: /node_modules[\\/](react-relay|relay-runtime)[\\/]/ },
-            { name: 'mui', test: /node_modules[\\/](@mui[\\/](material|system|utils|styled-engine|private-theming|core-downloads-tracker)|@emotion|stylis)[\\/]/ },
+            // Only MUI's styling core is pinned to one chunk. Material components are left to normal
+            // splitting, so a component used only by a lazy page (the form's Autocomplete, say)
+            // ships with that page instead of weighing down the first one.
+            { name: 'mui', test: /node_modules[\\/](@mui[\\/](system|utils|styled-engine|private-theming)|@emotion|stylis)[\\/]/ },
             { name: 'grid', test: /node_modules[\\/]@mui[\\/]x-data-grid[\\/]/ },
             { name: 'intl', test: /node_modules[\\/](react-intl|@formatjs|intl-messageformat)[\\/]/ },
           ],
