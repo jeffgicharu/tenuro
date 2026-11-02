@@ -6,7 +6,6 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 api_port=${1:-4000}
 web_port=${2:-5173}
 env_file=${ENV_FILE:-$root/.env.local}
-[ -f "$env_file" ] || env_file=/mnt/storage/Projects/Websites/Website-7/.env.local
 (cd "$root/apps/web" && FORCE_NO_WATCHMAN=1 npx relay-compiler >/dev/null)
 (cd "$root/apps/api" && PORT=$api_port PERSISTED_QUERIES="$root/apps/web/persisted-queries.json" \
   exec node --env-file="$env_file" --experimental-strip-types --no-warnings src/main.ts) &
