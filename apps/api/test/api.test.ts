@@ -664,11 +664,16 @@ describe('portfolio accounting', () => {
     const fx = (n: number, cur: string) => (n / (rates.get(cur) ?? 1)) * (rates.get(tenant.reporting_currency) ?? 1);
     const rows = await app.owner.selectFrom('lease as l').innerJoin('lease_accounting as a', 'a.lease_row_id', 'l.id')
       .where('l.tenant_id', '=', tenant.id).where('l.sandbox_id', 'is', null).where('l.deleted_at', 'is', null).where('l.status', 'in', ['ACTIVE', 'HOLDING_OVER'])
-      .select(['l.reference', 'a.currency', 'a.liability', 'a.within_1_year']).execute();
+      .select(['l.reference', 'a.currency', 'a.liability', 'a.within_1_year', 'a.monthly_interest']).execute();
     const expected = rows.reduce((n, r) => n + fx(Number(r.liability), r.currency), 0);
     expect(Math.abs(Number(s.liability.amount) - expected)).toBeLessThan(0.01);
     const band = rows.reduce((n, r) => n + fx(Number(r.within_1_year), r.currency), 0);
     expect(Math.abs(Number(s.maturity[0]!.amount.amount) - band)).toBeLessThan(0.01);
+    const monthly = (s as unknown as { monthly: { month: number; interest: { amount: string } }[] }).monthly;
+    for (let m = 0; m < 12; m++) {
+      const want = rows.reduce((n, r) => n + fx(Number(r.monthly_interest[m] ?? 0), r.currency), 0);
+      expect(Math.abs(Number(monthly[m]!.interest.amount) - want)).toBeLessThan(0.01);
+    }
     const top = [...rows].sort((a, b) => fx(Number(b.liability), b.currency) - fx(Number(a.liability), a.currency)).slice(0, 10).map((r) => r.reference);
     expect(s.largest.map((l) => l.reference)).toEqual(top);
   });

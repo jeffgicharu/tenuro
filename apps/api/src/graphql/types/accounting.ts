@@ -176,6 +176,8 @@ interface GroupRow {
   liability: string; rou: string; interest: string; depreciation: string; lease_cost: string; cash: string;
   within_1_year: string; year_1_to_2: string; year_2_to_3: string; year_3_to_4: string; year_4_to_5: string; after_5_years: string;
   open: string; additions: string; interest_ytd: string; payments: string; remeasure: string; close: string;
+  /** mi1..mi12, md1..md12, mc1..mc12: the monthly interest, depreciation and lease cost. */
+  [month: `${'mi' | 'md' | 'mc'}${number}`]: string;
 }
 
 async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> {
@@ -210,9 +212,9 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
   };
 
   // Shared leases: their stored figures (only rows the person sees unchanged), summed in the database
-  // by currency, standard and country, with the monthly charge by currency and the ten largest.
+  // by currency, standard and country (the twelve months element by element), and the ten largest.
   const LIVE = sql`l.status IN ('ACTIVE', 'HOLDING_OVER')`;
-  const [groups, months, largest] = await Promise.all([
+  const [groups, largest] = await Promise.all([
     sql<GroupRow>`
       SELECT a.currency, a.measured_as, l.country_code, count(*)::int AS n,
         sum(a.liability)::text AS liability, sum(a.rou)::text AS rou, sum(a.interest_year)::text AS interest,
@@ -220,16 +222,13 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
         sum(a.within_1_year)::text AS within_1_year, sum(a.year_1_to_2)::text AS year_1_to_2, sum(a.year_2_to_3)::text AS year_2_to_3,
         sum(a.year_3_to_4)::text AS year_3_to_4, sum(a.year_4_to_5)::text AS year_4_to_5, sum(a.after_5_years)::text AS after_5_years,
         sum(a.liability_open)::text AS open, sum(a.additions_ytd)::text AS additions, sum(a.interest_ytd)::text AS interest_ytd,
-        sum(a.payments_ytd)::text AS payments, sum(a.remeasure_ytd)::text AS remeasure, sum(a.liability_close)::text AS close
+        sum(a.payments_ytd)::text AS payments, sum(a.remeasure_ytd)::text AS remeasure, sum(a.liability_close)::text AS close,
+        sum(coalesce(a.monthly_interest[1], 0))::text AS mi1, sum(coalesce(a.monthly_interest[2], 0))::text AS mi2, sum(coalesce(a.monthly_interest[3], 0))::text AS mi3, sum(coalesce(a.monthly_interest[4], 0))::text AS mi4, sum(coalesce(a.monthly_interest[5], 0))::text AS mi5, sum(coalesce(a.monthly_interest[6], 0))::text AS mi6, sum(coalesce(a.monthly_interest[7], 0))::text AS mi7, sum(coalesce(a.monthly_interest[8], 0))::text AS mi8, sum(coalesce(a.monthly_interest[9], 0))::text AS mi9, sum(coalesce(a.monthly_interest[10], 0))::text AS mi10, sum(coalesce(a.monthly_interest[11], 0))::text AS mi11, sum(coalesce(a.monthly_interest[12], 0))::text AS mi12,
+        sum(coalesce(a.monthly_depreciation[1], 0))::text AS md1, sum(coalesce(a.monthly_depreciation[2], 0))::text AS md2, sum(coalesce(a.monthly_depreciation[3], 0))::text AS md3, sum(coalesce(a.monthly_depreciation[4], 0))::text AS md4, sum(coalesce(a.monthly_depreciation[5], 0))::text AS md5, sum(coalesce(a.monthly_depreciation[6], 0))::text AS md6, sum(coalesce(a.monthly_depreciation[7], 0))::text AS md7, sum(coalesce(a.monthly_depreciation[8], 0))::text AS md8, sum(coalesce(a.monthly_depreciation[9], 0))::text AS md9, sum(coalesce(a.monthly_depreciation[10], 0))::text AS md10, sum(coalesce(a.monthly_depreciation[11], 0))::text AS md11, sum(coalesce(a.monthly_depreciation[12], 0))::text AS md12,
+        sum(coalesce(a.monthly_cost[1], 0))::text AS mc1, sum(coalesce(a.monthly_cost[2], 0))::text AS mc2, sum(coalesce(a.monthly_cost[3], 0))::text AS mc3, sum(coalesce(a.monthly_cost[4], 0))::text AS mc4, sum(coalesce(a.monthly_cost[5], 0))::text AS mc5, sum(coalesce(a.monthly_cost[6], 0))::text AS mc6, sum(coalesce(a.monthly_cost[7], 0))::text AS mc7, sum(coalesce(a.monthly_cost[8], 0))::text AS mc8, sum(coalesce(a.monthly_cost[9], 0))::text AS mc9, sum(coalesce(a.monthly_cost[10], 0))::text AS mc10, sum(coalesce(a.monthly_cost[11], 0))::text AS mc11, sum(coalesce(a.monthly_cost[12], 0))::text AS mc12
       FROM v_lease l JOIN lease_accounting a ON a.lease_row_id = l.id
       WHERE ${LIVE}
       GROUP BY 1, 2, 3`.execute(ctx.tx),
-    sql<{ currency: string; month: number; interest: string; depreciation: string; cost: string }>`
-      SELECT a.currency, m.month::int AS month, sum(m.interest)::text AS interest, sum(m.depreciation)::text AS depreciation, sum(m.cost)::text AS cost
-      FROM v_lease l JOIN lease_accounting a ON a.lease_row_id = l.id
-      CROSS JOIN LATERAL unnest(a.monthly_interest, a.monthly_depreciation, a.monthly_cost) WITH ORDINALITY AS m(interest, depreciation, cost, month)
-      WHERE ${LIVE}
-      GROUP BY 1, 2`.execute(ctx.tx),
     // Ranked in dollars, which orders them as the reporting currency would.
     sql<{ lease_id: string; reference: string; property_name: string; city: string; currency: string; liability: string }>`
       SELECT l.lease_id, l.reference, l.property_name, l.city, a.currency, a.liability::text AS liability
@@ -239,6 +238,7 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
       ORDER BY a.liability / coalesce(r.per_usd, 1) DESC, l.lease_id
       LIMIT 10`.execute(ctx.tx),
   ]);
+  const months = (g: GroupRow, prefix: 'mi' | 'md' | 'mc') => Array.from({ length: 12 }, (_, i) => Number(g[`${prefix}${i + 1}` as keyof GroupRow] ?? 0));
   for (const g of groups.rows) {
     add(g.country_code, g.currency, g.measured_as, g.n, {
       liability: Number(g.liability), rou: Number(g.rou), interest: Number(g.interest), depreciation: Number(g.depreciation),
@@ -246,14 +246,8 @@ async function summarise(ctx: Context, tenantId: string): Promise<SummaryShape> 
       bands: Object.fromEntries(BAND_KEYS.map((k) => [k, Number(g[BAND_COLUMNS[k]])])),
       open: Number(g.open), additions: Number(g.additions), interestYtd: Number(g.interest_ytd), payments: Number(g.payments),
       remeasure: Number(g.remeasure), close: Number(g.close),
-      monthlyInterest: zeros(), monthlyDepreciation: zeros(), monthlyCost: zeros(),
+      monthlyInterest: months(g, 'mi'), monthlyDepreciation: months(g, 'md'), monthlyCost: months(g, 'mc'),
     });
-  }
-  for (const m of months.rows) {
-    if (m.month < 1 || m.month > 12) continue;
-    totals.monthlyInterest[m.month - 1]! += fx(Number(m.interest), m.currency);
-    totals.monthlyDepreciation[m.month - 1]! += fx(Number(m.depreciation), m.currency);
-    totals.monthlyCost[m.month - 1]! += fx(Number(m.cost), m.currency);
   }
   for (const l of largest.rows) {
     const local = Number(l.liability);

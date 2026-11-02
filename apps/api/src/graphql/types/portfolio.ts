@@ -249,16 +249,21 @@ const Portfolio = builder.objectRef<Record<string, never>>('Portfolio').implemen
       args: { first: t.arg.int({ required: false, defaultValue: 6 }) },
       description: 'The decisions to make first: overdue ones by rent at stake, then upcoming ones by deadline.',
       resolve: async (_p, args, ctx) => {
+        // The open-task check runs only for the decisions listed, not for every candidate.
         const r = await sql<AttentionRow>`
-          SELECT k.key_date_id, l.annual_rent_reporting::text AS rent,
-            EXISTS (SELECT 1 FROM v_task t WHERE t.key_date_id = k.key_date_id AND t.status IN ('TODO', 'IN_PROGRESS')) AS has_task
-          FROM v_key_date k JOIN v_lease l ON l.lease_id = k.lease_id
-          WHERE k.status = 'UPCOMING' AND k.kind IN ${DECISION_KINDS} AND k.due_on <= ${addDays(ctx.today, 90)}
-          -- Overdue first, the largest rent at stake leading; then upcoming by deadline.
-          ORDER BY (k.due_on < ${ctx.today}) DESC,
-            CASE WHEN k.due_on < ${ctx.today} THEN l.annual_rent_reporting END DESC NULLS LAST,
-            k.due_on, l.annual_rent_reporting DESC, k.key_date_id
-          LIMIT ${Math.min(Math.max(args.first ?? 6, 1), 25)}
+          SELECT x.key_date_id, x.rent,
+            EXISTS (SELECT 1 FROM v_task t WHERE t.key_date_id = x.key_date_id AND t.status IN ('TODO', 'IN_PROGRESS')) AS has_task
+          FROM (
+            SELECT k.key_date_id, l.annual_rent_reporting::text AS rent, k.due_on < ${ctx.today} AS overdue, l.annual_rent_reporting AS rank_rent, k.due_on
+            FROM v_key_date k JOIN v_lease l ON l.lease_id = k.lease_id
+            WHERE k.status = 'UPCOMING' AND k.kind IN ${DECISION_KINDS} AND k.due_on <= ${addDays(ctx.today, 90)}
+            -- Overdue first, the largest rent at stake leading; then upcoming by deadline.
+            ORDER BY (k.due_on < ${ctx.today}) DESC,
+              CASE WHEN k.due_on < ${ctx.today} THEN l.annual_rent_reporting END DESC NULLS LAST,
+              k.due_on, l.annual_rent_reporting DESC, k.key_date_id
+            LIMIT ${Math.min(Math.max(args.first ?? 6, 1), 25)}
+          ) x
+          ORDER BY x.overdue DESC, CASE WHEN x.overdue THEN x.rank_rent END DESC NULLS LAST, x.due_on, x.rank_rent DESC, x.key_date_id
         `.execute(ctx.tx);
         return r.rows;
       },
