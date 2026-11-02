@@ -70,7 +70,7 @@ export const sw: Catalogue = {
   'signin.role.VIEWER': 'Anaweza kuona na kuhamisha data, lakini hawezi kufanya mabadiliko.',
   'signin.signingIn': 'Inaingia…',
   'signin.error': 'Kuingia hakukufanikiwa. Jaribu tena baada ya muda mfupi.',
-  'signin.limit': 'Majaribio mengi ya kuingia kutoka mtandao wako kwa muda mfupi. Jaribu baadaye.',
+  'signin.limit': 'Tenuro haiwezi kufungua kipindi kingine kwa sasa. Tafadhali jaribu tena baada ya dakika chache.',
 
   'status.ACTIVE': 'Unatumika',
   'status.HOLDING_OVER': 'Umepita muda',

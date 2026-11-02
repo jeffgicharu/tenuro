@@ -290,12 +290,32 @@ describe('limits on what visitors can create', () => {
     expect(statuses.at(-1)).toBe(429);
   });
 
-  it('limits new sessions per address per hour', async () => {
+  it('never limits a browser that signs in again or switches account', async () => {
     const v = new Visitor(app, '203.0.113.77');
+    const roles = ['ADMIN', 'MANAGER', 'VIEWER'] as const;
     const statuses: number[] = [];
-    for (let i = 0; i <= config.limits.newSessionsPerIpPerHour; i++) statuses.push(await v.signIn('sunbula', 'VIEWER'));
-    expect(statuses.filter((s) => s === 204)).toHaveLength(config.limits.newSessionsPerIpPerHour);
-    expect(statuses.at(-1)).toBe(429);
+    for (let i = 0; i <= config.limits.newSessionsPerIpPerHour + 5; i++) statuses.push(await v.signIn(i % 2 ? 'sunbula' : 'mbuyu-court', roles[i % 3]!));
+    expect(statuses.every((s) => s === 204)).toBe(true);
+    const sandboxes = await app.owner.selectFrom('session').select(sql<number>`count(DISTINCT sandbox_id)::int`.as('n'))
+      .where('ip_hash', '=', (await app.owner.selectFrom('session').select('ip_hash').where('sandbox_id', '=', await v.sandboxId()).executeTakeFirstOrThrow()).ip_hash)
+      .executeTakeFirstOrThrow();
+    expect(sandboxes.n).toBe(1);
+  });
+
+  it('gives a browser its sandbox back after signing out, and ignores a forged sandbox cookie', async () => {
+    const v = new Visitor(app, '203.0.113.78');
+    await v.signIn('mbuyu-court', 'MANAGER');
+    const first = await v.sandboxId();
+    expect(await v.signOut()).toBe(204);
+    expect(v.jar.has('tenuro_session')).toBe(false);
+    await v.signIn('halvard-crane', 'VIEWER');
+    expect(await v.sandboxId()).toBe(first);
+
+    const forger = new Visitor(app, '203.0.113.79');
+    forger.jar.set('tenuro_sandbox', `${first}.${'A'.repeat(32)}`);
+    forger.cookie = `tenuro_sandbox=${first}.${'A'.repeat(32)}`;
+    await forger.signIn('mbuyu-court', 'VIEWER');
+    expect(await forger.sandboxId()).not.toBe(first);
   });
 
   it('caps the global number of live sessions', async () => {

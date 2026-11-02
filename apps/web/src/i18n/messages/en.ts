@@ -69,7 +69,7 @@ export const en = {
   'signin.role.VIEWER': 'Can view and export, but can’t make changes.',
   'signin.signingIn': 'Signing in…',
   'signin.error': 'Sign-in did not work. Try again in a moment.',
-  'signin.limit': 'Too many sign-ins from your network in a short time. Try again later.',
+  'signin.limit': 'Tenuro can’t open another session just now. Please try again in a few minutes.',
 
   'status.ACTIVE': 'Active',
   'status.HOLDING_OVER': 'Holding over',

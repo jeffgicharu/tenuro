@@ -4,7 +4,7 @@ import { createYoga } from 'graphql-yoga';
 import { sql } from 'kysely';
 import type { Db } from './db/client.ts';
 import { config } from './config.ts';
-import { hashIp, LimitReached, readCookie, resolveSession, sessionCookie, signIn, signOut } from './auth/session.ts';
+import { hashIp, LimitReached, readCookie, readSandboxCookie, resolveSession, sandboxCookie, sessionCookie, signIn, signOut } from './auth/session.ts';
 import { newContext, type Context } from './graphql/context.ts';
 import { useOperationLimits, usePersisted, useScopedTransaction } from './graphql/plugins.ts';
 import { schema } from './graphql/schema.ts';
@@ -32,7 +32,7 @@ async function readJson(req: IncomingMessage, limit: number): Promise<unknown> {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null;
 }
 
-function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
+function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string | string[]> = {}) {
   const json = body === null ? '' : JSON.stringify(body);
   res.writeHead(status, {
     ...COMMON_HEADERS, 'content-security-policy': API_CSP, 'cache-control': 'no-store',
@@ -109,9 +109,12 @@ export function createApp(db: Db) {
         const body = (await readJson(req, 1024)) as { accountId?: unknown } | null;
         if (typeof body?.accountId !== 'string' || !/^[0-9a-f-]{36}$/.test(body.accountId)) return send(res, 400, { error: 'accountId required' });
         try {
-          const result = await signIn(db, { accountId: body.accountId, existingToken: readCookie(req.headers.cookie, config.cookieName), ip: clientIp(req) });
+          const result = await signIn(db, {
+            accountId: body.accountId, existingToken: readCookie(req.headers.cookie, config.cookieName),
+            knownSandbox: readSandboxCookie(req.headers.cookie), ip: clientIp(req),
+          });
           if (!result) return send(res, 404, { error: 'unknown account' });
-          return send(res, 204, null, { 'set-cookie': sessionCookie(result.token) });
+          return send(res, 204, null, { 'set-cookie': [sessionCookie(result.token), sandboxCookie(result.sandboxId)] });
         } catch (err) {
           if (err instanceof LimitReached) return send(res, 429, { error: 'limit', limit: err.limit }, { 'retry-after': '3600' });
           throw err;

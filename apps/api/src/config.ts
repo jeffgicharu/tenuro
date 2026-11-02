@@ -33,6 +33,9 @@ export const config = {
     return production ? required('SESSION_SECRET') : (env.SESSION_SECRET ?? 'dev-only-session-secret');
   },
   cookieName: production ? '__Host-tenuro_session' : 'tenuro_session',
+  // Remembers a browser's sandbox across sign-out and sign-in, so its changes come back and it is not
+  // counted as a new visitor. Signed, and only ever names a sandbox that still exists.
+  sandboxCookieName: production ? '__Host-tenuro_sandbox' : 'tenuro_sandbox',
   sessionDays: 7,
   // Paths inside a release; overridable for local development and tests.
   webDist: env.WEB_DIST ?? new URL('./web/', import.meta.url).pathname,
@@ -46,8 +49,10 @@ export const config = {
     uploadMaxBytes: 10 * 1024 * 1024,
     sandboxIdleHours: 24,
     // Global caps, so dropping the cookie cannot exhaust the server.
-    newSandboxesPerIpPerDay: 20,
-    newSessionsPerIpPerHour: 60,
+    // Generous enough for a whole office exploring every account on one address; a browser that
+    // returns (or switches account) reuses its sandbox and is not counted again.
+    newSandboxesPerIpPerDay: 60,
+    newSessionsPerIpPerHour: 120,
     totalUploadBytes: 500 * 1024 * 1024,
     maxSandboxes: 2_000,
     maxSessions: 2_000,

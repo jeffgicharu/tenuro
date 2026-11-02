@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { sql } from 'kysely';
 import type { Db } from '../db/client.ts';
 import type { UserRole } from '../db/types.ts';
@@ -32,6 +32,25 @@ export function sessionCookie(token: string | null): string {
   return `${config.cookieName}=${encodeURIComponent(token)}; ${attrs.join('; ')}; Max-Age=${config.sessionDays * 86_400}`;
 }
 
+// The sandbox cookie: "<sandbox id>.<keyed hash>", so a browser can only name a sandbox it was given.
+const sandboxMac = (id: string) => createHmac('sha256', config.sessionSecret).update(`sandbox:${id}`).digest('base64url').slice(0, 32);
+
+export function sandboxCookie(sandboxId: string): string {
+  const attrs = ['Path=/', 'HttpOnly', 'SameSite=Lax'];
+  if (config.production) attrs.push('Secure');
+  // Sandboxes are cleared by the nightly rebuild, so a day is as long as one can be useful.
+  return `${config.sandboxCookieName}=${sandboxId}.${sandboxMac(sandboxId)}; ${attrs.join('; ')}; Max-Age=86400`;
+}
+
+export function readSandboxCookie(header: string | null | undefined): string | null {
+  const v = readCookie(header, config.sandboxCookieName);
+  const m = v?.match(/^([0-9a-f-]{36})\.([A-Za-z0-9_-]{32})$/);
+  if (!m) return null;
+  const [, id, mac] = m as unknown as [string, string, string];
+  const expected = sandboxMac(id);
+  return timingSafeEqual(Buffer.from(mac), Buffer.from(expected)) ? id : null;
+}
+
 export async function resolveSession(db: Db, token: string | null): Promise<SessionInfo | null> {
   if (!token || token.length > 128) return null;
   const { rows } = await sql<{ user_id: string; tenant_id: string; role: UserRole; sandbox_id: string | null }>`
@@ -48,10 +67,11 @@ export class LimitReached extends Error {
   }
 }
 
-// Signs in to one of the accounts listed on the sign-in page. An existing sandbox is kept, so a
-// person can switch role or company and still see their own changes; otherwise a new sandbox is
-// made, within the per-IP and global caps.
-export async function signIn(db: Db, opts: { accountId: string; existingToken: string | null; ip: string }): Promise<{ token: string } | null> {
+// Signs in to one of the accounts listed on the sign-in page. A browser keeps its sandbox (from its
+// current session, or from its sandbox cookie after signing out), so a person can switch role or
+// company, or come back, and still see their own changes; such a sign-in is not counted against the
+// address. Otherwise a new sandbox is made, within the per-address and global caps.
+export async function signIn(db: Db, opts: { accountId: string; existingToken: string | null; knownSandbox?: string | null; ip: string }): Promise<{ token: string; sandboxId: string } | null> {
   const ipHash = hashIp(opts.ip);
   const { limits } = config;
   return db.transaction().execute(async (tx) => {
@@ -68,10 +88,18 @@ export async function signIn(db: Db, opts: { accountId: string; existingToken: s
         .returning('sandbox_id').executeTakeFirst();
       sandboxId = prior?.sandbox_id ?? null;
     }
+    if (!sandboxId && opts.knownSandbox) {
+      const known = await tx.selectFrom('sandbox').select('id').where('id', '=', opts.knownSandbox).executeTakeFirst();
+      sandboxId = known?.id ?? null;
+    }
 
-    const recentSessions = await tx.selectFrom('session').select(sql<number>`count(*)::int`.as('n'))
-      .where('ip_hash', '=', ipHash).where('created_at', '>', sql<Date>`now() - interval '1 hour'`).executeTakeFirstOrThrow();
-    if (recentSessions.n >= limits.newSessionsPerIpPerHour) throw new LimitReached('sessions-per-ip');
+    // A returning browser is not a new visitor: only sign-ins that would start a sandbox are counted,
+    // and the hourly count is of distinct sandboxes signed into, so switching account never adds.
+    if (!sandboxId) {
+      const recent = await tx.selectFrom('session').select(sql<number>`count(DISTINCT sandbox_id)::int`.as('n'))
+        .where('ip_hash', '=', ipHash).where('created_at', '>', sql<Date>`now() - interval '1 hour'`).executeTakeFirstOrThrow();
+      if (recent.n >= limits.newSessionsPerIpPerHour) throw new LimitReached('sessions-per-ip');
+    }
     const totalSessions = await tx.selectFrom('session').select(sql<number>`count(*)::int`.as('n'))
       .where('expires_at', '>', sql<Date>`now()`).executeTakeFirstOrThrow();
     if (totalSessions.n >= limits.maxSessions) throw new LimitReached('sessions-total');
@@ -91,7 +119,7 @@ export async function signIn(db: Db, opts: { accountId: string; existingToken: s
       token_hash: hashToken(token), user_id: account.id, sandbox_id: sandboxId, ip_hash: ipHash,
       expires_at: sql<Date>`now() + make_interval(days => ${config.sessionDays})` as unknown as Date,
     }).execute();
-    return { token };
+    return { token, sandboxId };
   });
 }
 

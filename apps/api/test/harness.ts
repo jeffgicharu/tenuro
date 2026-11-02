@@ -70,8 +70,27 @@ export class Visitor {
     this.ip = ip ?? `10.${Math.floor(ipCounter / 250)}.${ipCounter % 250}.7`;
   }
 
+  /** Cookies by name, as a browser would keep them. */
+  readonly jar = new Map<string, string>();
+
+  private keep(res: Response) {
+    for (const c of res.headers.getSetCookie()) {
+      const [pair, ...attrs] = c.split(';');
+      const [name, ...value] = pair!.split('=');
+      if (attrs.some((a) => /max-age=0/i.test(a.trim()))) this.jar.delete(name!.trim());
+      else this.jar.set(name!.trim(), value.join('='));
+    }
+    this.cookie = [...this.jar.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+
+  async signOut(): Promise<number> {
+    const res = await fetch(`${this.app.url}/api/session`, { method: 'DELETE', headers: { 'x-tenuro-client': 'web', 'x-real-ip': this.ip, cookie: this.cookie } });
+    this.keep(res);
+    return res.status;
+  }
+
   async sandboxId(): Promise<string> {
-    const token = decodeURIComponent(this.cookie.split('=')[1] ?? '');
+    const token = decodeURIComponent(this.jar.get('tenuro_session') ?? '');
     const row = await this.app.owner.selectFrom('session').select('sandbox_id').where('token_hash', '=', hashToken(token)).executeTakeFirstOrThrow();
     return row.sandbox_id!;
   }
@@ -86,8 +105,7 @@ export class Visitor {
       headers: { 'content-type': 'application/json', 'x-tenuro-client': 'web', 'x-real-ip': this.ip, cookie: this.cookie },
       body: JSON.stringify({ accountId: localId }),
     });
-    const set = res.headers.get('set-cookie');
-    if (set) this.cookie = set.split(';')[0]!;
+    this.keep(res);
     return res.status;
   }
 
