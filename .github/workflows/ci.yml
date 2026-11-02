@@ -131,8 +131,8 @@ jobs:
           SEED_DEBUG=1 PGUSER=tenuro PGPASSWORD=ci-owner PGDATABASE=tenuro /usr/bin/time -v runtime/bin/node --max-old-space-size=112 server/migrate.mjs 2> migrate-time.txt
           grep -E 'Maximum resident|Elapsed' migrate-time.txt
           peak=$(awk '/Maximum resident set size/ {print int($6/1024)}' migrate-time.txt)
-          echo "migrate and seed peak memory: ${peak} MB (unit cap 160 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$peak" -lt 150 ]
+          echo "migrate and seed peak memory: ${peak} MB (unit cap 192 MB)" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$peak" -lt 180 ]
       - name: Nightly rebuild cost
         env:
           PGHOST: 127.0.0.1

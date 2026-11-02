@@ -25,7 +25,9 @@ BindReadOnlyPaths=/srv/tenuro
 BindPaths=/var/lib/tenuro-jobs
 InaccessiblePaths=-/etc/nginx -/etc/letsencrypt -/etc/ssl/private -/etc/ssl/cloudflare
 
-MemoryMax=160M
+# On a fresh database this unit also builds the portfolio data, the same work as
+# tenuro-reset.service, so it has the same cap. Measured in CI at about 157 MB peak.
+MemoryMax=192M
 MemorySwapMax=0
 TasksMax=32
 
