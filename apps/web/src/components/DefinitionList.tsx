@@ -16,7 +16,7 @@ export function DefinitionList({ items, columns = 1 }: { items: Definition[]; co
       component="dl"
       sx={{
         m: 0, display: 'grid', columnGap: 8,
-        gridTemplateColumns: { xs: '1fr', md: columns === 2 ? '1fr 1fr' : '1fr' },
+        gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: columns === 2 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)' },
       }}
     >
       {items.map((item, i) => (

@@ -157,7 +157,7 @@ export const leaseAr: Record<LeaseKey, string> = {
   'lease.schedule.rent': 'الإيجار',
   'lease.schedule.number': 'رقم',
   'lease.schedule.current': 'الفترة الحالية',
-  'lease.schedule.change.FIXED_UPLIFT': 'زيادة ثابتة',
+  'lease.schedule.change.FIXED_UPLIFT': 'زيادة الإيجار',
   'lease.schedule.change.STEP': 'مراجعة متفق عليها',
   'lease.schedule.caption': 'الإيجار المستحق لكل فترة من فترات العقد، {count, plural, one {فترة واحدة} two {فترتان} few {# فترات} other {# فترة}}. لا تُتوقع تغيّرات المؤشر أو السوق المستقبلية.',
 

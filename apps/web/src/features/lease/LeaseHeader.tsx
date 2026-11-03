@@ -35,7 +35,7 @@ export function LeaseHeader({ lease: ref, canEdit, onAddTask }: { lease: LeaseHe
   const country = new Intl.DisplayNames([intl.locale], { type: 'region' }).of(lease.countryCode) ?? lease.countryCode;
 
   return (
-    <Box component="header" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 200px', md: 'minmax(0, 1fr) 280px' }, gap: { xs: 5, sm: 6, md: 10 }, alignItems: 'end' }}>
+    <Box component="header" sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, 1fr) 200px', md: 'minmax(0, 1fr) 280px' }, gap: { xs: 5, sm: 6, md: 10 }, alignItems: 'end' }}>
       <Box sx={{ minWidth: 0 }}>
         <Box component="nav" aria-label="Breadcrumb" sx={{ mb: 4 }}>
           <Box component="ol" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, listStyle: 'none', m: 0, p: 0, fontSize: '0.8125rem', color: t.inkSecondary }}>

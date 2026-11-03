@@ -10,7 +10,7 @@ export function CompactMoney({ value, showCode = true }: { value: MoneyValue; sh
   const f = useFormat();
   const exact = f.money(value.amount, value.currency);
   const short = f.money(value.amount, value.currency, { compact: true, showCode });
-  if (short === exact) return <Box component="bdi" data-num sx={{ whiteSpace: 'nowrap' }}>{exact}</Box>;
+  if (short === exact) return <Box component="bdi" data-num>{exact}</Box>;
   return (
     <Tooltip title={exact} describeChild placement="top">
       <Box
@@ -18,7 +18,8 @@ export function CompactMoney({ value, showCode = true }: { value: MoneyValue; sh
         data-num
         tabIndex={0}
         sx={{
-          whiteSpace: 'nowrap', borderRadius: 0.5, cursor: 'help',
+          // May wrap between the number, its unit and the code (Arabic puts all three in words), never inside one.
+          borderRadius: 0.5, cursor: 'help',
           textDecoration: 'underline dotted', textDecorationThickness: '1px', textUnderlineOffset: '0.2em', textDecorationColor: 'currentColor',
           '&:focus-visible': { outline: (t) => `2px solid ${t.tokens.focus}`, outlineOffset: 2 },
         }}

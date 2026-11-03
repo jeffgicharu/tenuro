@@ -30,7 +30,8 @@ export function LeaseRentSchedule({ lease: ref }: { lease: LeaseRentSchedule_lea
   const theme = useTheme();
   const t = theme.tokens;
   const rows = data.rentSchedule.edges.map((e) => e.node);
-  const cell = { py: 2, px: 3, borderBottom: `1px solid ${t.rule}`, fontSize: '0.875rem' } as const;
+  // Cells keep to one line; on a phone the table scrolls sideways in its frame rather than stacking dates word by word.
+  const cell = { py: 2, px: 3, borderBottom: `1px solid ${t.rule}`, fontSize: '0.875rem', whiteSpace: 'nowrap' } as const;
   const head = { ...cell, fontWeight: 600, fontSize: '0.75rem', color: t.inkSecondary, textAlign: 'start' as const, backgroundColor: t.sunken, position: 'sticky' as const, top: 0 };
 
   return (

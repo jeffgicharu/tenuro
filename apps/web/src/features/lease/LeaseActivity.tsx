@@ -65,7 +65,7 @@ function ActivityItem({ activity: ref }: { activity: LeaseActivityItem_activity$
             {open && (
               <Box component="ul" sx={{ listStyle: 'none', m: 0, mt: 1, p: 0, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface }}>
                 {list.map((c, i) => (
-                  <Box component="li" key={i} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px 1fr' }, gap: 2, px: 3, py: 2, borderTop: i ? `1px solid ${t.rule}` : 0, fontSize: '0.8125rem' }}>
+                  <Box component="li" key={i} sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: '180px minmax(0, 1fr)' }, gap: 2, px: 3, py: 2, borderTop: i ? `1px solid ${t.rule}` : 0, fontSize: '0.8125rem' }}>
                     <Box sx={{ color: t.inkSecondary }}>{fieldLabel(c.field)}</Box>
                     <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }} data-num>
                       <Box component="del" sx={{ color: t.danger, textDecorationColor: t.danger }}><bdi>{c.from || '—'}</bdi></Box>
@@ -106,7 +106,7 @@ export function LeaseActivity({ lease: ref }: { lease: LeaseActivity_lease$key }
         component="ol"
         sx={{
           listStyle: 'none', m: 0, p: 0, position: 'relative',
-          '&::before': { content: '""', position: 'absolute', insetInlineStart: 15.5, top: 20, bottom: 20, width: 1, backgroundColor: t.rule },
+          '&::before': { content: '""', position: 'absolute', insetInlineStart: 15.5, top: 20, bottom: 20, width: '1px', backgroundColor: t.rule },
         }}
       >
         {rows.map((e) => <ActivityItem key={e.node.id} activity={e.node} />)}

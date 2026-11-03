@@ -252,9 +252,11 @@ test.describe('documents', () => {
 test.describe('figures fit their tiles', () => {
   // Exact KES amounts once ran past their tiles on the accounting page. Every KPI tile, for each
   // company (KES has the longest figures), at desktop, tablet and phone widths.
-  for (const company of ['Mbuyu Court Holdings', 'Sunbula Estates', 'Halvard & Crane Property Partners'] as const) {
-    test(`nothing overflows a KPI tile for ${company}`, async ({ page }) => {
+  // Each company in English, and in its other working language (Arabic figures read "607.5 مليون AED").
+  for (const [company, language] of [['Mbuyu Court Holdings', 'en'], ['Mbuyu Court Holdings', 'sw'], ['Sunbula Estates', 'en'], ['Sunbula Estates', 'ar'], ['Halvard & Crane Property Partners', 'en']] as const) {
+    test(`nothing overflows a KPI tile for ${company} in ${language}`, async ({ page }) => {
       await signIn(page, company, 'Read-only viewer', '/leases?status=ACTIVE');
+      await page.evaluate((l) => { if (l === 'en') localStorage.removeItem('tenuro.language'); else localStorage.setItem('tenuro.language', l); }, language);
       const lease = await page.locator('a[href^="/leases/"]:not([href="/leases/new"])').first().getAttribute('href');
       const overflowing = () => page.evaluate(() => {
         const bad: string[] = [];
@@ -276,7 +278,7 @@ test.describe('figures fit their tiles', () => {
           if (path.includes('#')) await page.reload();
           await expect(page.locator('[data-kpi]').first()).toBeVisible();
           await page.waitForLoadState('networkidle');
-          expect(await overflowing(), `${company} ${path} at ${width}px`).toEqual([]);
+          expect(await overflowing(), `${company} (${language}) ${path} at ${width}px`).toEqual([]);
         }
       }
     });

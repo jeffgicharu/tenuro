@@ -76,7 +76,7 @@ export function LeaseOverview({ lease: ref }: { lease: LeaseOverview_lease$key }
   const perPeriod = intl.formatMessage({ id: `frequency.perPeriod.${lease.paymentFrequency}` });
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, columnGap: 10 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(2, minmax(0, 1fr))' }, columnGap: 10 }}>
       <Box>
         <Section id="ov-parties" title={<FormattedMessage id="lease.section.parties" />}>
           <DefinitionList

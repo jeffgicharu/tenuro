@@ -68,7 +68,7 @@ export default function PortfolioMap({ portfolio: ref }: { portfolio: PortfolioM
 
   return (
     <Panel title={<FormattedMessage id="dashboard.map.title" />} lede={<FormattedMessage id="dashboard.map.lede" />}>
-      <Box sx={{ display: 'grid', gap: 4, gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 210px' }, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gap: 4, gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 240px' }, alignItems: 'start' }}>
         <Box
           component="svg"
           viewBox={map.viewBox}

@@ -226,7 +226,7 @@ function NewTaskDialog({ leaseId, connectionId, users, onClose }: {
           slotProps={{ htmlInput: { maxLength: 200 } }}
           fullWidth
         />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 4 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 4 }}>
           <TextField select label={intl.formatMessage({ id: 'lease.tasks.new.assignee' })} value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
             <MenuItem value=""><FormattedMessage id="lease.tasks.unassigned" /></MenuItem>
             {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.displayName}</MenuItem>)}

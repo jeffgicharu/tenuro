@@ -362,7 +362,7 @@ export function LeaseFormEditor(props: EditorProps) {
           </Box>
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '232px minmax(0, 1fr)' }, gap: { xs: 5, md: 10 }, alignItems: 'start' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: '232px minmax(0, 1fr)' }, gap: { xs: 5, md: 10 }, alignItems: 'start' }}>
           <Box sx={{ position: { md: 'sticky' }, top: { md: 24 } }}>
             <FormStepper items={items} current={state.step} onSelect={(k) => goto(k as LeaseFormStep)} label={m('leaseForm.stepper.label')} compact={compact} />
           </Box>

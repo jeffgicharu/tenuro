@@ -20,7 +20,7 @@ function Figure({ label, value, detail, tone }: { label: ReactNode; value: React
         sx={{
           m: 0, fontFamily: theme.typography.h1.fontFamily, fontSize: { xs: '1.35rem', md: '1.6rem' }, lineHeight: 1.15,
           fontWeight: theme.direction === 'rtl' ? 600 : 500, color: tone === 'danger' ? t.danger : tone === 'warning' ? t.warning : t.ink,
-          overflowWrap: 'anywhere',
+          overflowWrap: 'break-word',
         }}
       >
         {value}

@@ -160,6 +160,8 @@ export function createAppTheme(brand: BrandInput, mode: Mode, direction: 'ltr' |
         styleOverrides: { root: { borderRadius: radius, border: `1px solid ${t.rule}`, alignItems: 'flex-start' } },
       },
       MuiLink: { defaultProps: { underline: 'hover' }, styleOverrides: { root: { color: t.brand, fontWeight: 500 } } },
+      // MUI sets dialog titles in h6, which here is a small uppercase label; a dialog's title is a heading.
+      MuiDialogTitle: { styleOverrides: { root: { fontFamily: arabic ? ui : display, fontSize: '1.25rem', fontWeight: arabic ? 600 : 500, lineHeight: 1.3, letterSpacing: 0, textTransform: 'none' } } },
       MuiSkeleton: { defaultProps: { animation: 'wave' }, styleOverrides: { root: { backgroundColor: t.sunken } } },
       MuiDataGrid: {
         defaultProps: { rowHeight: t.rowHeight, columnHeaderHeight: t.rowHeight + 2 },

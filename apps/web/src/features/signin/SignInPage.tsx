@@ -149,7 +149,10 @@ export function SignInPage() {
               return (
                 <Box component="li" key={tenant.id} sx={{ py: 5, borderBottom: `1px solid ${t.rule}` }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mb: 4 }}>
-                    <img src={tenant.theme.mark} alt="" width={40} height={40} style={{ flexShrink: 0 }} />
+                    {/* Company marks are drawn for a light page; in dark mode they sit on a light tile so each stays legible. */}
+                    <Box sx={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 48, height: 48, borderRadius: 1, ...(t.mode === 'dark' ? { backgroundColor: '#F4F0E7' } : {}) }}>
+                      <img src={tenant.theme.mark} alt="" width={40} height={40} />
+                    </Box>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography id={`company-${tenant.id}`} variant="h3" component="h2" sx={{ fontSize: '1.15rem' }} lang={currentLanguage === 'ar' && tenant.nameLocal ? 'ar' : undefined}>
                         {name}
@@ -162,7 +165,7 @@ export function SignInPage() {
                     </Box>
                   </Box>
                   {/* A labelled group, so each role button is announced with its company ("Mbuyu Court Holdings, group: Admin, Wanjiru Kariuki"). */}
-                  <Box role="group" aria-labelledby={`company-${tenant.id}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
+                  <Box role="group" aria-labelledby={`company-${tenant.id}`} sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
                     {accounts.map((a) => {
                       const Icon = ROLE_ICON[a.role];
                       const current = viewer?.user.id === a.id;

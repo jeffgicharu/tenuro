@@ -11,7 +11,8 @@ function PartyFields({ role }: { role: 'landlord' | 'guarantor' | 'agent' }) {
   return (
     <>
       <FormText path={`${base}.name`} required />
-      <FieldRow columns={3}>
+      {/* The email gets the wider column: addresses are long. */}
+      <FieldRow columns={3} template="minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr)">
         <FormText path={`${base}.contactName`} optional />
         <FormText path={`${base}.email`} optional />
         <FormText path={`${base}.phone`} optional />

@@ -143,7 +143,7 @@ export function KeyDateList({ viewer: ref, filter, canEdit, compact = false }: {
               <Box
                 sx={{
                   display: 'grid', alignItems: 'center', columnGap: 4, rowGap: 1, px: { xs: 4, md: 5 }, py: 2.5, borderBottom: `1px solid ${t.rule}`,
-                  gridTemplateColumns: compact ? '44px minmax(0, 1fr) auto' : { xs: '44px minmax(0, 1fr) auto', md: '44px minmax(0, 0.8fr) minmax(0, 1.5fr) 150px 110px auto' },
+                  gridTemplateColumns: compact ? '44px minmax(0, 1fr) auto' : { xs: '44px minmax(0, 1fr) auto', md: '44px minmax(160px, 0.9fr) minmax(0, 1.4fr) 150px 110px auto' },
                   borderInlineStart: `3px solid ${late ? t.danger : soon ? t.warning : 'transparent'}`,
                   opacity: open ? 1 : 0.6, transition: 'opacity 160ms ease, background-color 120ms ease', '&:hover': { backgroundColor: t.brandTint },
                 }}

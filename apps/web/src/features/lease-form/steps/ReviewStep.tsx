@@ -53,7 +53,7 @@ export function ReviewStep({ original, onEdit }: { original: LeaseFormData | nul
     <>
       {original && <ChangesTable changes={diffForms(original, data)} currency={data.rent.currency} />}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 0, mb: 10, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 0, mb: 10, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface }}>
         {[
           { label: m('leaseForm.review.term'), value: months !== null ? m('leaseForm.review.termValue', { months }) : dash },
           { label: m('leaseForm.review.annualRent'), value: annual ? <Money value={{ amount: annual, currency: data.rent.currency }} /> : dash },

@@ -189,9 +189,11 @@ export function FormCheckbox({ path, label, help }: Common) {
 }
 
 // A two-column grid that collapses to one column on small screens.
-export function FieldRow({ children, columns = 2 }: { children: ReactNode; columns?: 1 | 2 | 3 }) {
+// Three columns only from desktop width (two on a tablet); `template` widens a column that needs it.
+export function FieldRow({ children, columns = 2, template }: { children: ReactNode; columns?: 1 | 2 | 3; template?: string }) {
+  const three = template ?? 'repeat(3, minmax(0, 1fr))';
   return (
-    <Box sx={{ display: 'grid', gap: 4, gridTemplateColumns: { xs: '1fr', sm: columns === 1 ? '1fr' : columns === 3 ? '1fr 1fr 1fr' : '1fr 1fr' } }}>
+    <Box sx={{ display: 'grid', gap: 4, gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: columns === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', md: columns === 3 ? three : columns === 1 ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))' } }}>
       {children}
     </Box>
   );

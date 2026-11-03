@@ -57,7 +57,7 @@ export function ReportsPage() {
         <Typography variant="h1"><FormattedMessage id="reports.title" /></Typography>
         <Box sx={{ mt: 1, fontSize: '0.875rem', color: t.inkSecondary }}><FormattedMessage id="reports.lede" /></Box>
       </Box>
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 4, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' } }}>
+      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 4, gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' } }}>
         {REPORTS.map((id) => {
           const Icon = ICON[id];
           const mine = busy?.id === id;

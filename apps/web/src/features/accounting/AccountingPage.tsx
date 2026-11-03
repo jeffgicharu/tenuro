@@ -86,8 +86,8 @@ function AccountingContent() {
   const Figure = ({ label, value, hint, lead }: { label: string; value: React.ReactNode; hint?: React.ReactNode; lead?: boolean }) => (
     <Box component="li" data-kpi sx={{ minWidth: 0, py: { xs: 3, md: 5 }, px: { xs: 0, md: 5 }, gridColumn: lead ? { xs: '1 / -1', md: 'auto' } : undefined, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } }, borderTop: { xs: `1px solid ${t.rule}`, md: 'none' } }}>
       <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1.5 }}>{label}</Box>
-      <Box data-num data-kpi-value sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: lead ? { xs: '1.5rem', md: '1.9rem' } : { xs: '1.1rem', md: '1.3rem' }, lineHeight: 1.15, overflowWrap: 'anywhere' }}>{value}</Box>
-      {hint && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 1, overflowWrap: 'anywhere' }}>{hint}</Box>}
+      <Box data-num data-kpi-value sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: lead ? { xs: '1.5rem', md: '1.9rem' } : { xs: '1.1rem', md: '1.3rem' }, lineHeight: 1.15, overflowWrap: 'break-word' }}>{value}</Box>
+      {hint && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 1, overflowWrap: 'break-word' }}>{hint}</Box>}
     </Box>
   );
   // Headline figures are compact so they always fit (the exact amount is in their tooltip); the
@@ -128,7 +128,7 @@ function AccountingContent() {
                 const total = k === 'closing' || k === 'opening';
                 return (
                   <tr key={k}>
-                    <Box component="th" scope="row" sx={{ textAlign: 'start', fontWeight: total ? 600 : 400, py: 1.25, borderTop: k === 'closing' ? `2px solid ${t.ink}` : 'none', borderBottom: `1px solid ${t.rule}` }}>
+                    <Box component="th" scope="row" sx={{ textAlign: 'start', fontWeight: total ? 600 : 400, py: 1.25, paddingInlineEnd: 3, borderTop: k === 'closing' ? `2px solid ${t.ink}` : 'none', borderBottom: `1px solid ${t.rule}` }}>
                       <FormattedMessage id={`accounting.roll.${k}`} />
                     </Box>
                     <Box component="td" data-num sx={{ textAlign: 'end', fontWeight: total ? 600 : 400, py: 1.25, borderTop: k === 'closing' ? `2px solid ${t.ink}` : 'none', borderBottom: `1px solid ${t.rule}`, whiteSpace: 'nowrap' }}>

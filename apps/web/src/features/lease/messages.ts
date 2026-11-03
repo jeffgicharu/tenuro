@@ -155,7 +155,7 @@ export const leaseEn = {
   'lease.schedule.rent': 'Rent',
   'lease.schedule.number': 'No.',
   'lease.schedule.current': 'Current period',
-  'lease.schedule.change.FIXED_UPLIFT': 'Fixed uplift',
+  'lease.schedule.change.FIXED_UPLIFT': 'Rent increase',
   'lease.schedule.change.STEP': 'Settled review',
   'lease.schedule.caption': 'Rent payable for each period of the lease, {count, plural, one {# period} other {# periods}}. Future index or market changes are not forecast.',
 

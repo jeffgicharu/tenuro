@@ -109,8 +109,8 @@ function DashboardSkeleton() {
         {[0, 1, 2, 3, 4].map((i) => <Box key={i}><Skeleton width="60%" /><Skeleton width="80%" height={44} /><Skeleton width="50%" /></Box>)}
       </Box>
       <Box sx={{ mb: 5 }}>{panel(300)}</Box>
-      <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: '1fr', lg: '1.7fr 1fr' }, mb: 5 }}>{panel(260)}{panel(260)}</Box>
-      <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: '1fr', lg: '1.25fr 1fr' } }}>{panel(320)}{panel(320)}</Box>
+      <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.7fr) minmax(0, 1fr)' }, mb: 5 }}>{panel(260)}{panel(260)}</Box>
+      <Box sx={{ display: 'grid', gap: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.25fr) minmax(0, 1fr)' } }}>{panel(320)}{panel(320)}</Box>
     </Box>
   );
 }

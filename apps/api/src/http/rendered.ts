@@ -200,14 +200,14 @@ export function renderPlan(d: { reference: string; premises: string; property_na
   const nx = W - 46; const ny = oy + 30;
   const bottom = Number(Y(Hf)) + 40;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="system-ui, sans-serif" direction="${ar ? 'rtl' : 'ltr'}">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="system-ui, sans-serif">
   <defs><pattern id="h" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#f6e3dc"/><line x1="0" y1="0" x2="0" y2="7" stroke="${red}" stroke-width="1.1"/></pattern></defs>
   <rect width="${W}" height="${H}" fill="${paper}"/>
-  <text x="${ox - 44}" y="30" font-size="18" fill="${ink}" text-anchor="start" direction="ltr">${esc(L.title)} · ${esc(d.reference)}</text>
+  <text x="${ar ? W - 30 : ox - 44}" y="30" font-size="18" fill="${ink}" text-anchor="${ar ? 'end' : 'start'}">${esc(L.title)} · <tspan direction="ltr" unicode-bidi="embed">${esc(d.reference)}</tspan></text>
   ${parts.join('\n  ')}
   <g transform="translate(${nx}, ${ny})"><circle r="24" fill="${paper}" stroke="${ink}"/><path d="M0,-18 L7,8 L0,3 L-7,8 Z" fill="${ink}"/><text y="40" text-anchor="middle" font-size="12" font-weight="600" fill="${ink}">N</text></g>
   <g transform="translate(${ox}, ${bottom})"><rect width="${(bar * k / 2).toFixed(1)}" height="6" fill="${ink}"/><rect x="${(bar * k / 2).toFixed(1)}" width="${(bar * k / 2).toFixed(1)}" height="6" fill="${paper}" stroke="${ink}"/><text y="22" font-size="11" fill="${grey}">0</text><text x="${(bar * k).toFixed(1)}" y="22" font-size="11" text-anchor="end" fill="${grey}">${bar} m</text></g>
-  <g transform="translate(${ox}, ${bottom + 44})"><line x1="0" y1="-12" x2="${W - ox - 40}" y2="-12" stroke="${ink}"/><text y="6" font-size="12" fill="${ink}">${esc(d.property_name)} · ${esc(d.premises)}</text><text y="24" font-size="11" fill="${grey}">${esc(L.note)}</text></g>
+  <g transform="translate(${ox}, ${bottom + 44})"><line x1="0" y1="-12" x2="${W - ox - 40}" y2="-12" stroke="${ink}"/><text x="${ar ? W - ox - 40 : 0}" text-anchor="${ar ? 'end' : 'start'}" y="6" font-size="12" fill="${ink}">${esc(d.property_name)} · ${esc(d.premises)}</text><text x="${ar ? W - ox - 40 : 0}" text-anchor="${ar ? 'end' : 'start'}" y="24" font-size="11" fill="${grey}">${esc(L.note)}</text></g>
 </svg>`;
 }
 

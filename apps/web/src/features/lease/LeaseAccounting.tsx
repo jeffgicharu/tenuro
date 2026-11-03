@@ -51,6 +51,8 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
   const f = useFormat();
   const intl = useIntl();
   const lease = data.node?.lease;
+  // Account names in the reader's language, by code (the ledger names them in English).
+  const accountName = (code: string, fallback: string) => (intl.messages[`account.${code}`] ? intl.formatMessage({ id: `account.${code}` }) : fallback);
   const a = lease?.accounting;
   const [showAll, setShowAll] = useState(false);
   const [openMonth, setOpenMonth] = useState<string | null>(null);
@@ -110,8 +112,8 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
   const Figure = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) => (
     <Box data-kpi sx={{ minWidth: 0, py: 3, px: { xs: 0, md: 4 }, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } } }}>
       <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1 }}>{label}</Box>
-      <Box data-num data-kpi-value sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: '1.4rem', lineHeight: 1.15, overflowWrap: 'anywhere' }}>{value}</Box>
-      {hint && <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mt: 0.5, overflowWrap: 'anywhere' }}>{hint}</Box>}
+      <Box data-num data-kpi-value sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: '1.4rem', lineHeight: 1.15, overflowWrap: 'break-word' }}>{value}</Box>
+      {hint && <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mt: 0.5, overflowWrap: 'break-word' }}>{hint}</Box>}
     </Box>
   );
   const th = { textAlign: 'end' as const, fontWeight: 600, fontSize: '0.75rem', color: t.inkSecondary, py: 1.5, px: 2, borderBottom: `1px solid ${t.ruleStrong}`, whiteSpace: 'nowrap' as const, position: 'sticky' as const, top: 0, backgroundColor: t.surface };
@@ -313,7 +315,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
                           </Box>
                         )}
                         <Box component="td" sx={{ ...td, textAlign: 'start', ...(i === mo.accounts.length - 1 && !isOpen ? { borderBottom: `1px solid ${t.ruleStrong}` } : {}) }}>
-                          <Box component="span" data-num sx={{ color: t.inkTertiary, marginInlineEnd: 1.5 }}>{acc.account}</Box>{acc.name}
+                          <Box component="span" sx={{ display: 'inline-flex', gap: 1.5, alignItems: 'baseline' }}><Box component="bdi" data-num sx={{ color: t.inkTertiary }}>{acc.account}</Box><span>{accountName(acc.account, acc.name)}</span></Box>
                         </Box>
                         <Box component="td" sx={{ ...td, ...(i === mo.accounts.length - 1 && !isOpen ? { borderBottom: `1px solid ${t.ruleStrong}` } : {}) }} data-num>{acc.debit ? f.money(acc.debit.toFixed(dp), cur, { showCode: false }) : ''}</Box>
                         <Box component="td" sx={{ ...td, ...(i === mo.accounts.length - 1 && !isOpen ? { borderBottom: `1px solid ${t.ruleStrong}` } : {}) }} data-num>{acc.credit ? f.money(acc.credit.toFixed(dp), cur, { showCode: false }) : ''}</Box>
@@ -327,7 +329,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
                               <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 0.5 }} data-num>{f.date(j.date)} · <FormattedMessage id={`lease.accounting.journal.${j.kind}`} /></Box>
                               {j.lines.map((l, m) => (
                                 <Box key={m} data-num sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px 120px', gap: 2, fontSize: '0.75rem', paddingInlineStart: Number(l.credit.amount) > 0 ? 4 : 0 }}>
-                                  <span>{l.account} {l.accountName}</span>
+                                  <Box component="span" sx={{ display: 'inline-flex', gap: 1.5 }}><bdi>{l.account}</bdi><span>{accountName(l.account, l.accountName)}</span></Box>
                                   <Box component="span" sx={{ textAlign: 'end' }}>{Number(l.debit.amount) > 0 ? f.money(l.debit.amount, cur, { showCode: false }) : ''}</Box>
                                   <Box component="span" sx={{ textAlign: 'end' }}>{Number(l.credit.amount) > 0 ? f.money(l.credit.amount, cur, { showCode: false }) : ''}</Box>
                                 </Box>

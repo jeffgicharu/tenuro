@@ -93,7 +93,7 @@ function Figure({ label, value, detail, tone, to, lead }: {
           fontSize: lead ? { xs: '1.9rem', md: '2.6rem' } : { xs: '1.5rem', md: '1.9rem' },
           fontWeight: theme.direction === 'rtl' ? 600 : 500,
           color: tone === 'danger' ? t.danger : tone === 'warning' ? t.warning : t.ink,
-          overflowWrap: 'anywhere',
+          overflowWrap: 'break-word',
         }}
       >
         <Box component="span" data-kpi-value sx={{ display: 'block' }}>{value}</Box>

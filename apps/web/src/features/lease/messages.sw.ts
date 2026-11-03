@@ -157,7 +157,7 @@ export const leaseSw: Record<LeaseKey, string> = {
   'lease.schedule.rent': 'Kodi',
   'lease.schedule.number': 'Na.',
   'lease.schedule.current': 'Kipindi cha sasa',
-  'lease.schedule.change.FIXED_UPLIFT': 'Ongezeko la kudumu',
+  'lease.schedule.change.FIXED_UPLIFT': 'Ongezeko la kodi',
   'lease.schedule.change.STEP': 'Mapitio yaliyokubaliwa',
   'lease.schedule.caption': 'Kodi inayolipwa kwa kila kipindi cha mkataba, {count, plural, one {kipindi #} other {vipindi #}}. Mabadiliko ya baadaye ya fahirisi au soko hayakadiriwi.',
 

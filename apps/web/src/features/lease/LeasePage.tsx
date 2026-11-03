@@ -60,13 +60,15 @@ export function LeasePage() {
     <Box sx={{ px: { xs: 4, md: 8, xl: 12 }, py: { xs: 5, md: 8 }, maxWidth: 1480, mx: 'auto' }}>
       <LeaseHeader lease={lease} canEdit={canEdit} onAddTask={() => selectTab('tasks')} />
       <LeaseFigures lease={lease} />
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1fr) 320px' }, gap: { xs: 6, xl: 10 }, mt: 8 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'minmax(0, 1fr) 320px' }, gap: { xs: 6, xl: 10 }, mt: 8 }}>
         <Box sx={{ minWidth: 0 }}>
           <Tabs
             value={tab}
             onChange={(_e, v: TabKey) => selectTab(v)}
             variant="scrollable"
-            scrollButtons={false}
+            // On a phone the tabs scroll; arrows at the ends show there are more (they hide at either end).
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             aria-label={intl.formatMessage({ id: 'lease.tabs' })}
           >
             {TABS.map((key) => (
