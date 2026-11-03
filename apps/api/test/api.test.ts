@@ -717,6 +717,39 @@ describe('portfolio accounting', () => {
   });
 });
 
+describe('attaching documents', () => {
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
+  const upload = (v: Visitor, leaseLocalId: string, body: Buffer, filename: string) => fetch(`${app.url}/api/uploads`, {
+    method: 'POST',
+    headers: { 'x-tenuro-client': 'web', 'x-real-ip': v.ip, cookie: v.cookie, 'content-type': 'application/octet-stream', 'x-lease-id': leaseLocalId, 'x-filename': encodeURIComponent(filename), 'x-document-kind': 'CORRESPONDENCE' },
+    body: new Uint8Array(body),
+  });
+  const DOCS = (id: string) => `{ node(id: "${id}") { ... on Lease { documents(first: 50) { edges { node { title filename mimeType sizeBytes } } } } } }`;
+  type D = { node: { documents: { edges: { node: { title: string; filename: string; mimeType: string; sizeBytes: number } }[] } } };
+
+  it('lets a manager attach a PDF that only their own workspace sees, and refuses the wrong type or role', async () => {
+    const manager = new Visitor(app, '198.51.100.80');
+    const other = new Visitor(app, '198.51.100.81');
+    const viewer = new Visitor(app, '198.51.100.82');
+    await manager.signIn('mbuyu-court', 'MANAGER');
+    await other.signIn('mbuyu-court', 'MANAGER');
+    await viewer.signIn('mbuyu-court', 'VIEWER');
+    const lease = await firstLease(manager);
+    const id = localId(lease.id);
+
+    const res = await upload(manager, id, pdf, 'Landlord letter_2026.pdf');
+    expect(res.status).toBe(201);
+    const mine = (await manager.gql<D>(DOCS(lease.id))).data!.node.documents.edges.map((e) => e.node);
+    expect(mine).toContainEqual({ title: 'Landlord letter 2026', filename: 'Landlord letter_2026.pdf', mimeType: 'application/pdf', sizeBytes: pdf.length });
+    const theirs = (await other.gql<D>(DOCS(lease.id))).data!.node.documents.edges.map((e) => e.node.filename);
+    expect(theirs).not.toContain('Landlord letter_2026.pdf');
+
+    expect((await upload(manager, id, Buffer.from('not really a pdf'), 'fake.pdf')).status).toBe(415);
+    expect((await upload(manager, id, pdf, 'letter.png')).status).toBe(415);
+    expect((await upload(viewer, id, pdf, 'letter.pdf')).status).toBe(403);
+  });
+});
+
 describe('rendered documents', () => {
   it('renders the lease agreement as sandboxed HTML and the plan as SVG, for the signed-in company only', async () => {
     const v = new Visitor(app, '198.51.100.70');

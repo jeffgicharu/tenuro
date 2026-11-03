@@ -232,6 +232,16 @@ test.describe('documents', () => {
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: /^Demise plan/ }).click();
     await expect(page.getByRole('img', { name: 'Demise plan' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    // A manager attaches a file: it is checked, given a kind and a title, and listed straight away.
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
+    await page.locator('input[type="file"]').setInputFiles({ name: 'Landlord letter.pdf', mimeType: 'application/pdf', buffer: pdf });
+    const dialog = page.getByRole('dialog', { name: 'Attach a file to this lease' });
+    await expect(dialog).toBeVisible();
+    await expectAccessible(page, 'attach a file');
+    await dialog.getByRole('button', { name: 'Attach' }).click();
+    await expect(page.getByText('Attached Landlord letter.pdf')).toBeVisible();
+    await expect(page.getByText('Landlord letter', { exact: true })).toBeVisible();
     // Chrome reports the sandbox refusing Playwright's own injected script in the document frame; that refusal
     // is the sandbox doing its job (the documents themselves carry no scripts), so only that one message is set aside.
     const sandboxNotice = /^console: Blocked script execution in '[^']*\/api\/documents\/[^']+' because the document's frame is sandboxed/;

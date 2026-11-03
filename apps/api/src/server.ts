@@ -11,6 +11,7 @@ import { schema } from './graphql/schema.ts';
 import { startTimings, useServerTiming } from './graphql/timing.ts';
 import { API_CSP, COMMON_HEADERS, newNonce, pageCsp } from './http/security.ts';
 import { serveDocument } from './http/documents.ts';
+import { UploadRefused, uploadDocument } from './http/upload.ts';
 import { loadManifest, routePreloader } from './http/preloads.ts';
 import { serveStatic } from './http/static.ts';
 
@@ -162,6 +163,18 @@ export function createApp(db: Db) {
         const session = await resolveSession(db, readCookie(req.headers.cookie, config.cookieName));
         if (!session) return send(res, 401, { error: 'sign in first' });
         return serveDocument(db, session, doc[1]!, url.searchParams.get('download') === '1', res);
+      }
+
+      if (path === '/api/uploads' && req.method === 'POST') {
+        if (!isTrustedWrite(req)) return send(res, 400, { error: 'missing client header' });
+        const session = await resolveSession(db, readCookie(req.headers.cookie, config.cookieName));
+        if (!session) return send(res, 401, { error: 'sign in first' });
+        try {
+          return send(res, 201, await uploadDocument(db, session, req));
+        } catch (err) {
+          if (err instanceof UploadRefused) return send(res, err.status, { error: err.code, message: err.message });
+          throw err;
+        }
       }
 
       if (path.startsWith('/api/')) return send(res, 404, { error: 'not found' });

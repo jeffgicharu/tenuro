@@ -79,7 +79,7 @@ export function LeasePage() {
               {tab === 'schedule' && <LeaseRentSchedule lease={lease} />}
               {tab === 'accounting' && <LeaseAccounting leaseId={lease.id} reference={lease.reference} />}
               {tab === 'key-dates' && <LeaseKeyDates lease={lease} />}
-              {tab === 'documents' && <LeaseDocuments lease={lease} />}
+              {tab === 'documents' && <LeaseDocuments lease={lease} canEdit={canEdit} />}
               {tab === 'tasks' && <LeaseTasks lease={lease} canEdit={canEdit} />}
               {tab === 'activity' && <LeaseActivity lease={lease} />}
             </Suspense>
