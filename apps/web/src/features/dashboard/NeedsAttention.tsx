@@ -122,14 +122,15 @@ export function NeedsAttention({ portfolio: ref, canEdit, userId }: { portfolio:
           const isOverdue = b!.withinDays === 0;
           const hot = isOverdue && b!.count > 0;
           return (
-            <Box component="li" key={b!.withinDays} sx={{ px: { xs: 4, md: 6 }, py: 3.5, borderInlineEnd: `1px solid ${t.rule}`, backgroundColor: hot ? t.dangerSoft : 'transparent', '&:last-of-type': { borderInlineEnd: 0 } }}>
+            <Box component="li" key={b!.withinDays} sx={{ minWidth: 0, px: { xs: 4, md: 6 }, py: 3.5, borderInlineEnd: `1px solid ${t.rule}`, backgroundColor: hot ? t.dangerSoft : 'transparent', '&:last-of-type': { borderInlineEnd: 0 } }}>
               <Box sx={{ fontSize: '0.75rem', color: hot ? t.danger : t.inkSecondary, fontWeight: hot ? 600 : 400 }}>
                 {isOverdue ? <FormattedMessage id="dashboard.attention.overdue" /> : <FormattedMessage id="dashboard.attention.band" values={{ from: b!.fromDays ?? 0, to: b!.withinDays }} />}
               </Box>
-              <Box data-num sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mt: 0.5 }}>
+              {/* The rent at stake moves under the count when a narrow cell or a longer language needs it. */}
+              <Box data-num sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 2, rowGap: 0, mt: 0.5, minWidth: 0 }}>
                 <Box component="span" sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: '1.6rem', fontWeight: theme.direction === 'rtl' ? 600 : 500, color: hot ? t.danger : t.ink }}>{f.number(b!.count)}</Box>
-                <Box component="span" sx={{ fontSize: '0.8125rem', color: t.inkSecondary, whiteSpace: 'nowrap' }}>
-                  <FormattedMessage id="dashboard.kpi.rentAtStake" values={{ rent: <bdi>{compact(b!.rentAtStake)}</bdi> }} />
+                <Box component="span" sx={{ fontSize: '0.8125rem', color: t.inkSecondary }}>
+                  <FormattedMessage id="dashboard.kpi.rentAtStake" values={{ rent: <Box component="bdi" sx={{ whiteSpace: 'nowrap' }}>{compact(b!.rentAtStake)}</Box> }} />
                 </Box>
               </Box>
             </Box>
