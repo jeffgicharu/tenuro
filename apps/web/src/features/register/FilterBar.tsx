@@ -43,7 +43,7 @@ interface Props {
 
 const STATUSES: LeaseStatus[] = ['ACTIVE', 'HOLDING_OVER', 'EXPIRED', 'TERMINATED'];
 const TYPES: PropertyType[] = ['OFFICE', 'RETAIL', 'WAREHOUSE', 'INDUSTRIAL', 'MIXED_USE'];
-const KINDS: KeyDateKind[] = ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'EXPIRY', 'DEPOSIT_RETURN', 'INSURANCE'];
+const KINDS: KeyDateKind[] = ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'RENT_INCREASE', 'EXPIRY', 'DEPOSIT_RETURN', 'INSURANCE'];
 
 const without = <K extends keyof RegisterFilter>(f: RegisterFilter, ...keys: K[]): RegisterFilter => {
   const next = { ...f };

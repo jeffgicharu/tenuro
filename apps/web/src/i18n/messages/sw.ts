@@ -96,6 +96,7 @@ export const sw: Catalogue = {
   'keyDate.BREAK_NOTICE': 'Notisi ya kusitisha mapema',
   'keyDate.RENEWAL_NOTICE': 'Notisi ya kuhuisha',
   'keyDate.RENT_REVIEW': 'Mapitio ya kodi',
+  'keyDate.RENT_INCREASE': 'Ongezeko la kodi',
   'keyDate.EXPIRY': 'Mwisho wa mkataba',
   'keyDate.DEPOSIT_RETURN': 'Kurejeshwa kwa amana',
   'keyDate.INSURANCE': 'Bima',

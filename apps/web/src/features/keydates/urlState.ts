@@ -1,8 +1,8 @@
 // The key dates page's state lives in the URL, so views and filters can be shared and reloaded.
-export type KeyDateKind = 'BREAK_NOTICE' | 'RENEWAL_NOTICE' | 'RENT_REVIEW' | 'EXPIRY' | 'DEPOSIT_RETURN' | 'INSURANCE' | 'CUSTOM';
+export type KeyDateKind = 'BREAK_NOTICE' | 'RENEWAL_NOTICE' | 'RENT_REVIEW' | 'RENT_INCREASE' | 'EXPIRY' | 'DEPOSIT_RETURN' | 'INSURANCE' | 'CUSTOM';
 export type KeyDatesView = 'list' | 'calendar' | 'next90';
 
-export const KINDS: KeyDateKind[] = ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'EXPIRY', 'DEPOSIT_RETURN', 'INSURANCE'];
+export const KINDS: KeyDateKind[] = ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'RENT_INCREASE', 'EXPIRY', 'DEPOSIT_RETURN', 'INSURANCE'];
 
 export interface KeyDatesState {
   view: KeyDatesView;
@@ -78,8 +78,19 @@ export function addDaysIso(iso: string, days: number): string {
 
 export const filterKey = (f: GraphQLKeyDateFilter) => JSON.stringify(f);
 
-// Each kind's colour in the theme's chart palette (the calendar's dots and the kind filters).
-export function kindColour(chart: string[], kind: string): string {
-  const i = Math.max(0, KINDS.indexOf(kind as (typeof KINDS)[number]));
-  return chart[i % chart.length]!;
+// Each kind keeps one hue in both themes (only its lightness changes, so it reads against the light
+// or dark page), so a kind looks the same whichever mode someone uses.
+const KIND_COLOURS: Record<KeyDateKind, { light: string; dark: string }> = {
+  BREAK_NOTICE: { light: '#2F6DB5', dark: '#82B2EA' },
+  RENEWAL_NOTICE: { light: '#1D7F79', dark: '#6CCBC3' },
+  RENT_REVIEW: { light: '#7650AE', dark: '#B79BE5' },
+  RENT_INCREASE: { light: '#A8417F', dark: '#E596C6' },
+  EXPIRY: { light: '#B2452E', dark: '#EE9783' },
+  DEPOSIT_RETURN: { light: '#3E7F37', dark: '#90CF89' },
+  INSURANCE: { light: '#9A6A0C', dark: '#E2B85E' },
+  CUSTOM: { light: '#66625A', dark: '#ADA89E' },
+};
+
+export function kindColour(mode: 'light' | 'dark', kind: string): string {
+  return (KIND_COLOURS[kind as KeyDateKind] ?? KIND_COLOURS.CUSTOM)[mode];
 }

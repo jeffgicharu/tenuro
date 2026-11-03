@@ -95,6 +95,7 @@ export const en = {
   'keyDate.BREAK_NOTICE': 'Break notice',
   'keyDate.RENEWAL_NOTICE': 'Renewal notice',
   'keyDate.RENT_REVIEW': 'Rent review',
+  'keyDate.RENT_INCREASE': 'Rent increase',
   'keyDate.EXPIRY': 'Expiry',
   'keyDate.DEPOSIT_RETURN': 'Deposit return',
   'keyDate.INSURANCE': 'Insurance',

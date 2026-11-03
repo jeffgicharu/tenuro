@@ -3,7 +3,7 @@
 
 export type LeaseStatus = 'DRAFT' | 'ACTIVE' | 'HOLDING_OVER' | 'EXPIRED' | 'TERMINATED';
 export type PropertyType = 'OFFICE' | 'RETAIL' | 'WAREHOUSE' | 'INDUSTRIAL' | 'MIXED_USE';
-export type KeyDateKind = 'BREAK_NOTICE' | 'RENEWAL_NOTICE' | 'RENT_REVIEW' | 'EXPIRY' | 'DEPOSIT_RETURN' | 'INSURANCE' | 'CUSTOM';
+export type KeyDateKind = 'BREAK_NOTICE' | 'RENEWAL_NOTICE' | 'RENT_REVIEW' | 'RENT_INCREASE' | 'EXPIRY' | 'DEPOSIT_RETURN' | 'INSURANCE' | 'CUSTOM';
 export type OrderField =
   | 'REFERENCE' | 'PROPERTY_NAME' | 'CITY' | 'COUNTRY' | 'LANDLORD' | 'STATUS' | 'COMMENCEMENT_DATE'
   | 'EXPIRY_DATE' | 'ANNUAL_RENT' | 'AREA' | 'NEXT_KEY_DATE' | 'UPDATED_AT';
@@ -39,7 +39,7 @@ export const DEFAULT_ORDER: RegisterOrder[] = [{ field: 'NEXT_KEY_DATE', directi
 
 const STATUSES: readonly LeaseStatus[] = ['DRAFT', 'ACTIVE', 'HOLDING_OVER', 'EXPIRED', 'TERMINATED'];
 const TYPES: readonly PropertyType[] = ['OFFICE', 'RETAIL', 'WAREHOUSE', 'INDUSTRIAL', 'MIXED_USE'];
-const KINDS: readonly KeyDateKind[] = ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'EXPIRY', 'DEPOSIT_RETURN', 'INSURANCE', 'CUSTOM'];
+const KINDS: readonly KeyDateKind[] = ['BREAK_NOTICE', 'RENEWAL_NOTICE', 'RENT_REVIEW', 'RENT_INCREASE', 'EXPIRY', 'DEPOSIT_RETURN', 'INSURANCE', 'CUSTOM'];
 const FIELDS: readonly OrderField[] = ['REFERENCE', 'PROPERTY_NAME', 'CITY', 'COUNTRY', 'LANDLORD', 'STATUS', 'COMMENCEMENT_DATE',
   'EXPIRY_DATE', 'ANNUAL_RENT', 'AREA', 'NEXT_KEY_DATE', 'UPDATED_AT'];
 

@@ -96,6 +96,7 @@ export const ar: Catalogue = {
   'keyDate.BREAK_NOTICE': 'إشعار الإنهاء المبكر',
   'keyDate.RENEWAL_NOTICE': 'إشعار التجديد',
   'keyDate.RENT_REVIEW': 'مراجعة الإيجار',
+  'keyDate.RENT_INCREASE': 'زيادة الإيجار',
   'keyDate.EXPIRY': 'انتهاء العقد',
   'keyDate.DEPOSIT_RETURN': 'استرداد التأمين',
   'keyDate.INSURANCE': 'التأمين',

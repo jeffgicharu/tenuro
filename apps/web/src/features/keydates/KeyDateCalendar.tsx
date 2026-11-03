@@ -105,7 +105,7 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
                     {info && (
                       <Box aria-hidden sx={{ display: { xs: 'none', md: 'flex' }, flexWrap: 'wrap', gap: '3px', mt: 'auto' }}>
                         {info.kinds.map((k) => (
-                          <Box key={k.kind} component="span" sx={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: kindColour(t.chart, k.kind) }} />
+                          <Box key={k.kind} component="span" sx={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: kindColour(t.mode, k.kind) }} />
                         ))}
                       </Box>
                     )}
@@ -119,7 +119,7 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
       <Box aria-hidden sx={{ display: { xs: 'none', md: 'flex' }, flexWrap: 'wrap', gap: 3, mt: 4, fontSize: '0.75rem', color: t.inkSecondary }}>
         {KINDS.map((k) => (
           <Box key={k} sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-            <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: kindColour(t.chart, k) }} />
+            <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: kindColour(t.mode, k) }} />
             <FormattedMessage id={`keyDate.${k}`} />
           </Box>
         ))}

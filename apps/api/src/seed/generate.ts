@@ -316,7 +316,9 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
             if (o.notice_by) keyDates.push({ kind, due: o.notice_by, title: tx.keyDate[kind] });
           }
           const nextReview = nextReviewOn(terms, addMonths(today, -6));
-          if (nextReview) keyDates.push({ kind: 'RENT_REVIEW', due: nextReview, title: tx.keyDate.RENT_REVIEW });
+          // A fixed step is an increase that simply takes effect; index and market reviews are negotiated.
+          const reviewKind = escKind === 'FIXED' ? 'RENT_INCREASE' : 'RENT_REVIEW';
+          if (nextReview) keyDates.push({ kind: reviewKind, due: nextReview, title: tx.keyDate[reviewKind] });
           if (expiry < today) keyDates.push({ kind: 'DEPOSIT_RETURN', due: addDays(expiry, r.int(30, 75)), title: tx.keyDate.DEPOSIT_RETURN });
           if (r.chance(0.25)) keyDates.push({ kind: 'INSURANCE', due: addMonths(today, r.int(-3, 11)).slice(0, 8) + '01', title: tx.keyDate.INSURANCE });
         }
@@ -336,10 +338,7 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           if (!past && (!nextKey || k.due < nextKey.due)) nextKey = { due: k.due, kind: k.kind };
           const daysOut = daysBetween(today, k.due);
           if (daysOut >= -20 && daysOut <= 120 && r.chance(0.72)) {
-            const taskTitles: Record<KeyDateKind, string> = {
-              ...tx.task,
-              RENT_REVIEW: escKind === 'FIXED' ? tx.task.RENT_REVIEW_FIXED : tx.task.RENT_REVIEW,
-            };
+            const taskTitles: Record<KeyDateKind, string> = tx.task;
             const st: TaskStatus = daysOut < 0 ? r.weighted([['DONE', 55], ['IN_PROGRESS', 30], ['TODO', 15]] as const) : r.weighted([['TODO', 60], ['IN_PROGRESS', 35], ['DONE', 5]] as const);
             const created = addDays(k.due, -r.int(60, 150));
             out.task.push({

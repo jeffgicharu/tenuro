@@ -10,13 +10,13 @@ const TEXT = {
     renewTerms: (years: number) => `Option to renew for ${years} years at open market rent, on the same terms otherwise.`,
     keyDate: {
       EXPIRY: 'Lease expiry', BREAK_NOTICE: 'Break notice deadline', RENEWAL_NOTICE: 'Renewal notice deadline',
-      RENT_REVIEW: 'Rent review', DEPOSIT_RETURN: 'Deposit return due', INSURANCE: 'Insurance certificate renewal', CUSTOM: 'Key date',
+      RENT_REVIEW: 'Rent review', RENT_INCREASE: 'Rent increase', DEPOSIT_RETURN: 'Deposit return due', INSURANCE: 'Insurance certificate renewal', CUSTOM: 'Key date',
     } satisfies Record<KeyDateKind, string>,
     task: {
       EXPIRY: 'Decide on exit or renewal and brief the landlord',
       BREAK_NOTICE: 'Confirm break decision and serve notice if exercising',
       RENEWAL_NOTICE: 'Prepare renewal terms and serve notice',
-      RENT_REVIEW_FIXED: 'Check uplifted rent on the next invoice',
+      RENT_INCREASE: 'Check the increased rent on the next invoice',
       RENT_REVIEW: 'Agree the reviewed rent with the landlord',
       DEPOSIT_RETURN: 'Chase return of the deposit',
       INSURANCE: 'Obtain the renewed insurance certificate',
@@ -41,13 +41,13 @@ const TEXT = {
     renewTerms: (years: number) => `خيار التجديد لمدة ${years} سنوات بإيجار السوق، وبالشروط ذاتها فيما عدا ذلك.`,
     keyDate: {
       EXPIRY: 'انتهاء العقد', BREAK_NOTICE: 'آخر موعد لإشعار الإنهاء المبكر', RENEWAL_NOTICE: 'آخر موعد لإشعار التجديد',
-      RENT_REVIEW: 'مراجعة الإيجار', DEPOSIT_RETURN: 'موعد استرداد التأمين', INSURANCE: 'تجديد شهادة التأمين', CUSTOM: 'موعد مهم',
+      RENT_REVIEW: 'مراجعة الإيجار', RENT_INCREASE: 'زيادة الإيجار', DEPOSIT_RETURN: 'موعد استرداد التأمين', INSURANCE: 'تجديد شهادة التأمين', CUSTOM: 'موعد مهم',
     } satisfies Record<KeyDateKind, string>,
     task: {
       EXPIRY: 'تحديد الإخلاء أو التجديد وإبلاغ المؤجر',
       BREAK_NOTICE: 'تأكيد قرار الإنهاء المبكر وإرسال الإشعار عند الاقتضاء',
       RENEWAL_NOTICE: 'إعداد شروط التجديد وإرسال الإشعار',
-      RENT_REVIEW_FIXED: 'التحقق من الإيجار بعد الزيادة في الفاتورة القادمة',
+      RENT_INCREASE: 'التحقق من الإيجار بعد الزيادة في الفاتورة القادمة',
       RENT_REVIEW: 'الاتفاق مع المؤجر على الإيجار بعد المراجعة',
       DEPOSIT_RETURN: 'متابعة استرداد التأمين',
       INSURANCE: 'الحصول على شهادة التأمين المجددة',

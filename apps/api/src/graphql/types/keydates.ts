@@ -11,7 +11,7 @@ import { viewIdIn } from '../../db/viewid.ts';
 // The key dates across the whole portfolio: the list, the month calendar and the reminders due.
 // Everything reads the person's own view (shared rows plus their private changes).
 
-type Kind = 'BREAK_NOTICE' | 'RENEWAL_NOTICE' | 'RENT_REVIEW' | 'EXPIRY' | 'DEPOSIT_RETURN' | 'INSURANCE' | 'CUSTOM';
+type Kind = 'BREAK_NOTICE' | 'RENEWAL_NOTICE' | 'RENT_REVIEW' | 'RENT_INCREASE' | 'EXPIRY' | 'DEPOSIT_RETURN' | 'INSURANCE' | 'CUSTOM';
 type Status = 'UPCOMING' | 'ACTIONED' | 'DISMISSED';
 
 const KeyDateFilter = builder.inputType('KeyDateFilter', {

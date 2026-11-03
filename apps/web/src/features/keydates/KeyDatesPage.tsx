@@ -78,7 +78,7 @@ function KeyDatesContent() {
             return (
               <Button key={k} size="small" variant={on ? 'contained' : 'outlined'} aria-pressed={on} onClick={() => toggleKind(k)}
                 sx={{ borderRadius: 4, textTransform: 'none', gap: 1, ...(on ? {} : { color: t.ink, borderColor: t.ruleStrong }) }}>
-                <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: on ? 'currentColor' : kindColour(t.chart, k) }} />
+                <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: on ? 'currentColor' : kindColour(t.mode, k) }} />
                 <FormattedMessage id={`keyDate.${k}`} />
               </Button>
             );

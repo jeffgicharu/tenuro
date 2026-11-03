@@ -194,7 +194,7 @@ export function generatedKeyDates(f: LeaseFormData, today: string): { kind: KeyD
   }
   const review = nextReviewOn(rentTermsFromForm(f), addDays(today, -1));
   const kind = f.rent.escalation.kind;
-  if (review) out.push({ kind: 'RENT_REVIEW', due: review, title: kind === 'FIXED' ? 'Fixed rent uplift' : kind === 'CPI' ? 'Indexation review' : 'Rent review' });
+  if (review) out.push(kind === 'FIXED' ? { kind: 'RENT_INCREASE', due: review, title: 'Rent increase' } : { kind: 'RENT_REVIEW', due: review, title: kind === 'CPI' ? 'Indexation review' : 'Rent review' });
   for (const d of f.deposits) {
     out.push({ kind: 'DEPOSIT_RETURN', due: d.returnDueOn || addMonths(f.term.expiryDate, 2), title: 'Deposit return due' });
   }
