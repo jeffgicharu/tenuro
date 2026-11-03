@@ -295,10 +295,11 @@ export function renderPlan(d: PlanLease, lang: 'en' | 'ar'): string {
   }
   // Lifts band: three cars with their label beneath, all inside the band.
   const bandH = (ch - 2 * stairH) / 2;
-  const liftTop = cy + stairH; const liftH = bandH * 0.55; const liftW = cw / 3.4;
+  // Three cars across 93% of the core's width, in the upper part of the band; the label below them.
+  const liftTop = cy + stairH; const liftH = bandH * 0.42; const liftW = cw * 0.26;
   for (let n = 0; n < 3; n++) {
-    const lx = cx + cw * 0.08 + n * (liftW + cw * 0.04);
-    const ly = liftTop + bandH * 0.1;
+    const lx = cx + cw * 0.07 + n * (liftW + cw * 0.04);
+    const ly = liftTop + bandH * 0.08;
     parts.push(`<rect x="${X(lx)}" y="${Y(ly)}" width="${S(liftW)}" height="${S(liftH)}" fill="${paper}" stroke="${ink}"/><line x1="${X(lx)}" y1="${Y(ly)}" x2="${X(lx + liftW)}" y2="${Y(ly + liftH)}" stroke="${grey}"/><line x1="${X(lx + liftW)}" y1="${Y(ly)}" x2="${X(lx)}" y2="${Y(ly + liftH)}" stroke="${grey}"/>`);
   }
   parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(liftTop + bandH)) - 3).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}" paint-order="stroke" stroke="#ece6da" stroke-width="3">${esc(L.lifts)}</text>`);

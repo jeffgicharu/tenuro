@@ -41,6 +41,15 @@ describe('demise plan', () => {
     }
   });
 
+  it('keeps the lift cars inside the core', () => {
+    const svg = renderPlan({ reference: 'GB-O-00488', premises: 'Level 2, Wing A', property_name: 'P', area_sqm: '71', property_type: 'OFFICE' }, 'en');
+    const core = /<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="[\d.]+" fill="#ece6da" stroke="#1c1a16" stroke-width="2"\/>/.exec(svg)!;
+    const right = Number(core[1]) + Number(core[2]);
+    const cars = [...svg.matchAll(/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="[\d.]+" fill="#fffdf8" stroke="#1c1a16"\/><line/g)];
+    expect(cars).toHaveLength(3);
+    for (const c of cars) expect(Number(c[1]) + Number(c[2])).toBeLessThanOrEqual(right + 0.5);
+  });
+
   it('numbers neighbours from the premises name', () => {
     expect(neighbourName('Shop G-05', 1)).toBe('Shop G-06');
     expect(neighbourName('محل 12، الطابق الأول', -1)).toBe('محل 11، الطابق الأول');
