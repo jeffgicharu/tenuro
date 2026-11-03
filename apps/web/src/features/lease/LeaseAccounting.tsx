@@ -168,7 +168,9 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
               <span>{f.money(String(chart.max / 2), a.initialLiability.currency, { compact: true, showCode: false })}</span>
               <span>0</span>
             </Box>
-            <Box sx={{ position: 'relative' }}>
+            {/* The drawing fills a fixed-height frame. Sized in the flow, its aspect ratio set a minimum
+                width of about 550px, which pushed the whole tab wider than a phone screen. */}
+            <Box sx={{ position: 'relative', minWidth: 0, height: 180 }}>
               <Box
                 component="svg"
                 viewBox={`0 0 ${chart.W} ${chart.H}`}
@@ -181,7 +183,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
                   setHover(Math.max(0, Math.min(chart.points.length - 1, Math.round(frac * (chart.points.length - 1)))));
                 }}
                 onMouseLeave={() => setHover(null)}
-                sx={{ width: '100%', height: 180, display: 'block', backgroundColor: t.sunken, borderRadius: 1, transform: theme.direction === 'rtl' ? 'scaleX(-1)' : undefined }}
+                sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', backgroundColor: t.sunken, borderRadius: 1, transform: theme.direction === 'rtl' ? 'scaleX(-1)' : undefined }}
               >
                 {[0.5, 1].map((g) => <line key={g} x1={0} x2={chart.W} y1={chart.H * (1 - g)} y2={chart.H * (1 - g)} stroke={t.rule} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />)}
                 {chart.todayX !== null && <line x1={chart.todayX} x2={chart.todayX} y1={0} y2={chart.H} stroke={t.ink} strokeDasharray="3 3" strokeWidth={1} vectorEffect="non-scaling-stroke" />}

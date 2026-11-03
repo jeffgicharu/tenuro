@@ -219,14 +219,19 @@ export function SavedViewsBar({ viewer: ref, activeViewId, onSelect, currentConf
         {tab(null, intl.formatMessage({ id: 'register.views.all' }))}
         {viewer.savedViews.edges.map(({ node }) => tab(node.id, node.name, { shared: node.shared, deletable: !node.shared || viewer.isAdmin, config: node.config }))}
       </Box>
+      {/* On a phone the button is its icon alone, leaving the views row room to show that it scrolls. */}
       <Button
         size="small"
         variant="text"
+        aria-label={intl.formatMessage({ id: 'register.views.save' })}
         startIcon={<BookmarkPlus size={15} strokeWidth={1.8} />}
         onClick={() => { setNameError(null); setDialogOpen(true); }}
-        sx={{ mb: 1, flexShrink: 0 }}
+        sx={{
+          mb: 1, flexShrink: 0,
+          [theme.breakpoints.down('sm')]: { minWidth: 44, minHeight: 44, mb: 0, px: 0, '& .MuiButton-startIcon': { m: 0 } },
+        }}
       >
-        <FormattedMessage id="register.views.save" />
+        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}><FormattedMessage id="register.views.save" /></Box>
       </Button>
       <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} aria-labelledby="save-view-title" maxWidth="xs" fullWidth>
         <Box component="form" onSubmit={(e) => { e.preventDefault(); save(); }}>

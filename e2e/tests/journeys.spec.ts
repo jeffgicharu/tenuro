@@ -82,6 +82,21 @@ test.describe('main journeys', () => {
     expect(problems).toEqual([]);
   });
 
+  // Regression: each account sat inside a wrapper element, and the menu's arrow keys move only
+  // between the list's direct children, so the keyboard skipped every account.
+  test('the account menu reaches every account with the arrow keys', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', null);
+    await page.getByRole('button', { name: /Otieno Wekesa/ }).click();
+    const target = page.getByRole('menuitemradio', { name: /Portfolio admin.*Charlotte Pemberton/ });
+    await expect(target).toBeVisible();
+    for (let i = 0; i < 20 && !(await target.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(target).toBeFocused();
+    expect(problems).toEqual([]);
+  });
+
   test('the lease form blocks an incomplete step with a summary', async ({ page }) => {
     const problems = watchPage(page);
     await signIn(page, 'Mbuyu Court Holdings', 'Lease manager');

@@ -152,6 +152,7 @@ export const leaseEn = {
 
   'lease.schedule.period': 'Period',
   'lease.schedule.due': 'Due',
+  'lease.schedule.dueOn': 'Due {date}',
   'lease.schedule.rent': 'Rent',
   'lease.schedule.number': 'No.',
   'lease.schedule.current': 'Current period',

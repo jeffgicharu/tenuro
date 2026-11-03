@@ -154,6 +154,7 @@ export const leaseAr: Record<LeaseKey, string> = {
 
   'lease.schedule.period': 'الفترة',
   'lease.schedule.due': 'الاستحقاق',
+  'lease.schedule.dueOn': 'تستحق في {date}',
   'lease.schedule.rent': 'الإيجار',
   'lease.schedule.number': 'رقم',
   'lease.schedule.current': 'الفترة الحالية',

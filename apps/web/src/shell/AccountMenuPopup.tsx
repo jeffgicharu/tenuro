@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Fragment, Suspense, useState } from 'react';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import Box from '@mui/material/Box';
@@ -13,6 +13,13 @@ import type { AccountMenuAccountsQuery } from './__generated__/AccountMenuAccoun
 import { usePreferences, type ModePreference } from '../app/preferences.tsx';
 import { signInAs, signOut } from '../app/session.ts';
 import { LANGUAGES, type Language } from '../i18n/locale.ts';
+
+// Language and appearance choices share a row. Each stays a direct child of the menu list, which is
+// how MUI's arrow-key navigation finds its items.
+const rowItem = (count: number) => ({
+  display: 'inline-flex', width: `${100 / count}%`, justifyContent: 'center', gap: 1.5, px: 1, borderRadius: 1,
+  fontWeight: 500, '&.Mui-selected': { fontWeight: 600 },
+}) as const;
 
 interface Props {
   anchor: HTMLElement | null;
@@ -44,7 +51,7 @@ export function AccountMenuPopup({ anchor, onClose, collapsed, user, companyName
       // Popover edges are physical, so the start edge flips in right-to-left.
       anchorOrigin={{ vertical: 'bottom', horizontal: (theme.direction === 'rtl') !== collapsed ? 'right' : 'left' }}
       transformOrigin={{ vertical: 'top', horizontal: theme.direction === 'rtl' ? 'right' : 'left' }}
-      slotProps={{ paper: { sx: { width: 300, maxHeight: '80dvh' } }, list: { dense: true, sx: { py: 1 } } }}
+      slotProps={{ paper: { sx: { width: 300, maxHeight: 'calc(100dvh - 96px)' } }, list: { dense: true, sx: { py: 1 } } }}
     >
       <Box sx={{ px: 4, py: 3 }}>
         <Box sx={{ fontWeight: 600 }}>{user.displayName}</Box>
@@ -70,8 +77,8 @@ export function AccountMenuPopup({ anchor, onClose, collapsed, user, companyName
         <FormattedMessage id="shell.language" />
       </ListSubheader>
       {languages.map((l) => (
-        <MenuItem key={l} role="menuitemradio" aria-checked={currentLanguage === l} lang={l} onClick={() => { prefs.setLanguage(l); onClose(); }}>
-          <Box sx={{ width: 22, display: 'inline-flex' }}>{currentLanguage === l && <Check size={15} />}</Box>
+        <MenuItem key={l} role="menuitemradio" aria-checked={currentLanguage === l} selected={currentLanguage === l} lang={l} onClick={() => { prefs.setLanguage(l); onClose(); }} sx={rowItem(languages.length)}>
+          {currentLanguage === l && <Check size={14} aria-hidden />}
           {LANGUAGES[l].label}
         </MenuItem>
       ))}
@@ -80,9 +87,8 @@ export function AccountMenuPopup({ anchor, onClose, collapsed, user, companyName
         <FormattedMessage id="shell.appearance" />
       </ListSubheader>
       {modes.map(({ value, icon: Icon }) => (
-        <MenuItem key={value} role="menuitemradio" aria-checked={prefs.mode === value} onClick={() => prefs.setMode(value)}>
-          <Box sx={{ width: 22, display: 'inline-flex' }}>{prefs.mode === value && <Check size={15} />}</Box>
-          <Icon size={15} strokeWidth={1.7} style={{ marginInlineEnd: 8 }} aria-hidden />
+        <MenuItem key={value} role="menuitemradio" aria-checked={prefs.mode === value} selected={prefs.mode === value} onClick={() => prefs.setMode(value)} sx={rowItem(modes.length)}>
+          <Icon size={14} strokeWidth={1.7} aria-hidden />
           <FormattedMessage id={`shell.mode.${value}`} />
         </MenuItem>
       ))}
@@ -117,7 +123,8 @@ function AccountItems({ currentUserId }: { currentUserId: string }) {
         lastTenant = a.tenant.id;
         const current = a.id === currentUserId;
         return (
-          <Box key={a.id}>
+          // A fragment, not a wrapper: arrow keys only move between the menu list's direct children.
+          <Fragment key={a.id}>
             {header && (
               <Box sx={{ px: 4, pt: 2, pb: 0.5, fontSize: '0.6875rem', fontWeight: 600, color: t.inkTertiary }}>
                 {intl.locale.startsWith('ar') && a.tenant.nameLocal ? a.tenant.nameLocal : a.tenant.name}
@@ -137,7 +144,7 @@ function AccountItems({ currentUserId }: { currentUserId: string }) {
               <Box sx={{ flex: 1 }}>{intl.formatMessage({ id: `shell.role.${a.role}` })}</Box>
               <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary }}>{a.displayName}</Box>
             </MenuItem>
-          </Box>
+          </Fragment>
         );
       })}
     </>

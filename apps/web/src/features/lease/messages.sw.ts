@@ -154,6 +154,7 @@ export const leaseSw: Record<LeaseKey, string> = {
 
   'lease.schedule.period': 'Kipindi',
   'lease.schedule.due': 'Tarehe ya kulipa',
+  'lease.schedule.dueOn': 'Inalipwa {date}',
   'lease.schedule.rent': 'Kodi',
   'lease.schedule.number': 'Na.',
   'lease.schedule.current': 'Kipindi cha sasa',
