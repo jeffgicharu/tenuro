@@ -10,6 +10,7 @@ import type { LeaseAccountingQuery } from './__generated__/LeaseAccountingQuery.
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { CompactMoney } from '../../components/CompactMoney.tsx';
 import { Money } from '../../components/Money.tsx';
+import { ScrollFrame } from '../../components/ScrollFrame.tsx';
 import { useFormat } from '../../i18n/format.ts';
 import { downloadCsv } from '../../app/download.ts';
 
@@ -255,7 +256,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
           <Button size="small" onClick={() => setShowAll((v) => !v)}><FormattedMessage id={showAll ? 'lease.accounting.showUpcoming' : 'lease.accounting.showAll'} values={{ count: a.schedule.length }} /></Button>
           <Button size="small" variant="outlined" startIcon={<Download size={14} aria-hidden />} onClick={exportSchedule}><FormattedMessage id="lease.accounting.exportCsv" /></Button>
         </Box>
-        <Box tabIndex={0} role="region" aria-label={intl.formatMessage({ id: 'lease.accounting.scheduleTable' })} sx={{ overflow: 'auto', maxHeight: 480, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, '&:focus-visible': { outline: `2px solid ${t.focus}` } }}>
+        <ScrollFrame tabIndex={0} role="region" aria-label={intl.formatMessage({ id: 'lease.accounting.scheduleTable' })} sx={{ overflow: 'auto', maxHeight: 480, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, '&:focus-visible': { outline: `2px solid ${t.focus}` } }}>
           <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -282,7 +283,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
               })}
             </tbody>
           </Box>
-        </Box>
+        </ScrollFrame>
       </Box>
 
       <Box component="section" aria-labelledby="acc-journals">
@@ -294,7 +295,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
         {months.length === 0 ? (
           <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary }}><FormattedMessage id="lease.accounting.noJournals" /></Box>
         ) : (
-          <Box sx={{ border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, overflow: 'auto' }}>
+          <ScrollFrame tabIndex={0} role="region" aria-labelledby="acc-journals" sx={{ border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, '&:focus-visible': { outline: `2px solid ${t.focus}` } }}>
             <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
@@ -318,7 +319,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
                             </Button>
                           </Box>
                         )}
-                        <Box component="td" sx={{ ...td, textAlign: 'start', ...(i === mo.accounts.length - 1 && !isOpen ? { borderBottom: `1px solid ${t.ruleStrong}` } : {}) }}>
+                        <Box component="td" sx={{ ...td, textAlign: 'start', whiteSpace: 'normal', minWidth: 150, ...(i === mo.accounts.length - 1 && !isOpen ? { borderBottom: `1px solid ${t.ruleStrong}` } : {}) }}>
                           <Box component="span" sx={{ display: 'inline-flex', gap: 1.5, alignItems: 'baseline' }}><Box component="bdi" data-num sx={{ color: t.inkTertiary }}>{acc.account}</Box><span>{accountName(acc.account, acc.name)}</span></Box>
                         </Box>
                         <Box component="td" sx={{ ...td, ...(i === mo.accounts.length - 1 && !isOpen ? { borderBottom: `1px solid ${t.ruleStrong}` } : {}) }} data-num>{acc.debit ? f.money(acc.debit.toFixed(dp), cur, { showCode: false }) : ''}</Box>
@@ -347,7 +348,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
                 );
               })}
             </Box>
-          </Box>
+          </ScrollFrame>
         )}
       </Box>
     </Box>

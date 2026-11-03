@@ -66,7 +66,7 @@ export function applyLeaseFilter<Q extends LeaseQb>(qb: Q, f: LeaseFilterInput |
   }
   if (f.nextKeyKind?.length) q = q.where('next_key_kind', 'in', f.nextKeyKind);
   if (f.hasOpenBreak != null) {
-    const exists = sql<boolean>`EXISTS (SELECT 1 FROM lease_option o WHERE o.lease_row_id = v_lease.id AND o.kind = 'BREAK' AND o.status = 'OPEN' AND o.exercise_on >= ${today})`;
+    const exists = sql<boolean>`EXISTS (SELECT 1 FROM lease_option o WHERE o.lease_row_id = v_lease.id AND o.kind = 'BREAK' AND o.status = 'OPEN' AND coalesce(o.notice_by, o.exercise_on) >= ${today})`;
     q = q.where(f.hasOpenBreak ? exists : sql<boolean>`NOT ${exists}`);
   }
   if (f.changedInSandbox != null) q = q.where('sandbox_id', f.changedInSandbox ? 'is not' : 'is', null);

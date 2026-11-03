@@ -163,9 +163,11 @@ function AccountingContent() {
           </Box>
           <Box sx={{ overflowX: 'auto', display: { xs: 'none', sm: 'block' } }}>
             <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+              {/* Three columns: the property sits under the reference, so the table fits the panel at
+                  laptop widths (four columns cut off the last one at 1280). */}
               <thead><tr>
-                {['lease', 'property', 'local', 'reporting'].map((c) => (
-                  <Box key={c} component="th" scope="col" sx={{ textAlign: c === 'lease' || c === 'property' ? 'start' : 'end', color: t.inkSecondary, fontWeight: 600, pb: 1.5, borderBottom: `1px solid ${t.ruleStrong}`, whiteSpace: 'nowrap', px: 1.5 }}>
+                {['lease', 'local', 'reporting'].map((c) => (
+                  <Box key={c} component="th" scope="col" sx={{ textAlign: c === 'lease' ? 'start' : 'end', color: t.inkSecondary, fontWeight: 600, pb: 1.5, borderBottom: `1px solid ${t.ruleStrong}`, whiteSpace: 'nowrap', px: 1.5 }}>
                     <FormattedMessage id={`accounting.col.${c}`} values={{ currency: cur }} />
                   </Box>
                 ))}
@@ -173,10 +175,10 @@ function AccountingContent() {
               <tbody>
                 {s.largest.map((l) => (
                   <tr key={l.reference}>
-                    <Box component="td" sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, whiteSpace: 'nowrap' }}>
-                      {l.lease ? <Box component={RouterLink} to={`/leases/${encodeURIComponent(l.lease.id)}#accounting`} sx={{ fontFamily: FONT_MONO, color: t.brand, textDecoration: 'none', direction: 'ltr', unicodeBidi: 'isolate', '&:hover': { textDecoration: 'underline' } }}>{l.reference}</Box> : l.reference}
+                    <Box component="td" sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, width: '100%', maxWidth: 0 }}>
+                      {l.lease ? <Box component={RouterLink} to={`/leases/${encodeURIComponent(l.lease.id)}#accounting`} sx={{ fontFamily: FONT_MONO, color: t.brand, textDecoration: 'none', direction: 'ltr', unicodeBidi: 'isolate', '&:hover': { textDecoration: 'underline' } }}>{l.reference}</Box> : <bdi>{l.reference}</bdi>}
+                      <Box sx={{ color: t.inkSecondary, fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><bdi>{l.propertyName}</bdi> · <bdi>{l.city}</bdi></Box>
                     </Box>
-                    <Box component="td" sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, color: t.inkSecondary, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.propertyName} · {l.city}</Box>
                     <Box component="td" data-num sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, textAlign: 'end', whiteSpace: 'nowrap' }}><Money value={l.liabilityLocal} /></Box>
                     <Box component="td" data-num sx={{ py: 1.25, px: 1.5, borderBottom: `1px solid ${t.rule}`, textAlign: 'end', whiteSpace: 'nowrap', fontWeight: 600 }}><Money value={l.liability} showCode={false} /></Box>
                   </tr>

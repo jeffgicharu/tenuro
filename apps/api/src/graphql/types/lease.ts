@@ -15,6 +15,7 @@ import {
 } from './common.ts';
 import type { LeaseRow } from './lease-shape.ts';
 import { User } from './tenant.ts';
+import { optionStatus } from '../../domain/options.ts';
 
 type PropertyRow = Selectable<PropertyTable>;
 
@@ -79,7 +80,7 @@ export const LeaseOption = builder.objectRef<Selectable<LeaseOptionTable>>('Leas
     termMonths: t.exposeInt('term_months', { nullable: true }),
     price: t.field({ type: Money, nullable: true, resolve: async (o, _a, ctx) => (o.price ? money(o.price, await leaseCurrency(ctx, o.lease_row_id)) : null) }),
     reasonablyCertain: t.exposeBoolean('reasonably_certain', { description: 'Whether the lessee is reasonably certain to exercise it, which changes the accounting term.' }),
-    status: t.field({ type: OptionStatusEnum, resolve: (o) => o.status }),
+    status: t.field({ type: OptionStatusEnum, description: 'An open option lapses once its notice deadline passes unexercised.', resolve: (o, _a, ctx) => optionStatus(o.status, o.exercise_on, o.notice_by, ctx.today) }),
     terms: t.exposeString('terms', { nullable: true }),
   }),
 });

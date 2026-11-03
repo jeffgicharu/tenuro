@@ -120,11 +120,114 @@ ${clause(7, t.deposit, d.deposits.length ? `<ul>${d.deposits.map((x) => `<li>${e
 // lines, the building core (stairs, lifts, WCs) with its corridor, the neighbouring units outlined
 // and numbered, and the demised unit hatched and labelled with its area. The north arrow and the
 // scale bar sit clear of the drawing. Sized from the lease's area; the same lease draws the same plan.
-export function renderPlan(d: { reference: string; premises: string; property_name: string; area_sqm: string }, lang: 'en' | 'ar'): string {
+type PlanLease = { reference: string; premises: string; property_name: string; area_sqm: string; property_type?: string | null };
+type PlanText = typeof PLAN_TEXT['en'];
+const PLAN_TEXT = {
+  en: { title: 'Demise plan', demised: 'Demised premises', unit: 'Unit', core: 'Core', stair: 'Stair', lifts: 'Lifts', wc: 'WCs', corridor: 'Corridor', note: 'For identification only; area approximate',
+    street: 'Street frontage', mall: 'Mall walkway', yard: 'Service yard', service: 'Service corridor', entrance: 'Entrance', loading: 'Loading door' },
+  ar: { title: 'مخطط المساحة المؤجرة', demised: 'المساحة المؤجرة', unit: 'وحدة', core: 'النواة', stair: 'درج', lifts: 'مصاعد', wc: 'دورات مياه', corridor: 'ممر', note: 'للتوضيح فقط؛ المساحة تقريبية',
+    street: 'واجهة الشارع', mall: 'ممر المركز التجاري', yard: 'ساحة الخدمة', service: 'ممر الخدمة', entrance: 'مدخل', loading: 'باب تحميل' },
+};
+const PLAN_INK = '#1c1a16'; const PLAN_GREY = '#8a8378'; const PLAN_RED = '#a3301c'; const PLAN_PAPER = '#fffdf8';
+
+// The demised unit's label: its name from the lease, and its area on its own line.
+function demisedLabel(tx: number, ty: number, L: PlanText, premises: string, area: number, locale: string): string {
+  const halo = `paint-order="stroke" stroke="${PLAN_PAPER}" stroke-width="5"`;
+  return [
+    `<text x="${tx}" y="${ty - 14}" text-anchor="middle" font-size="12" font-weight="600" fill="${PLAN_INK}" ${halo}>${esc(L.demised)}</text>`,
+    `<text x="${tx}" y="${ty + 3}" text-anchor="middle" font-size="12" fill="${PLAN_INK}" ${halo}>${esc(premises)}</text>`,
+    `<text x="${tx}" y="${ty + 19}" text-anchor="middle" font-size="11" fill="${PLAN_INK}" ${halo}>≈ ${new Intl.NumberFormat(locale).format(Math.round(area))} m²</text>`,
+  ].join('');
+}
+
+// The premises name with its last number moved by `by`, for the neighbouring units ("Shop 1-34" → "Shop 1-35").
+export function neighbourName(premises: string, by: number): string | null {
+  const m = /(\d+)(?!.*\d)/.exec(premises);
+  if (!m) return null;
+  const n = Number(m[1]) + by;
+  if (n < 1) return null;
+  return premises.slice(0, m.index) + String(n).padStart(m[1]!.length, '0') + premises.slice(m.index + m[1]!.length);
+}
+
+// Shops and warehouse units: a ground-level row of units along a frontage, no lift core. A shop faces
+// a street when it is on the ground floor and a mall walkway otherwise; a warehouse unit faces a
+// service yard through a loading door.
+function renderRowPlan(d: PlanLease, lang: 'en' | 'ar', kind: 'retail' | 'industrial'): string {
+  const ar = lang === 'ar'; const L = PLAN_TEXT[lang]; const locale = ar ? 'ar' : 'en-GB';
+  const ink = PLAN_INK; const grey = PLAN_GREY; const red = PLAN_RED; const paper = PLAN_PAPER;
+  const area = Math.max(20, Number(d.area_sqm) || 20);
+  const depth = Math.min(kind === 'retail' ? 26 : 60, Math.max(kind === 'retail' ? 9 : 18, Math.sqrt(area * (kind === 'retail' ? 2.2 : 1.4))));
+  const w = area / depth;
+  const factors = [0.85, 1.15, 1, 0.9, 1.2];
+  const widths = factors.map((f, i) => (i === 2 ? w : w * f));
+  const Wf = widths.reduce((a, b) => a + b, 0);
+  const back = kind === 'retail' ? 1.8 : 0; // a service corridor behind the shops
+  const Hf = depth + back;
+  const front = kind === 'retail' ? 5 : 12; // the street, walkway or yard in front
+  const W = 760; const ox = 60; const oy = 70;
+  const k = Math.min((W - ox - 110) / Wf, 380 / (Hf + front));
+  const X = (m: number) => (ox + m * k).toFixed(1); const Y = (m: number) => (oy + m * k).toFixed(1); const S = (m: number) => (m * k).toFixed(1);
+  const ground = kind === 'industrial' || /\bG-|\bground\b|الأرضي/i.test(d.premises);
+  const frontLabel = kind === 'industrial' ? L.yard : ground ? L.street : L.mall;
+  const parts: string[] = [];
+  if (back > 0) {
+    parts.push(`<rect x="${X(0)}" y="${Y(0)}" width="${S(Wf)}" height="${S(back)}" fill="#ece6da" stroke="${ink}" stroke-width="1"/>`);
+    parts.push(`<text x="${X(Wf / 2)}" y="${(Number(Y(back / 2)) + 3.5).toFixed(1)}" text-anchor="middle" font-size="9" fill="${grey}" letter-spacing="1">${esc(ar ? L.service : L.service.toUpperCase())}</text>`);
+  }
+  let x = 0;
+  widths.forEach((uw, i) => {
+    const demised = i === 2;
+    parts.push(`<rect x="${X(x)}" y="${Y(back)}" width="${S(uw)}" height="${S(depth)}" fill="${demised ? 'url(#h)' : paper}" stroke="${demised ? red : ink}" stroke-width="${demised ? 2.4 : 1.2}"/>`);
+    // An opening in the front wall: a shop door, or a wide loading door.
+    const door = Math.min(uw * 0.5, kind === 'retail' ? 2.4 : 4.5);
+    const dx = x + (uw - door) / 2;
+    parts.push(`<line x1="${X(dx)}" y1="${Y(Hf)}" x2="${X(dx + door)}" y2="${Y(Hf)}" stroke="${paper}" stroke-width="5"/>`);
+    parts.push(kind === 'retail'
+      ? `<path d="M${X(dx)},${Y(Hf)} A${S(door)},${S(door)} 0 0 1 ${X(dx + door)},${(Number(Y(Hf)) - door * k).toFixed(1)}" fill="none" stroke="${grey}" stroke-width="0.8"/><line x1="${X(dx)}" y1="${Y(Hf)}" x2="${X(dx)}" y2="${(Number(Y(Hf)) - door * k).toFixed(1)}" stroke="${grey}" stroke-width="0.8"/>`
+      : `<line x1="${X(dx)}" y1="${(Number(Y(Hf)) + 6).toFixed(1)}" x2="${X(dx + door)}" y2="${(Number(Y(Hf)) + 6).toFixed(1)}" stroke="${grey}" stroke-width="1.2" stroke-dasharray="4 3"/>`);
+    const tx = Number(X(x + uw / 2)); const ty = Number(Y(back + depth / 2));
+    if (demised) parts.push(demisedLabel(tx, ty, L, d.premises, area, locale));
+    else {
+      const name = neighbourName(d.premises, i - 2);
+      if (name && uw * k > name.length * 6.2 + 8) parts.push(`<text x="${tx}" y="${ty + 4}" text-anchor="middle" font-size="11" fill="${grey}">${esc(name)}</text>`);
+    }
+    x += uw;
+  });
+  // Outer walls, then the frontage band in front of them.
+  parts.push(`<rect x="${X(0)}" y="${Y(0)}" width="${S(Wf)}" height="${S(Hf)}" fill="none" stroke="${ink}" stroke-width="4"/>`);
+  // Re-open the doors through the heavy outer wall.
+  x = 0;
+  widths.forEach((uw) => { const door = Math.min(uw * 0.5, kind === 'retail' ? 2.4 : 4.5); const dx = x + (uw - door) / 2; parts.push(`<line x1="${X(dx)}" y1="${Y(Hf)}" x2="${X(dx + door)}" y2="${Y(Hf)}" stroke="${paper}" stroke-width="6"/>`); x += uw; });
+  const fy = Number(Y(Hf)) + 10; const fh = front * k - 10;
+  parts.push(`<rect x="${X(0)}" y="${fy.toFixed(1)}" width="${S(Wf)}" height="${fh.toFixed(1)}" fill="${kind === 'industrial' ? '#efece6' : '#f3efe6'}" stroke="${grey}" stroke-width="0.8" stroke-dasharray="${kind === 'industrial' ? '0' : '6 4'}"/>`);
+  parts.push(`<text x="${X(Wf / 2)}" y="${(fy + fh / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${grey}" letter-spacing="${ar ? 0 : 1}">${esc(ar ? frontLabel : frontLabel.toUpperCase())}</text>`);
+  const H = Math.round(fy + fh + 130);
+  const bar = [5, 10, 20, 25, 50].find((m) => m * k >= 90) ?? 50;
+  const bottom = fy + fh + 40;
+  return planSvg(W, H, ox, bottom, k, bar, d, L, ar, parts);
+}
+
+// The SVG frame shared by every plan: title, north point, scale bar and the caption under the drawing.
+function planSvg(W: number, H: number, ox: number, bottom: number, k: number, bar: number, d: PlanLease, L: PlanText, ar: boolean, parts: string[]): string {
+  const ink = PLAN_INK; const grey = PLAN_GREY; const paper = PLAN_PAPER; const red = PLAN_RED;
+  const nx = W - 46; const ny = 96;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="system-ui, sans-serif">
+  <defs><pattern id="h" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#f6e3dc"/><line x1="0" y1="0" x2="0" y2="7" stroke="${red}" stroke-width="1.1"/></pattern></defs>
+  <rect width="${W}" height="${H}" fill="${paper}"/>
+  <text x="${ar ? W - 30 : 26}" y="30" font-size="18" fill="${ink}" text-anchor="${ar ? 'end' : 'start'}">${esc(L.title)} · <tspan direction="ltr" unicode-bidi="embed">${esc(d.reference)}</tspan></text>
+  ${parts.join('\n  ')}
+  <g transform="translate(${nx}, ${ny})"><circle r="24" fill="${paper}" stroke="${ink}"/><path d="M0,-18 L7,8 L0,3 L-7,8 Z" fill="${ink}"/><text y="40" text-anchor="middle" font-size="12" font-weight="600" fill="${ink}">N</text></g>
+  <g transform="translate(${ox}, ${bottom.toFixed(1)})"><rect width="${(bar * k / 2).toFixed(1)}" height="6" fill="${ink}"/><rect x="${(bar * k / 2).toFixed(1)}" width="${(bar * k / 2).toFixed(1)}" height="6" fill="${paper}" stroke="${ink}"/><text y="22" font-size="11" fill="${grey}">0</text><text x="${(bar * k).toFixed(1)}" y="22" font-size="11" text-anchor="end" fill="${grey}">${bar} m</text></g>
+  <g transform="translate(${ox}, ${(bottom + 44).toFixed(1)})"><line x1="0" y1="-12" x2="${W - ox - 40}" y2="-12" stroke="${ink}"/><text x="${ar ? W - ox - 40 : 0}" text-anchor="${ar ? 'end' : 'start'}" y="6" font-size="12" fill="${ink}">${esc(d.property_name)} · ${esc(d.premises)}</text><text x="${ar ? W - ox - 40 : 0}" text-anchor="${ar ? 'end' : 'start'}" y="24" font-size="11" fill="${grey}">${esc(L.note)}</text></g>
+</svg>`;
+}
+
+export function renderPlan(d: PlanLease, lang: 'en' | 'ar'): string {
+  if (d.property_type === 'RETAIL') return renderRowPlan(d, lang, 'retail');
+  if (d.property_type === 'WAREHOUSE' || d.property_type === 'INDUSTRIAL') return renderRowPlan(d, lang, 'industrial');
   const ar = lang === 'ar';
-  const L = ar
-    ? { title: 'مخطط المساحة المؤجرة', demised: 'المساحة المؤجرة', unit: 'وحدة', core: 'النواة', stair: 'درج', lifts: 'مصاعد', wc: 'دورات مياه', corridor: 'ممر', note: 'للتوضيح فقط؛ المساحة تقريبية' }
-    : { title: 'Demise plan', demised: 'Demised premises', unit: 'Unit', core: 'Core', stair: 'Stair', lifts: 'Lifts', wc: 'WCs', corridor: 'Corridor', note: 'For identification only; area approximate' };
+  const L = PLAN_TEXT[lang]; const locale = ar ? 'ar' : 'en-GB';
   const area = Math.max(20, Number(d.area_sqm) || 20);
   // The floor is a few times the unit, so neighbours and the core have room.
   const floorArea = Math.max(area * 3.4, 640);
@@ -146,10 +249,14 @@ export function renderPlan(d: { reference: string; premises: string; property_na
     ...(topH > 3 ? [{ x: midX, y: 0, w: midW, h: topH }] : []),
     ...(botH > 3 ? [{ x: midX, y: botY, w: midW, h: botH }] : []),
   ];
-  const seed = [...d.reference].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-  const floor = 1 + (seed % 9);
+  // Neighbours are numbered on the lease's own floor ("Level 14, East" → 14.02, 14.03 …).
+  const floorMatch = /(\d+)/.exec(d.premises);
+  const floor = floorMatch ? Number(floorMatch[1]) : 1;
   const num = (i: number) => `${floor}.${String(i + 1).padStart(2, '0')}`;
-  const ink = '#1c1a16'; const grey = '#8a8378'; const red = '#a3301c'; const paper = '#fffdf8';
+  // A whole-floor lease takes every unit on the plate.
+  const wholeFloor = /whole floor|كاملاً/i.test(d.premises);
+  if (wholeFloor) units.forEach((u) => { u.demised = true; });
+  const ink = PLAN_INK; const grey = PLAN_GREY; const red = PLAN_RED; const paper = PLAN_PAPER;
   const parts: string[] = [];
   // Column grid: lines every 7.5 m, letters along the top, numbers down the side.
   const step = 7.5;
@@ -165,9 +272,9 @@ export function renderPlan(d: { reference: string; premises: string; property_na
   units.forEach((u, i) => {
     parts.push(`<rect x="${X(u.x)}" y="${Y(u.y)}" width="${S(u.w)}" height="${S(u.h)}" fill="${u.demised ? 'url(#h)' : paper}" stroke="${u.demised ? red : ink}" stroke-width="${u.demised ? 2.4 : 1.2}"/>`);
     const tx = Number(X(u.x + u.w / 2)); const ty = Number(Y(u.y + u.h / 2));
+    // One label for the demised premises, in the first demised unit (all of them for a whole floor).
     if (u.demised) {
-      parts.push(`<text x="${tx}" y="${ty - 6}" text-anchor="middle" font-size="13" font-weight="600" fill="${ink}" paint-order="stroke" stroke="${paper}" stroke-width="5">${esc(L.demised)}</text>`);
-      parts.push(`<text x="${tx}" y="${ty + 12}" text-anchor="middle" font-size="11" fill="${ink}" paint-order="stroke" stroke="${paper}" stroke-width="5">${esc(L.unit)} ${num(i)} · ≈ ${Math.round(area)} m²</text>`);
+      if (i === 0) parts.push(demisedLabel(tx, ty, L, d.premises, area, locale));
     } else if (u.w * k > 50 && u.h * k > 26) {
       parts.push(`<text x="${tx}" y="${ty + 4}" text-anchor="middle" font-size="11" fill="${grey}">${esc(L.unit)} ${num(i)}</text>`);
     }
@@ -177,38 +284,33 @@ export function renderPlan(d: { reference: string; premises: string; property_na
     if (x > cx - 0.5 && x < cx + cw + 0.5 && y > cy - 0.5 && y < cy + ch + 0.5) continue;
     parts.push(`<rect x="${(Number(X(x)) - 4).toFixed(1)}" y="${(Number(Y(y)) - 4).toFixed(1)}" width="8" height="8" fill="${ink}"/>`);
   }
-  // The core: two stairs at its ends, a bank of three lifts and the WCs between them.
+  // The core, in four bands from top to bottom: a stair, the lifts, the WCs and a second stair. Each
+  // label sits inside its own band, so none can land on another however small the core is drawn.
   parts.push(`<rect x="${X(cx)}" y="${Y(cy)}" width="${S(cw)}" height="${S(ch)}" fill="#ece6da" stroke="${ink}" stroke-width="2"/>`);
-  const stairH = ch * 0.3; const stairs = [cy, cy + ch - stairH];
+  const stairH = ch * 0.25; const stairs = [cy, cy + ch - stairH];
   for (const sy of stairs) {
     parts.push(`<rect x="${X(cx)}" y="${Y(sy)}" width="${S(cw)}" height="${S(stairH)}" fill="${paper}" stroke="${ink}" stroke-width="1.2"/>`);
     for (let t = 1; t < 8; t++) parts.push(`<line x1="${X(cx + (cw * t) / 8)}" y1="${Y(sy)}" x2="${X(cx + (cw * t) / 8)}" y2="${Y(sy + stairH)}" stroke="${grey}" stroke-width="0.8"/>`);
     parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(sy + stairH / 2)) + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}" paint-order="stroke" stroke="${paper}" stroke-width="4">${esc(L.stair)}</text>`);
   }
-  const liftY = cy + stairH + ch * 0.06; const liftH = ch * 0.2; const liftW = cw / 3.4;
+  // Lifts band: three cars with their label beneath, all inside the band.
+  const bandH = (ch - 2 * stairH) / 2;
+  const liftTop = cy + stairH; const liftH = bandH * 0.55; const liftW = cw / 3.4;
   for (let n = 0; n < 3; n++) {
     const lx = cx + cw * 0.08 + n * (liftW + cw * 0.04);
-    parts.push(`<rect x="${X(lx)}" y="${Y(liftY)}" width="${S(liftW)}" height="${S(liftH)}" fill="${paper}" stroke="${ink}"/><line x1="${X(lx)}" y1="${Y(liftY)}" x2="${X(lx + liftW)}" y2="${Y(liftY + liftH)}" stroke="${grey}"/><line x1="${X(lx + liftW)}" y1="${Y(liftY)}" x2="${X(lx)}" y2="${Y(liftY + liftH)}" stroke="${grey}"/>`);
+    const ly = liftTop + bandH * 0.1;
+    parts.push(`<rect x="${X(lx)}" y="${Y(ly)}" width="${S(liftW)}" height="${S(liftH)}" fill="${paper}" stroke="${ink}"/><line x1="${X(lx)}" y1="${Y(ly)}" x2="${X(lx + liftW)}" y2="${Y(ly + liftH)}" stroke="${grey}"/><line x1="${X(lx + liftW)}" y1="${Y(ly)}" x2="${X(lx)}" y2="${Y(ly + liftH)}" stroke="${grey}"/>`);
   }
-  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(liftY + liftH)) + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}">${esc(L.lifts)}</text>`);
-  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(cy + ch - stairH)) - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}">${esc(L.wc)}</text>`);
-  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(cy)) - 6).toFixed(1)}" text-anchor="middle" font-size="9" fill="${grey}" letter-spacing="1">${esc(L.corridor.toUpperCase())}</text>`);
+  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(liftTop + bandH)) - 3).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}" paint-order="stroke" stroke="#ece6da" stroke-width="3">${esc(L.lifts)}</text>`);
+  // WCs band: its own room, label centred.
+  const wcTop = liftTop + bandH;
+  parts.push(`<rect x="${X(cx)}" y="${Y(wcTop)}" width="${S(cw)}" height="${S(bandH)}" fill="${paper}" stroke="${ink}" stroke-width="1.2"/>`);
+  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(wcTop + bandH / 2)) + 3.5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}">${esc(L.wc)}</text>`);
+  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(cy)) - 6).toFixed(1)}" text-anchor="middle" font-size="9" fill="${grey}" letter-spacing="${ar ? 0 : 1}">${esc(ar ? L.corridor : L.corridor.toUpperCase())}</text>`);
   // Outer walls on top.
   parts.push(`<rect x="${X(0)}" y="${Y(0)}" width="${S(Wf)}" height="${S(Hf)}" fill="none" stroke="${ink}" stroke-width="4"/>`);
-  // North arrow and scale bar, clear of the drawing.
   const bar = [5, 10, 20, 25, 50].find((m) => m * k >= 90) ?? 50;
-  const nx = W - 46; const ny = oy + 30;
-  const bottom = Number(Y(Hf)) + 40;
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="system-ui, sans-serif">
-  <defs><pattern id="h" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#f6e3dc"/><line x1="0" y1="0" x2="0" y2="7" stroke="${red}" stroke-width="1.1"/></pattern></defs>
-  <rect width="${W}" height="${H}" fill="${paper}"/>
-  <text x="${ar ? W - 30 : ox - 44}" y="30" font-size="18" fill="${ink}" text-anchor="${ar ? 'end' : 'start'}">${esc(L.title)} · <tspan direction="ltr" unicode-bidi="embed">${esc(d.reference)}</tspan></text>
-  ${parts.join('\n  ')}
-  <g transform="translate(${nx}, ${ny})"><circle r="24" fill="${paper}" stroke="${ink}"/><path d="M0,-18 L7,8 L0,3 L-7,8 Z" fill="${ink}"/><text y="40" text-anchor="middle" font-size="12" font-weight="600" fill="${ink}">N</text></g>
-  <g transform="translate(${ox}, ${bottom})"><rect width="${(bar * k / 2).toFixed(1)}" height="6" fill="${ink}"/><rect x="${(bar * k / 2).toFixed(1)}" width="${(bar * k / 2).toFixed(1)}" height="6" fill="${paper}" stroke="${ink}"/><text y="22" font-size="11" fill="${grey}">0</text><text x="${(bar * k).toFixed(1)}" y="22" font-size="11" text-anchor="end" fill="${grey}">${bar} m</text></g>
-  <g transform="translate(${ox}, ${bottom + 44})"><line x1="0" y1="-12" x2="${W - ox - 40}" y2="-12" stroke="${ink}"/><text x="${ar ? W - ox - 40 : 0}" text-anchor="${ar ? 'end' : 'start'}" y="6" font-size="12" fill="${ink}">${esc(d.property_name)} · ${esc(d.premises)}</text><text x="${ar ? W - ox - 40 : 0}" text-anchor="${ar ? 'end' : 'start'}" y="24" font-size="11" fill="${grey}">${esc(L.note)}</text></g>
-</svg>`;
+  return planSvg(W, H, ox, Number(Y(Hf)) + 40, k, bar, d, L, ar, parts);
 }
 
 // A rent review memorandum: the latest rent change on the lease, as a short dated note.

@@ -723,6 +723,8 @@ type LeaseOption {
   Whether the lessee is reasonably certain to exercise it, which changes the accounting term.
   """
   reasonablyCertain: Boolean!
+
+  """An open option lapses once its notice deadline passes unexercised."""
   status: OptionStatus!
   termMonths: Int
   terms: String

@@ -9,6 +9,7 @@ import type { Context } from '../graphql/context.ts';
 import type { LeaseRow } from '../graphql/types/lease-shape.ts';
 import { MINOR_UNITS, PER_USD } from '../seed/markets.ts';
 import { addDays, addMonths } from './dates.ts';
+import { optionStatus } from './options.ts';
 import { annualRent, nextReviewOn, type RentTerms } from './rent.ts';
 
 const pct = (v: string) => (v.trim() ? new Decimal(v).div(100).toDecimalPlaces(6).toString() : null);
@@ -166,7 +167,7 @@ export async function insertChildren(ctx: Context, f: LeaseFormData, t: WriteTar
   const options: Insertable<LeaseOptionTable>[] = f.options.map((o) => ({
     id: randomUUID(), ...scope, kind: o.kind, exercise_on: o.exerciseOn, notice_by: o.noticeBy || null,
     term_months: o.kind === 'RENEWAL' ? Number(o.termMonths) : null, price: o.kind === 'PURCHASE' ? o.price.trim() : null,
-    reasonably_certain: o.reasonablyCertain, status: o.exerciseOn < t.today ? 'LAPSED' : 'OPEN', terms: opt(o.terms),
+    reasonably_certain: o.reasonablyCertain, status: optionStatus('OPEN', o.exerciseOn, o.noticeBy || null, t.today), terms: opt(o.terms),
   }));
   const deposits: Insertable<DepositTable>[] = f.deposits.map((d) => ({
     id: randomUUID(), ...scope, kind: d.kind, amount: d.amount.trim(), currency: f.rent.currency, held_by: d.heldBy.trim(),

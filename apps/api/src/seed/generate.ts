@@ -15,6 +15,7 @@ import {
 } from './names.ts';
 import { Rng, stableId } from './rng.ts';
 import { seedText } from './text.ts';
+import { optionStatus } from '../domain/options.ts';
 import { TENANTS, type TenantSeed } from './tenants.ts';
 
 export interface SeedData {
@@ -290,17 +291,21 @@ export function* generateBatches(opts: SeedOptions, batchLeases = 400): Generato
           options.push({
             id: stableId('option', leaseId, 'break'), tenant_id: tenantId, sandbox_id: null, lease_row_id: leaseId,
             kind: 'BREAK', exercise_on: breakOn, notice_by: notice, term_months: null, price: null,
-            reasonably_certain: false, status: breakOn < today ? 'LAPSED' : 'OPEN',
+            reasonably_certain: false, status: optionStatus('OPEN', breakOn, notice, today),
             terms: tx.breakTerms,
           });
         }
         if (r.chance(0.7)) {
           const renewTerm = r.pick([36, 60, 60, 72]);
+          const renewOn = addDays(expiry, 1); const renewNotice = addMonths(expiry, -r.pick([6, 9, 12]));
+          // A lease holding over did not renew, so its renewal option lapsed at the notice deadline;
+          // an expired one either renewed or let it lapse; otherwise it is open until its deadline.
+          const renewStatus = expiry < today && status !== 'HOLDING_OVER' ? r.pick(['EXERCISED', 'LAPSED'] as const) : optionStatus('OPEN', renewOn, renewNotice, today);
           options.push({
             id: stableId('option', leaseId, 'renewal'), tenant_id: tenantId, sandbox_id: null, lease_row_id: leaseId,
-            kind: 'RENEWAL', exercise_on: addDays(expiry, 1), notice_by: addMonths(expiry, -r.pick([6, 9, 12])),
+            kind: 'RENEWAL', exercise_on: renewOn, notice_by: renewNotice,
             term_months: renewTerm, price: null, reasonably_certain: type === 'WAREHOUSE' && r.chance(0.3),
-            status: expiry < today ? (status === 'HOLDING_OVER' ? 'OPEN' : r.pick(['EXERCISED', 'LAPSED'] as const)) : 'OPEN',
+            status: renewStatus,
             terms: tx.renewTerms(renewTerm / 12),
           });
         }
