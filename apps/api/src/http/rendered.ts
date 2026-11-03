@@ -311,7 +311,8 @@ export function renderPlan(d: PlanLease, lang: 'en' | 'ar'): string {
   const wcTop = liftTop + bandH;
   parts.push(`<rect x="${X(cx)}" y="${Y(wcTop)}" width="${S(cw)}" height="${S(bandH)}" fill="${paper}" stroke="${ink}" stroke-width="1.2"/>`);
   parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(wcTop + bandH / 2)) + 3.5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink}">${esc(L.wc)}</text>`);
-  parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(cy)) - 6).toFixed(1)}" text-anchor="middle" font-size="9" fill="${grey}" letter-spacing="${ar ? 0 : 1}">${esc(ar ? L.corridor : L.corridor.toUpperCase())}</text>`);
+  // A whole-floor demise has no corridor partition, so the corridor is labelled only on a split floor.
+  if (!wholeFloor) parts.push(`<text x="${X(cx + cw / 2)}" y="${(Number(Y(cy)) - 6).toFixed(1)}" text-anchor="middle" font-size="9" fill="${grey}" letter-spacing="${ar ? 0 : 1}">${esc(ar ? L.corridor : L.corridor.toUpperCase())}</text>`);
   // Outer walls on top.
   parts.push(`<rect x="${X(0)}" y="${Y(0)}" width="${S(Wf)}" height="${S(Hf)}" fill="none" stroke="${ink}" stroke-width="4"/>`);
   const bar = [5, 10, 20, 25, 50].find((m) => m * k >= 90) ?? 50;
