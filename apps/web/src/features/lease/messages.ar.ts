@@ -73,6 +73,8 @@ export const leaseAr: Record<LeaseKey, string> = {
   "lease.accounting.scheduleTitle": "جدول الفترات",
   "lease.accounting.showAll": "عرض كل الفترات ({count})",
   "lease.accounting.showUpcoming": "عرض الفترات الـ12 القادمة",
+  "lease.accounting.showLast": "عرض آخر 12 فترة",
+  "lease.accounting.scheduleEnded": "انتهت جميع الفترات؛ هذه آخر {count} فترة.",
   "lease.accounting.exportCsv": "تصدير CSV",
   "lease.accounting.journalsTitle": "القيود في {year}",
   "lease.accounting.journalKind": "نوع القيد",

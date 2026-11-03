@@ -71,6 +71,8 @@ export const leaseEn = {
   "lease.accounting.scheduleTitle": "Period schedule",
   "lease.accounting.showAll": "Show all {count} periods",
   "lease.accounting.showUpcoming": "Show the next 12",
+  "lease.accounting.showLast": "Show the last 12",
+  "lease.accounting.scheduleEnded": "Every period has ended; these are the last {count}.",
   "lease.accounting.exportCsv": "Export CSV",
   "lease.accounting.journalsTitle": "Journals in {year}",
   "lease.accounting.journalKind": "Kind of journal",

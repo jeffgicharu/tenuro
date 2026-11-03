@@ -189,8 +189,8 @@ export function SavedViewsBar({ viewer: ref, activeViewId, onSelect, currentConf
     ro.observe(list);
     return () => { list.removeEventListener('scroll', measure); ro.disconnect(); };
   }, [activeViewId, viewer.savedViews.edges.length, intl.locale]);
-  const endSide = theme.direction === 'rtl' ? 'left' : 'right';
-  const mask = `linear-gradient(to ${endSide}, ${fade.start ? 'transparent 0, #000 24px' : '#000 0'}, ${fade.end ? '#000 calc(100% - 32px), transparent 100%' : '#000 100%'})`;
+  // Written left to right on purpose: the stylesheet's RTL plugin mirrors "to right" in right-to-left.
+  const mask = `linear-gradient(to right, ${fade.start ? 'transparent 0, #000 24px' : '#000 0'}, ${fade.end ? '#000 calc(100% - 32px), transparent 100%' : '#000 100%'})`;
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 4, borderBottom: `1px solid ${t.rule}` }}>

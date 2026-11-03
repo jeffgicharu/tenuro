@@ -79,7 +79,10 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
   }
   const operating = a.measuredAs === 'ASC842_OPERATING';
   const exempt = a.exemption !== 'NONE';
-  const rows = showAll ? a.schedule : a.schedule.filter((r) => r.endDate >= today).slice(0, 12);
+  // The next 12 periods; for a lease whose periods have all ended, its last 12 rather than an empty table.
+  const upcoming = a.schedule.filter((r) => r.endDate >= today);
+  const ended = upcoming.length === 0;
+  const rows = showAll ? a.schedule : ended ? a.schedule.slice(-12) : upcoming.slice(0, 12);
   // Journals summarised by month: one row per account with its debit and credit totals, each month
   // opening to its entries.
   const cur = a.initialLiability.currency;
@@ -253,9 +256,14 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
       <Box component="section" aria-labelledby="acc-schedule">
         <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 3, mb: 2 }}>
           <Box component="h2" id="acc-schedule" sx={{ ...theme.typography.h3, m: 0, flex: 1 }}><FormattedMessage id="lease.accounting.scheduleTitle" /></Box>
-          <Button size="small" onClick={() => setShowAll((v) => !v)}><FormattedMessage id={showAll ? 'lease.accounting.showUpcoming' : 'lease.accounting.showAll'} values={{ count: a.schedule.length }} /></Button>
+          <Button size="small" onClick={() => setShowAll((v) => !v)}><FormattedMessage id={showAll ? (ended ? 'lease.accounting.showLast' : 'lease.accounting.showUpcoming') : 'lease.accounting.showAll'} values={{ count: a.schedule.length }} /></Button>
           <Button size="small" variant="outlined" startIcon={<Download size={14} aria-hidden />} onClick={exportSchedule}><FormattedMessage id="lease.accounting.exportCsv" /></Button>
         </Box>
+        {ended && !showAll && (
+          <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mb: 2 }}>
+            <FormattedMessage id="lease.accounting.scheduleEnded" values={{ count: rows.length }} />
+          </Box>
+        )}
         <ScrollFrame tabIndex={0} role="region" aria-label={intl.formatMessage({ id: 'lease.accounting.scheduleTable' })} sx={{ overflow: 'auto', maxHeight: 480, border: `1px solid ${t.rule}`, borderRadius: 1, backgroundColor: t.surface, '&:focus-visible': { outline: `2px solid ${t.focus}` } }}>
           <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>

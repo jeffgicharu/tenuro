@@ -73,6 +73,8 @@ export const leaseSw: Record<LeaseKey, string> = {
   "lease.accounting.scheduleTitle": "Ratiba ya vipindi",
   "lease.accounting.showAll": "Onyesha vipindi vyote {count}",
   "lease.accounting.showUpcoming": "Onyesha 12 zijazo",
+  "lease.accounting.showLast": "Onyesha 12 za mwisho",
+  "lease.accounting.scheduleEnded": "Vipindi vyote vimekwisha; hivi ni {count} vya mwisho.",
   "lease.accounting.exportCsv": "Hamisha CSV",
   "lease.accounting.journalsTitle": "Maingizo ya {year}",
   "lease.accounting.journalKind": "Aina ya ingizo",

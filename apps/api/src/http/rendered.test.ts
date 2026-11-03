@@ -13,6 +13,12 @@ describe('demise plan', () => {
     expect(svg).toContain('Shop 1-35'); // neighbours follow the premises' numbering
   });
 
+  it('labels Arabic neighbouring shops by number, so the labels fit', () => {
+    const svg = renderPlan({ reference: 'BH-R-01968', premises: 'محل 48، الطابق الثاني', property_name: 'واحة', area_sqm: '196', property_type: 'RETAIL' }, 'ar');
+    for (const n of [46, 47, 49, 50]) expect(svg).toContain(`>محل ${n}<`);
+    expect(svg).toContain('ممر المركز التجاري');
+  });
+
   it('puts a ground-floor shop on a street', () => {
     const svg = renderPlan({ reference: 'X', premises: 'Shop G-05', property_name: 'P', area_sqm: '60', property_type: 'RETAIL' }, 'en');
     expect(svg).toContain('STREET FRONTAGE');

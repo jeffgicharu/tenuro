@@ -188,7 +188,8 @@ function renderRowPlan(d: PlanLease, lang: 'en' | 'ar', kind: 'retail' | 'indust
     const tx = Number(X(x + uw / 2)); const ty = Number(Y(back + depth / 2));
     if (demised) parts.push(demisedLabel(tx, ty, L, d.premises, area, locale));
     else {
-      const name = neighbourName(d.premises, i - 2);
+      // Neighbours share the floor, so their label is the name up to its first comma ("محل 49").
+      const name = neighbourName(d.premises, i - 2)?.split(/[,،]/)[0]?.trim() ?? null;
       if (name && uw * k > name.length * 6.2 + 8) parts.push(`<text x="${tx}" y="${ty + 4}" text-anchor="middle" font-size="11" fill="${grey}">${esc(name)}</text>`);
     }
     x += uw;

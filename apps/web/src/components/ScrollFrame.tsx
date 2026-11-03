@@ -1,13 +1,11 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Box, { type BoxProps } from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles';
 
 // A frame that scrolls sideways when its content is wider, and fades whichever edge has more to
 // show, so a table cut off at the edge reads as "scroll for more" rather than as clipped. Works in
 // either direction: in right-to-left the start edge is on the right.
 export function ScrollFrame({ children, sx, ...rest }: Omit<BoxProps, 'children'> & { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const rtl = useTheme().direction === 'rtl';
   const [fade, setFade] = useState({ start: false, end: false });
 
   useLayoutEffect(() => {
@@ -30,9 +28,10 @@ export function ScrollFrame({ children, sx, ...rest }: Omit<BoxProps, 'children'
     return () => { el.removeEventListener('scroll', measure); ro.disconnect(); };
   }, []);
 
-  const toEnd = rtl ? 'left' : 'right';
+  // Written left to right on purpose: in right-to-left the stylesheet's RTL plugin mirrors
+  // "to right" into "to left", so the start fade lands on the right and the end fade on the left.
   const mask = fade.start || fade.end
-    ? `linear-gradient(to ${toEnd}, ${fade.start ? 'transparent 0, #000 40px' : '#000 0'}, ${fade.end ? '#000 calc(100% - 40px), transparent 100%' : '#000 100%'})`
+    ? `linear-gradient(to right, ${fade.start ? 'transparent 0, #000 40px' : '#000 0'}, ${fade.end ? '#000 calc(100% - 40px), transparent 100%' : '#000 100%'})`
     : undefined;
 
   return (
