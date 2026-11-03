@@ -389,7 +389,10 @@ describe('server timing', () => {
     expect(header).toMatch(/desc="Viewer\.portfolio";dur=/);
     // The database share, with the slowest statements by their text.
     expect(header).toMatch(/db;desc="\d+ statements";dur=/);
-    expect(header).toMatch(/s1;desc="[^"]*(select|SELECT)[^"]*";dur=/);
+    // Any of the listed statements: which one is slowest varies run to run (an occasional UPDATE
+    // touching the session can come first), so requiring it of s1 made this test flaky.
+    expect(header).toMatch(/s1;desc="[^"]+";dur=\d+\.\d/);
+    expect(header).toMatch(/s\d;desc="[^"]*(select|SELECT)[^"]*";dur=/);
     expect(header).toMatch(/desc="Portfolio\.(liveLeases|keyDatesDue)";dur=/);
   });
 });
