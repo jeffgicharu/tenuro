@@ -13,6 +13,7 @@ import { useRouteQuery } from '../../app/relayRoute.ts';
 import { downloadCsv } from '../../app/download.ts';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { ErrorBoundary } from '../../components/ErrorBoundary.tsx';
+import { CompactMoney } from '../../components/CompactMoney.tsx';
 import { Money } from '../../components/Money.tsx';
 import { useFormat } from '../../i18n/format.ts';
 import { FONT_MONO } from '../../theme/theme.ts';
@@ -83,14 +84,16 @@ function AccountingContent() {
   ]);
 
   const Figure = ({ label, value, hint, lead }: { label: string; value: React.ReactNode; hint?: React.ReactNode; lead?: boolean }) => (
-    <Box component="li" sx={{ minWidth: 0, py: { xs: 3, md: 5 }, px: { xs: 0, md: 5 }, gridColumn: lead ? { xs: '1 / -1', md: 'auto' } : undefined, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } }, borderTop: { xs: `1px solid ${t.rule}`, md: 'none' } }}>
+    <Box component="li" data-kpi sx={{ minWidth: 0, py: { xs: 3, md: 5 }, px: { xs: 0, md: 5 }, gridColumn: lead ? { xs: '1 / -1', md: 'auto' } : undefined, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } }, borderTop: { xs: `1px solid ${t.rule}`, md: 'none' } }}>
       <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1.5 }}>{label}</Box>
-      <Box data-num sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: lead ? { xs: '1.5rem', md: '1.9rem' } : { xs: '1.1rem', md: '1.3rem' }, lineHeight: 1.1, '& bdi': { whiteSpace: 'nowrap' } }}>{value}</Box>
-      {hint && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 1 }}>{hint}</Box>}
+      <Box data-num data-kpi-value sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: lead ? { xs: '1.5rem', md: '1.9rem' } : { xs: '1.1rem', md: '1.3rem' }, lineHeight: 1.15, overflowWrap: 'anywhere' }}>{value}</Box>
+      {hint && <Box sx={{ fontSize: '0.8125rem', color: t.inkSecondary, mt: 1, overflowWrap: 'anywhere' }}>{hint}</Box>}
     </Box>
   );
-  // Accounting figures show the minor unit, as journals and exports do.
-  const exact = (m: { amount: string; currency: string }) => <bdi>{f.money(m.amount, m.currency)}</bdi>;
+  // Headline figures are compact so they always fit (the exact amount is in their tooltip); the
+  // tables below and the export keep the minor unit.
+  const exact = (m: { amount: string; currency: string }) => <CompactMoney value={m} />;
+  const short = (amount: string) => f.money(amount, cur, { compact: true });
 
   return (
     <>
@@ -106,12 +109,12 @@ function AccountingContent() {
 
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, mb: 7, display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'minmax(0, 1.4fr) repeat(3, minmax(0, 1fr))' }, borderTop: `2px solid ${t.ink}`, borderBottom: `1px solid ${t.rule}` }}>
         <Figure lead label={intl.formatMessage({ id: 'accounting.liability' })} value={exact(s.liability)}
-          hint={<FormattedMessage id="accounting.split" values={{ current: f.money(current.toFixed(2), cur), nonCurrent: f.money((liability - current).toFixed(2), cur) }} />} />
+          hint={<FormattedMessage id="accounting.split" values={{ current: short(current.toFixed(2)), nonCurrent: short((liability - current).toFixed(2)) }} />} />
         <Figure label={intl.formatMessage({ id: 'accounting.rou' })} value={exact(s.rou)} hint={<FormattedMessage id="accounting.measured" values={{ count: s.leasesMeasured }} />} />
         <Figure label={intl.formatMessage({ id: 'accounting.interest' }, { year: s.year })} value={exact(s.interestThisYear)}
-          hint={<FormattedMessage id="accounting.depreciation" values={{ amount: f.money(s.depreciationThisYear.amount, cur) }} />} />
+          hint={<FormattedMessage id="accounting.depreciation" values={{ amount: short(s.depreciationThisYear.amount) }} />} />
         <Figure label={intl.formatMessage({ id: 'accounting.cash' }, { year: s.year })} value={exact(s.cashThisYear)}
-          hint={Number(s.leaseCostThisYear.amount) > 0 ? <FormattedMessage id="accounting.expensed" values={{ amount: f.money(s.leaseCostThisYear.amount, cur) }} /> : undefined} />
+          hint={Number(s.leaseCostThisYear.amount) > 0 ? <FormattedMessage id="accounting.expensed" values={{ amount: short(s.leaseCostThisYear.amount) }} /> : undefined} />
       </Box>
 
       <Box sx={{ display: 'grid', gap: 5, mb: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) minmax(0, 1.3fr)' } }}>

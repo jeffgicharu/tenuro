@@ -7,6 +7,7 @@ import { useTheme } from '@mui/material/styles';
 import { Download } from 'lucide-react';
 import type { LeaseAccountingQuery } from './__generated__/LeaseAccountingQuery.graphql';
 import { EmptyState } from '../../components/EmptyState.tsx';
+import { CompactMoney } from '../../components/CompactMoney.tsx';
 import { Money } from '../../components/Money.tsx';
 import { useFormat } from '../../i18n/format.ts';
 import { downloadCsv } from '../../app/download.ts';
@@ -104,10 +105,10 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
   ]);
 
   const Figure = ({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) => (
-    <Box sx={{ minWidth: 0, py: 3, px: { xs: 0, md: 4 }, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } } }}>
+    <Box data-kpi sx={{ minWidth: 0, py: 3, px: { xs: 0, md: 4 }, '&:first-of-type': { paddingInlineStart: { md: 0 } }, '& + &': { borderInlineStart: { md: `1px solid ${t.rule}` } } }}>
       <Box sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1 }}>{label}</Box>
-      <Box data-num sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: '1.4rem', lineHeight: 1.15 }}>{value}</Box>
-      {hint && <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mt: 0.5 }}>{hint}</Box>}
+      <Box data-num data-kpi-value sx={{ fontFamily: theme.typography.h1.fontFamily, fontSize: '1.4rem', lineHeight: 1.15, overflowWrap: 'anywhere' }}>{value}</Box>
+      {hint && <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mt: 0.5, overflowWrap: 'anywhere' }}>{hint}</Box>}
     </Box>
   );
   const th = { textAlign: 'end' as const, fontWeight: 600, fontSize: '0.75rem', color: t.inkSecondary, py: 1.5, px: 2, borderBottom: `1px solid ${t.ruleStrong}`, whiteSpace: 'nowrap' as const, position: 'sticky' as const, top: 0, backgroundColor: t.surface };
@@ -129,14 +130,14 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
           {exempt && <> <FormattedMessage id={`lease.accounting.exempt.${a.exemption}`} /></>}
         </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, borderTop: `2px solid ${t.ink}`, borderBottom: `1px solid ${t.rule}` }}>
-          <Figure label={intl.formatMessage({ id: 'lease.accounting.liabilityToday' })} value={<Money value={a.liabilityToday} />} hint={<FormattedMessage id="lease.accounting.atCommencement" values={{ amount: f.money(a.initialLiability.amount, a.initialLiability.currency) }} />} />
-          <Figure label={intl.formatMessage({ id: 'lease.accounting.rouToday' })} value={<Money value={a.rouToday} />} hint={<FormattedMessage id="lease.accounting.atCommencement" values={{ amount: f.money(a.initialRou.amount, a.initialRou.currency) }} />} />
+          <Figure label={intl.formatMessage({ id: 'lease.accounting.liabilityToday' })} value={<CompactMoney value={a.liabilityToday} />} hint={<FormattedMessage id="lease.accounting.atCommencement" values={{ amount: f.money(a.initialLiability.amount, a.initialLiability.currency, { compact: true }) }} />} />
+          <Figure label={intl.formatMessage({ id: 'lease.accounting.rouToday' })} value={<CompactMoney value={a.rouToday} />} hint={<FormattedMessage id="lease.accounting.atCommencement" values={{ amount: f.money(a.initialRou.amount, a.initialRou.currency, { compact: true }) }} />} />
           {operating ? (
-            <Figure label={intl.formatMessage({ id: 'lease.accounting.leaseCostYear' }, { year: a.thisYear.year })} value={<Money value={a.thisYear.leaseCost} />} hint={<FormattedMessage id="lease.accounting.straightLine" />} />
+            <Figure label={intl.formatMessage({ id: 'lease.accounting.leaseCostYear' }, { year: a.thisYear.year })} value={<CompactMoney value={a.thisYear.leaseCost} />} hint={<FormattedMessage id="lease.accounting.straightLine" />} />
           ) : (
-            <Figure label={intl.formatMessage({ id: 'lease.accounting.interestYear' }, { year: a.thisYear.year })} value={<Money value={a.thisYear.interest} />} hint={<FormattedMessage id="lease.accounting.depreciationYear" values={{ amount: f.money(a.thisYear.depreciation.amount, a.thisYear.depreciation.currency) }} />} />
+            <Figure label={intl.formatMessage({ id: 'lease.accounting.interestYear' }, { year: a.thisYear.year })} value={<CompactMoney value={a.thisYear.interest} />} hint={<FormattedMessage id="lease.accounting.depreciationYear" values={{ amount: f.money(a.thisYear.depreciation.amount, a.thisYear.depreciation.currency, { compact: true }) }} />} />
           )}
-          <Figure label={intl.formatMessage({ id: 'lease.accounting.futureInterest' })} value={<Money value={a.futureInterest} />} hint={<FormattedMessage id="lease.accounting.totalPayments" values={{ amount: f.money(a.totalPayments.amount, a.totalPayments.currency, { compact: true }) }} />} />
+          <Figure label={intl.formatMessage({ id: 'lease.accounting.futureInterest' })} value={<CompactMoney value={a.futureInterest} />} hint={<FormattedMessage id="lease.accounting.totalPayments" values={{ amount: f.money(a.totalPayments.amount, a.totalPayments.currency, { compact: true }) }} />} />
         </Box>
       </Box>
 

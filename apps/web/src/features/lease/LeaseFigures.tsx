@@ -5,20 +5,22 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import type { LeaseFigures_lease$key } from './__generated__/LeaseFigures_lease.graphql';
 import { useFormat } from '../../i18n/format.ts';
+import { CompactMoney } from '../../components/CompactMoney.tsx';
 
 function Figure({ label, value, detail, tone }: { label: ReactNode; value: ReactNode; detail?: ReactNode; tone?: 'warning' | 'danger' }) {
   const theme = useTheme();
   const t = theme.tokens;
   return (
-    <Box sx={{ minWidth: 0, py: 4, px: { xs: 0, md: 5 }, '&:first-of-type': { paddingInlineStart: { md: 0 }, gridColumn: { xs: '1 / -1', md: 'auto' } } }}>
+    <Box data-kpi sx={{ minWidth: 0, py: 4, px: { xs: 0, md: 5 }, '&:first-of-type': { paddingInlineStart: { md: 0 }, gridColumn: { xs: '1 / -1', md: 'auto' } } }}>
       <Box component="dt" sx={{ fontSize: '0.75rem', color: t.inkSecondary, mb: 1.5 }}>{label}</Box>
       <Box
         component="dd"
         data-num
+        data-kpi-value
         sx={{
           m: 0, fontFamily: theme.typography.h1.fontFamily, fontSize: { xs: '1.35rem', md: '1.6rem' }, lineHeight: 1.15,
           fontWeight: theme.direction === 'rtl' ? 600 : 500, color: tone === 'danger' ? t.danger : tone === 'warning' ? t.warning : t.ink,
-          '& bdi': { whiteSpace: 'nowrap' },
+          overflowWrap: 'anywhere',
         }}
       >
         {value}
@@ -72,10 +74,10 @@ export function LeaseFigures({ lease: ref }: { lease: LeaseFigures_lease$key }) 
     >
       <Figure
         label={<FormattedMessage id="lease.figure.passingRent" />}
-        value={<bdi>{f.money(lease.annualRent.amount, lease.annualRent.currency)}</bdi>}
+        value={<CompactMoney value={lease.annualRent} />}
         detail={sameCurrency
           ? <FormattedMessage id="lease.figure.perYear" />
-          : <FormattedMessage id="lease.figure.reporting" values={{ amount: <bdi>{f.money(lease.annualRentReporting.amount, lease.annualRentReporting.currency)}</bdi> }} />}
+          : <FormattedMessage id="lease.figure.reporting" values={{ amount: <bdi>{f.money(lease.annualRentReporting.amount, lease.annualRentReporting.currency, { compact: true })}</bdi> }} />}
       />
       <Figure
         label={<FormattedMessage id="lease.figure.term" />}

@@ -93,10 +93,10 @@ function Figure({ label, value, detail, tone, to, lead }: {
           fontSize: lead ? { xs: '1.9rem', md: '2.6rem' } : { xs: '1.5rem', md: '1.9rem' },
           fontWeight: theme.direction === 'rtl' ? 600 : 500,
           color: tone === 'danger' ? t.danger : tone === 'warning' ? t.warning : t.ink,
-          '& bdi': { whiteSpace: 'nowrap' },
+          overflowWrap: 'anywhere',
         }}
       >
-        {value}
+        <Box component="span" data-kpi-value sx={{ display: 'block' }}>{value}</Box>
         <Box component="span" sx={{ display: 'block', mt: 1.25, fontFamily: theme.typography.body1.fontFamily, fontSize: '0.8125rem', fontWeight: 400, lineHeight: 1.4, color: t.inkSecondary }}>
           {detail}
         </Box>
@@ -110,9 +110,9 @@ function Figure({ label, value, detail, tone, to, lead }: {
     '&:not(:first-of-type)': { borderInlineStart: { md: `1px solid ${t.rule}` } },
     '&:first-of-type': { paddingInlineStart: { md: 0 } },
   };
-  if (!to) return <Box component="li" sx={frame}>{body}</Box>;
+  if (!to) return <Box component="li" data-kpi sx={frame}>{body}</Box>;
   return (
-    <Box component="li" sx={{ ...frame, py: 0, px: 0 }}>
+    <Box component="li" data-kpi sx={{ ...frame, py: 0, px: 0 }}>
       <Box
         component={RouterLink}
         to={to}

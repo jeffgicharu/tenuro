@@ -238,3 +238,38 @@ test.describe('documents', () => {
     expect(problems.filter((p) => !sandboxNotice.test(p))).toEqual([]);
   });
 });
+
+test.describe('figures fit their tiles', () => {
+  // Exact KES amounts once ran past their tiles on the accounting page. Every KPI tile, for each
+  // company (KES has the longest figures), at desktop, tablet and phone widths.
+  for (const company of ['Mbuyu Court Holdings', 'Sunbula Estates', 'Halvard & Crane Property Partners'] as const) {
+    test(`nothing overflows a KPI tile for ${company}`, async ({ page }) => {
+      await signIn(page, company, 'Read-only viewer', '/leases?status=ACTIVE');
+      const lease = await page.locator('a[href^="/leases/"]:not([href="/leases/new"])').first().getAttribute('href');
+      const overflowing = () => page.evaluate(() => {
+        const bad: string[] = [];
+        for (const tile of document.querySelectorAll<HTMLElement>('[data-kpi]')) {
+          const box = tile.getBoundingClientRect();
+          if (tile.scrollWidth > tile.clientWidth + 1) bad.push(`tile scrolls: ${tile.innerText.slice(0, 60)}`);
+          for (const el of tile.querySelectorAll<HTMLElement>('*')) {
+            const r = el.getBoundingClientRect();
+            if (r.width === 0) continue;
+            if (r.left < box.left - 1 || r.right > box.right + 1) { bad.push(`${el.innerText.slice(0, 40)} (${Math.round(r.left)}–${Math.round(r.right)} in ${Math.round(box.left)}–${Math.round(box.right)})`); break; }
+          }
+        }
+        return bad;
+      });
+      for (const width of [1440, 820, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const path of ['/', '/accounting', `${lease}#accounting`]) {
+          await page.goto(path);
+          if (path.includes('#')) await page.reload();
+          await expect(page.locator('[data-kpi]').first()).toBeVisible();
+          await page.waitForLoadState('networkidle');
+          expect(await overflowing(), `${company} ${path} at ${width}px`).toEqual([]);
+        }
+      }
+    });
+  }
+});
+
