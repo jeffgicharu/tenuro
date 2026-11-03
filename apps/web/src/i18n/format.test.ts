@@ -32,4 +32,11 @@ describe('formatters', () => {
     expect(f.relativeDays(120)).toBe('in 4 months');
     expect(f.relativeDays(900)).toBe('in 2.5 years');
   });
+
+  it('puts the compact unit after the number in Kiswahili, as in English', () => {
+    const plain = (v: string) => v.replace(/\s/g, ' ');
+    expect(plain(makeFormatters('sw-KE').money('115360870087.79', 'KES', { compact: true }))).toBe('KES 115.4B');
+    expect(plain(makeFormatters('en-KE').money('115360870087.79', 'KES', { compact: true }))).toBe('KES 115.4B');
+    expect(plain(makeFormatters('sw-KE').number(2500000, { compact: true }))).toBe('2.5M');
+  });
 });

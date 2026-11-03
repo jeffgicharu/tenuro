@@ -19,6 +19,21 @@ export interface Formatters {
   area(sqm: string | number): string;
 }
 
+// Kiswahili's locale data puts the compact unit before the number ("KES B115.4"), which reads as a
+// code; finance readers expect it after ("KES 115.4B"). Where a locale puts it first, it moves.
+function suffixCompact(f: Intl.NumberFormat, value: string): string {
+  const parts = f.formatToParts(value as unknown as number);
+  const unit = parts.findIndex((p) => p.type === 'compact');
+  const firstDigit = parts.findIndex((p) => p.type === 'integer');
+  if (unit === -1 || firstDigit === -1 || unit > firstDigit) return parts.map((p) => p.value).join('');
+  const compact = parts[unit]!.value;
+  const rest = parts.filter((_, i) => i !== unit && !(i === unit + 1 && parts[i]!.type === 'literal' && !parts[i]!.value.trim()));
+  let lastNumeric = -1;
+  rest.forEach((p, i) => { if (p.type === 'integer' || p.type === 'fraction' || p.type === 'decimal' || p.type === 'group') lastNumeric = i; });
+  rest.splice(lastNumeric + 1, 0, { type: 'compact', value: compact });
+  return rest.map((p) => p.value).join('');
+}
+
 export function makeFormatters(locale: string): Formatters {
   const cache = new Map<string, Intl.NumberFormat | Intl.DateTimeFormat>();
   const nf = (key: string, make: () => Intl.NumberFormat) => (cache.get(key) ?? cache.set(key, make()).get(key)) as Intl.NumberFormat;
@@ -39,12 +54,13 @@ export function makeFormatters(locale: string): Formatters {
         currencySign: 'accounting',
       }));
       // Intl formats decimal strings exactly; the value never passes through a float.
-      return f.format(amount as unknown as number);
+      return opts.compact ? suffixCompact(f, amount) : f.format(amount as unknown as number);
     },
     number(value, opts = {}) {
-      return nf(`n:${opts.maxFractionDigits ?? 2}:${opts.compact ? 'c' : ''}`, () => new Intl.NumberFormat(locale, {
+      const f = nf(`n:${opts.maxFractionDigits ?? 2}:${opts.compact ? 'c' : ''}`, () => new Intl.NumberFormat(locale, {
         maximumFractionDigits: opts.maxFractionDigits ?? 2, notation: opts.compact ? 'compact' : 'standard',
-      })).format(value as unknown as number);
+      }));
+      return opts.compact ? suffixCompact(f, String(value)) : f.format(value as unknown as number);
     },
     percent(fraction, digits = 2) {
       return nf(`p:${digits}`, () => new Intl.NumberFormat(locale, { style: 'percent', minimumFractionDigits: 0, maximumFractionDigits: digits }))
