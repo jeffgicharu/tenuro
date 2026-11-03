@@ -254,9 +254,8 @@ export function renderPlan(d: PlanLease, lang: 'en' | 'ar'): string {
   const floorMatch = /(\d+)/.exec(d.premises);
   const floor = floorMatch ? Number(floorMatch[1]) : 1;
   const num = (i: number) => `${floor}.${String(i + 1).padStart(2, '0')}`;
-  // A whole-floor lease takes every unit on the plate.
+  // A whole-floor lease takes the entire plate around the core: one hatched area, no unit partitions.
   const wholeFloor = /whole floor|كاملاً/i.test(d.premises);
-  if (wholeFloor) units.forEach((u) => { u.demised = true; });
   const ink = PLAN_INK; const grey = PLAN_GREY; const red = PLAN_RED; const paper = PLAN_PAPER;
   const parts: string[] = [];
   // Column grid: lines every 7.5 m, letters along the top, numbers down the side.
@@ -269,13 +268,17 @@ export function renderPlan(d: PlanLease, lang: 'en' | 'ar'): string {
     parts.push(`<line x1="${(ox - 22).toFixed(1)}" y1="${Y(y)}" x2="${X(Wf)}" y2="${Y(y)}" stroke="${grey}" stroke-width="0.6" stroke-dasharray="6 4"/>`);
     parts.push(`<circle cx="${(ox - 34).toFixed(1)}" cy="${Y(y)}" r="10" fill="${paper}" stroke="${grey}"/><text x="${(ox - 34).toFixed(1)}" y="${(Number(Y(y)) + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${grey}">${j + 1}</text>`);
   }
-  // Units: neighbours outlined, the demised unit hatched.
-  units.forEach((u, i) => {
+  // Units: neighbours outlined, the demised unit hatched; or, for a whole floor, the plate as one area
+  // (the core is drawn over it below) with a single label in the left block.
+  if (wholeFloor) {
+    parts.push(`<rect x="${X(0)}" y="${Y(0)}" width="${S(Wf)}" height="${S(Hf)}" fill="url(#h)" stroke="${red}" stroke-width="2.4"/>`);
+    parts.push(demisedLabel(Number(X(leftW / 2)), Number(Y(Hf / 2)), L, d.premises, area, locale));
+  }
+  if (!wholeFloor) units.forEach((u, i) => {
     parts.push(`<rect x="${X(u.x)}" y="${Y(u.y)}" width="${S(u.w)}" height="${S(u.h)}" fill="${u.demised ? 'url(#h)' : paper}" stroke="${u.demised ? red : ink}" stroke-width="${u.demised ? 2.4 : 1.2}"/>`);
     const tx = Number(X(u.x + u.w / 2)); const ty = Number(Y(u.y + u.h / 2));
-    // One label for the demised premises, in the first demised unit (all of them for a whole floor).
     if (u.demised) {
-      if (i === 0) parts.push(demisedLabel(tx, ty, L, d.premises, area, locale));
+      parts.push(demisedLabel(tx, ty, L, d.premises, area, locale));
     } else if (u.w * k > 50 && u.h * k > 26) {
       parts.push(`<text x="${tx}" y="${ty + 4}" text-anchor="middle" font-size="11" fill="${grey}">${esc(L.unit)} ${num(i)}</text>`);
     }

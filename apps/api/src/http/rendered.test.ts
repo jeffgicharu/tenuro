@@ -47,6 +47,15 @@ describe('demise plan', () => {
     }
   });
 
+  it('draws a whole-floor demise as one hatched area with a single label and no unit partitions', () => {
+    for (const premises of ['Level 7, Whole floor', 'الطابق 3، الطابق كاملاً']) {
+      const svg = renderPlan({ reference: 'SA-O-00311', premises, property_name: 'P', area_sqm: '276', property_type: 'OFFICE' }, premises.startsWith('L') ? 'en' : 'ar');
+      expect(svg.match(/fill="url\(#h\)"/g)).toHaveLength(1);
+      expect(svg.match(/>(المساحة المؤجرة|Demised premises)</g)).toHaveLength(1);
+      expect(svg).not.toMatch(/>(Unit|وحدة) \d+\.\d+</);
+    }
+  });
+
   it('keeps the lift cars inside the core', () => {
     const svg = renderPlan({ reference: 'GB-O-00488', premises: 'Level 2, Wing A', property_name: 'P', area_sqm: '71', property_type: 'OFFICE' }, 'en');
     const core = /<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="[\d.]+" fill="#ece6da" stroke="#1c1a16" stroke-width="2"\/>/.exec(svg)!;
