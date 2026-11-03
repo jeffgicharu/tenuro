@@ -53,6 +53,7 @@ describe('demise plan', () => {
       expect(svg.match(/fill="url\(#h\)"/g)).toHaveLength(1);
       expect(svg.match(/>(المساحة المؤجرة|Demised premises)</g)).toHaveLength(1);
       expect(svg).not.toMatch(/>(Unit|وحدة) \d+\.\d+</);
+      expect(svg).not.toMatch(/>(CORRIDOR|ممر)</);
     }
   });
 
