@@ -57,7 +57,10 @@ export function LeaseHeader({ lease: ref, canEdit, onAddTask }: { lease: LeaseHe
         </Box>
         <Typography variant="h1" sx={{ fontSize: { xs: '1.75rem', md: '2.25rem' }, mb: 1.5 }}>{lease.propertyName}</Typography>
         <Typography color="text.secondary" sx={{ fontSize: '0.9375rem' }}>
-          {lease.premises} · {[lease.property.district, lease.city, country].filter(Boolean).join(', ')}
+          {/* Each part is isolated, so Arabic data in an English page (or the reverse) keeps its own order and punctuation. */}
+          <bdi>{lease.premises}</bdi> · {[lease.property.district, lease.city, country].filter(Boolean).map((part, i) => (
+            <span key={i}>{i > 0 && ', '}<bdi>{part}</bdi></span>
+          ))}
         </Typography>
         {canEdit && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 5 }}>
