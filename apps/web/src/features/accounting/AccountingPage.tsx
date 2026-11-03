@@ -142,7 +142,7 @@ function AccountingContent() {
           <Box sx={{ fontSize: '0.75rem', color: t.inkTertiary, mt: 2 }}><FormattedMessage id="accounting.rollNote" /></Box>
         </Panel>
         <Panel id="acc-monthly" title={<FormattedMessage id="accounting.monthlyTitle" values={{ year: s.year }} />} lede={<FormattedMessage id="accounting.monthlyLede" />}>
-          <MonthlyChart months={s.monthly} />
+          <MonthlyChart months={s.monthly} year={s.year} />
         </Panel>
       </Box>
 
@@ -255,7 +255,7 @@ function Panel({ id, title, lede, children }: { id: string; title: React.ReactNo
 }
 
 // Interest and depreciation (with any expensed lease cost) stacked month by month.
-function MonthlyChart({ months }: { months: readonly { month: number; interest: { amount: string; currency: string }; depreciation: { amount: string }; leaseCost: { amount: string } }[] }) {
+function MonthlyChart({ months, year }: { year: number; months: readonly { month: number; interest: { amount: string; currency: string }; depreciation: { amount: string }; leaseCost: { amount: string } }[] }) {
   const theme = useTheme();
   const t = theme.tokens;
   const f = useFormat();
@@ -266,20 +266,25 @@ function MonthlyChart({ months }: { months: readonly { month: number; interest: 
   const cur = months[0]?.interest.currency ?? '';
   const anyCost = months.some((m) => Number(m.leaseCost.amount) > 0);
   const seg = (v: string, colour: string) => <Box sx={{ height: `${(Number(v) / max) * 100}%`, backgroundColor: colour }} />;
+  // Months after the current one are a forecast from the schedules: lighter and hatched, and said so.
+  const now = new Date();
+  const forecastFrom = year > now.getUTCFullYear() ? 1 : year < now.getUTCFullYear() ? 13 : now.getUTCMonth() + 2;
+  const hatch = `repeating-linear-gradient(135deg, transparent 0 4px, ${t.surface} 4px 6px)`;
   return (
     <>
       <Box component="ol" aria-label={intl.formatMessage({ id: 'accounting.monthlyAlt' })} sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: { xs: 0.5, md: 1.5 }, alignItems: 'end', height: 200 }}>
         {months.map((m, i) => (
           <Box component="li" key={m.month} sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minWidth: 0 }}>
             <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
-              {label.format(new Date(Date.UTC(2024, m.month - 1, 1)))}: {f.money(totals[i]!.toFixed(2), cur)}
+              {m.month >= forecastFrom ? intl.formatMessage({ id: 'accounting.forecastMonth' }, { month: label.format(new Date(Date.UTC(2024, m.month - 1, 1))) }) : label.format(new Date(Date.UTC(2024, m.month - 1, 1)))}: {f.money(totals[i]!.toFixed(2), cur)}
             </Box>
-            <Box aria-hidden title={f.money(totals[i]!.toFixed(2), cur)} sx={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', borderRadius: '2px 2px 0 0', overflow: 'hidden' }}>
+            <Box aria-hidden title={f.money(totals[i]!.toFixed(2), cur)} sx={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', borderRadius: '2px 2px 0 0', overflow: 'hidden', position: 'relative', ...(m.month >= forecastFrom ? { opacity: 0.55, '&::after': { content: '""', position: 'absolute', inset: 0, backgroundImage: hatch } } : {}) }}>
               {seg(m.interest.amount, t.brand)}
               {seg(m.depreciation.amount, t.accent)}
               {anyCost && seg(m.leaseCost.amount, t.warning)}
             </Box>
-            <Box aria-hidden sx={{ textAlign: 'center', fontSize: '0.625rem', color: t.inkTertiary, pt: 0.75, borderTop: `1px solid ${t.ruleStrong}` }}>{label.format(new Date(Date.UTC(2024, m.month - 1, 1)))}</Box>
+            {/* On a phone only every third month is labelled, so the names never run together. */}
+            <Box aria-hidden sx={{ textAlign: 'center', fontSize: '0.625rem', color: t.inkTertiary, pt: 0.75, borderTop: `1px solid ${t.ruleStrong}`, whiteSpace: 'nowrap', overflow: 'visible', visibility: { xs: (m.month - 1) % 3 === 0 ? 'visible' : 'hidden', md: 'visible' } }}>{label.format(new Date(Date.UTC(2024, m.month - 1, 1)))}</Box>
           </Box>
         ))}
       </Box>
@@ -287,6 +292,7 @@ function MonthlyChart({ months }: { months: readonly { month: number; interest: 
         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.brand }} /><FormattedMessage id="lease.accounting.col.interest" /></Box>
         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.accent }} /><FormattedMessage id="lease.accounting.col.depreciation" /></Box>
         {anyCost && <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.warning }} /><FormattedMessage id="accounting.expensedShort" /></Box>}
+        {forecastFrom <= 12 && <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}><Box component="span" sx={{ width: 10, height: 10, backgroundColor: t.brand, opacity: 0.55, backgroundImage: hatch }} /><FormattedMessage id="accounting.forecast" /></Box>}
       </Box>
     </>
   );

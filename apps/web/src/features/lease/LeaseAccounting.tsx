@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { graphql, useLazyLoadQuery } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
@@ -22,6 +23,7 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
       query LeaseAccountingQuery($id: ID!, $year: Int) {
         node(id: $id) {
           ... on Lease @alias(as: "lease") {
+            status commencementDate expiryDate
             accounting {
               measuredAs exemption annualDiscountRate termPeriods periodsPerYear
               initialLiability { amount currency } initialRou { amount currency }
@@ -48,7 +50,8 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
   const t = theme.tokens;
   const f = useFormat();
   const intl = useIntl();
-  const a = data.node?.lease?.accounting;
+  const lease = data.node?.lease;
+  const a = lease?.accounting;
   const [showAll, setShowAll] = useState(false);
   const [openMonth, setOpenMonth] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
@@ -129,6 +132,14 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
           />
           {exempt && <> <FormattedMessage id={`lease.accounting.exempt.${a.exemption}`} /></>}
         </Box>
+        {/* A lease past its term, or not yet started, carries nothing today: say why instead of showing a row of zeros. */}
+        {(lease?.status === 'HOLDING_OVER' || (lease && today < lease.commencementDate)) && (
+          <Alert severity="info" sx={{ mb: 4 }}>
+            {lease.status === 'HOLDING_OVER'
+              ? <FormattedMessage id="lease.accounting.holdingOverNote" values={{ date: f.date(lease.expiryDate, 'long') }} />
+              : <FormattedMessage id="lease.accounting.notStartedNote" values={{ date: f.date(lease.commencementDate, 'long') }} />}
+          </Alert>
+        )}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, borderTop: `2px solid ${t.ink}`, borderBottom: `1px solid ${t.rule}` }}>
           <Figure label={intl.formatMessage({ id: 'lease.accounting.liabilityToday' })} value={<CompactMoney value={a.liabilityToday} />} hint={<FormattedMessage id="lease.accounting.atCommencement" values={{ amount: f.money(a.initialLiability.amount, a.initialLiability.currency, { compact: true }) }} />} />
           <Figure label={intl.formatMessage({ id: 'lease.accounting.rouToday' })} value={<CompactMoney value={a.rouToday} />} hint={<FormattedMessage id="lease.accounting.atCommencement" values={{ amount: f.money(a.initialRou.amount, a.initialRou.currency, { compact: true }) }} />} />

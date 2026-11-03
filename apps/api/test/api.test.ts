@@ -668,6 +668,8 @@ describe('portfolio accounting', () => {
     const rf = s.rollForward;
     const n = (k: keyof typeof rf) => Number(rf[k].amount);
     expect(Math.abs(n('opening') + n('additions') + n('interest') - n('payments') + n('remeasurements') + n('fx') - n('closing'))).toBeLessThan(1);
+    // The roll-forward closes at today's liability: the same figure as the headline.
+    expect(Math.abs(n('closing') - Number(s.liability.amount))).toBeLessThan(1);
     expect(s.monthly.map((m) => m.month)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(s.largest.length).toBeLessThanOrEqual(10);
     const largest = s.largest.map((l) => Number(l.liability.amount));

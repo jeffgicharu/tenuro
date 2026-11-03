@@ -174,7 +174,7 @@ test.describe('accounting', () => {
     const problems = watchPage(page);
     await signIn(page, 'Mbuyu Court Holdings', 'Portfolio admin', '/accounting');
     await expect(page.getByRole('heading', { level: 1, name: 'Accounting' })).toBeVisible();
-    await expect(page.getByText('Lease liability', { exact: true })).toBeVisible();
+    await expect(page.getByText('Lease liability today', { exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Maturity of remaining payments' })).toBeVisible();
     await expectAccessible(page, 'accounting');
     const download = page.waitForEvent('download');

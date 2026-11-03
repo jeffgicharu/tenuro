@@ -22,6 +22,8 @@ export const leaseEn = {
   "lease.accounting.unavailable.title": "This lease cannot be measured yet",
   "lease.accounting.unavailable.body": "Its term or payments are not complete enough for a schedule. Amend the lease to fill them in.",
   "lease.accounting.basis": "Measured under {standard} at a discount rate of {rate} a year, over {periods} {frequency} periods.",
+  'lease.accounting.holdingOverNote': 'The term ended on {date}. The tenant is holding over month to month, which is treated as a short-term lease: the rent is expensed as it is paid, and nothing is carried on the balance sheet. The schedule below is the original term’s.',
+  'lease.accounting.notStartedNote': 'This lease commences on {date}. Nothing is recognised until then; the schedule below runs from commencement.',
   "lease.accounting.standard.IFRS16": "IFRS 16",
   "lease.accounting.standard.ASC842_FINANCE": "ASC 842 (finance lease)",
   "lease.accounting.standard.ASC842_OPERATING": "ASC 842 (operating lease)",

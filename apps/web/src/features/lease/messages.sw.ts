@@ -24,6 +24,8 @@ export const leaseSw: Record<LeaseKey, string> = {
   "lease.accounting.unavailable.title": "Mkataba huu hauwezi kupimwa bado",
   "lease.accounting.unavailable.body": "Muda au malipo yake hayajakamilika kwa ratiba. Rekebisha mkataba kuyajaza.",
   "lease.accounting.basis": "Umepimwa kwa {standard} kwa kiwango cha punguzo cha {rate} kwa mwaka, kwa vipindi {periods} ({frequency}).",
+  'lease.accounting.holdingOverNote': 'Muda uliisha tarehe {date}. Mpangaji anaendelea mwezi kwa mwezi, jambo linalochukuliwa kama ukodishaji wa muda mfupi: kodi inahesabiwa kama gharama inapolipwa, na hakuna kinachowekwa kwenye mizania. Ratiba hapa chini ni ya muda wa awali.',
+  'lease.accounting.notStartedNote': 'Mkataba huu unaanza tarehe {date}. Hakuna kinachotambuliwa kabla ya hapo; ratiba hapa chini inaanzia tarehe ya kuanza.',
   "lease.accounting.standard.IFRS16": "IFRS 16",
   "lease.accounting.standard.ASC842_FINANCE": "ASC 842 (ukodishaji wa kifedha)",
   "lease.accounting.standard.ASC842_OPERATING": "ASC 842 (ukodishaji wa uendeshaji)",

@@ -24,6 +24,8 @@ export const leaseAr: Record<LeaseKey, string> = {
   "lease.accounting.unavailable.title": "لا يمكن قياس هذا العقد بعد",
   "lease.accounting.unavailable.body": "مدته أو دفعاته غير مكتملة لإعداد الجدول. عدّل العقد لاستكمالها.",
   "lease.accounting.basis": "مُقاس وفق {standard} بمعدل خصم {rate} سنوياً، على {periods} فترة ({frequency}).",
+  'lease.accounting.holdingOverNote': 'انتهت المدة في {date}. يستمر المستأجر شهرًا بشهر، ويُعامل ذلك كعقد قصير الأجل: يُحمَّل الإيجار كمصروف عند دفعه، ولا يُدرج شيء في الميزانية. الجدول أدناه للمدة الأصلية.',
+  'lease.accounting.notStartedNote': 'يبدأ هذا العقد في {date}. لا يُعترف بشيء قبل ذلك؛ يبدأ الجدول أدناه من تاريخ البدء.',
   "lease.accounting.standard.IFRS16": "المعيار الدولي 16",
   "lease.accounting.standard.ASC842_FINANCE": "ASC 842 (إيجار تمويلي)",
   "lease.accounting.standard.ASC842_OPERATING": "ASC 842 (إيجار تشغيلي)",
