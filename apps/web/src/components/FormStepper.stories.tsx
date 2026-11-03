@@ -1,20 +1,22 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { useIntl } from 'react-intl';
 import { FormStepper, type StepperItem } from './FormStepper.tsx';
 
-const items: StepperItem[] = [
-  { key: 'parties', label: 'Parties', hint: 'Landlord, lessee and anyone else', state: 'complete', issues: 0 },
-  { key: 'property', label: 'Property', hint: 'Building and premises', state: 'issues', issues: 2 },
-  { key: 'term', label: 'Term', hint: 'Start and end dates', state: 'current', issues: 0 },
-  { key: 'rent', label: 'Rent', hint: 'Payments and reviews', state: 'untouched', issues: 0 },
-  { key: 'accounting', label: 'Accounting', hint: 'IFRS 16 or ASC 842 inputs', state: 'untouched', issues: 0 },
-  { key: 'review', label: 'Review', hint: 'Check and save', state: 'untouched', issues: 0 },
+const STATES: [string, StepperItem['state'], number][] = [
+  ['parties', 'complete', 0], ['property', 'issues', 2], ['term', 'current', 0], ['rent', 'untouched', 0], ['accounting', 'untouched', 0], ['review', 'untouched', 0],
 ];
 
-// The lease form's sections: a ruled list on wide screens, a select with progress on phones.
+// The lease form's sections: a ruled list on wide screens, a select with progress on phones. The
+// labels come from the form's own catalogue, in each language.
 function Stepper({ compact }: { compact: boolean }) {
+  const m = useIntl().formatMessage;
   const [current, setCurrent] = useState('term');
-  return <FormStepper items={items.map((i) => ({ ...i, state: i.key === current ? 'current' : i.state === 'current' ? 'complete' : i.state }))} current={current} onSelect={setCurrent} label="Form sections" compact={compact} />;
+  const items: StepperItem[] = STATES.map(([key, state, issues]) => ({
+    key, label: m({ id: `leaseForm.step.${key}` }), hint: m({ id: `leaseForm.stepHint.${key}` }),
+    state: key === current ? 'current' : state === 'current' ? 'complete' : state, issues,
+  }));
+  return <FormStepper items={items} current={current} onSelect={setCurrent} label={m({ id: 'leaseForm.stepper.label' })} compact={compact} />;
 }
 const meta = { title: 'Components/FormStepper', parameters: { layout: 'padded' } } satisfies Meta;
 export default meta;

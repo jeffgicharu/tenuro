@@ -1,10 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useIntl } from 'react-intl';
 import Button from '@mui/material/Button';
 import { EmptyState } from './EmptyState.tsx';
 
-const meta = { title: 'Components/EmptyState', component: EmptyState, args: { title: 'No leases match these filters', body: 'Clear a filter to see more of the register.' } } satisfies Meta<typeof EmptyState>;
+// The copy comes from the app's own catalogues, so each language shows its real text.
+function Story({ variant }: { variant: 'plain' | 'action' | 'alert' }) {
+  const m = useIntl().formatMessage;
+  if (variant === 'alert') {
+    return <EmptyState role="alert" title={m({ id: 'register.error.title' })} body={m({ id: 'register.error.body' })} action={<Button variant="contained">{m({ id: 'common.retry' })}</Button>} />;
+  }
+  return <EmptyState title={m({ id: 'register.empty.title' })} body={m({ id: 'register.empty.body' })} {...(variant === 'action' ? { action: <Button variant="outlined">{m({ id: 'register.empty.clear' })}</Button> } : {})} />;
+}
+
+const meta = { title: 'Components/EmptyState' } satisfies Meta;
 export default meta;
-type Story = StoryObj<typeof meta>;
-export const Default: Story = {};
-export const WithAction: Story = { args: { action: <Button variant="outlined">Clear filters</Button> } };
-export const AsAlert: Story = { args: { role: 'alert', title: 'The register could not load', body: 'Try again in a moment.', action: <Button variant="contained">Try again</Button> } };
+type S = StoryObj;
+export const Default: S = { render: () => <Story variant="plain" /> };
+export const WithAction: S = { render: () => <Story variant="action" /> };
+export const AsAlert: S = { render: () => <Story variant="alert" /> };
