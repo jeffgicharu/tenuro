@@ -148,7 +148,20 @@ function AccountingContent() {
 
       <Box sx={{ display: 'grid', gap: 5, mb: 5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1.5fr) minmax(0, 1fr)' } }}>
         <Panel id="acc-largest" title={<FormattedMessage id="accounting.largestTitle" />} lede={<FormattedMessage id="accounting.largestLede" />}>
-          <Box sx={{ overflowX: 'auto' }}>
+          {/* On a phone, stacked rows: the table's four columns do not fit, and figures were cut off. */}
+          <Box component="ol" sx={{ display: { xs: 'block', sm: 'none' }, listStyle: 'none', m: 0, p: 0 }}>
+            {s.largest.map((l) => (
+              <Box component="li" key={l.reference} sx={{ py: 2, borderBottom: `1px solid ${t.rule}`, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: 3, rowGap: 0.5, fontSize: '0.8125rem' }}>
+                <Box sx={{ minWidth: 0 }}>
+                  {l.lease ? <Box component={RouterLink} to={`/leases/${encodeURIComponent(l.lease.id)}#accounting`} sx={{ fontFamily: FONT_MONO, color: t.brand, textDecoration: 'none', direction: 'ltr', unicodeBidi: 'isolate' }}>{l.reference}</Box> : <bdi>{l.reference}</bdi>}
+                </Box>
+                <Box data-num sx={{ textAlign: 'end', fontWeight: 600 }}><Money value={l.liability} /></Box>
+                <Box sx={{ minWidth: 0, color: t.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.propertyName} · {l.city}</Box>
+                <Box data-num sx={{ textAlign: 'end', color: t.inkSecondary }}>{l.liabilityLocal.currency !== l.liability.currency && <Money value={l.liabilityLocal} />}</Box>
+              </Box>
+            ))}
+          </Box>
+          <Box sx={{ overflowX: 'auto', display: { xs: 'none', sm: 'block' } }}>
             <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
               <thead><tr>
                 {['lease', 'property', 'local', 'reporting'].map((c) => (

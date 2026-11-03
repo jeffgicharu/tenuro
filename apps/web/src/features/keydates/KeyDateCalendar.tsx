@@ -94,12 +94,18 @@ export function KeyDateCalendar({ month, day, filter, onMonth, onDay }: {
                           component="span"
                           data-num
                           sx={{
-                            fontSize: { xs: '0.625rem', md: '0.75rem' }, fontWeight: 600, lineHeight: 1.5,
+                            // On a phone the cell is too narrow for two numbers: the tint shows volume, the
+                            // count is in the day's label, and an overdue day gets a small dot instead.
+                            display: { xs: 'none', md: 'inline-block' },
+                            fontSize: '0.75rem', fontWeight: 600, lineHeight: 1.5,
                             ...(info.overdue ? { color: t.danger, backgroundColor: t.surface, border: `1px solid ${t.danger}`, borderRadius: 999, px: 0.75 } : { color: t.ink }),
                           }}
                         >
                           {info.total}
                         </Box>
+                      )}
+                      {info && info.overdue > 0 && (
+                        <Box component="span" sx={{ display: { xs: 'block', md: 'none' }, width: 6, height: 6, borderRadius: '50%', backgroundColor: t.danger, boxShadow: `0 0 0 1.5px ${t.surface}`, flexShrink: 0, alignSelf: 'center' }} />
                       )}
                     </Box>
                     {info && (

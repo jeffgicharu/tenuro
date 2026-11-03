@@ -367,7 +367,7 @@ export function LeaseFormEditor(props: EditorProps) {
             <FormStepper items={items} current={state.step} onSelect={(k) => goto(k as LeaseFormStep)} label={m('leaseForm.stepper.label')} compact={compact} />
           </Box>
 
-          <Box component="section" aria-labelledby="step-heading" sx={{ minWidth: 0, maxWidth: 780 }}>
+          <Box component="section" aria-labelledby="step-heading" sx={{ minWidth: 0, maxWidth: 780, pb: { xs: 'calc(104px + env(safe-area-inset-bottom))', md: 0 } }}>
             <Box sx={{ mb: 6 }}>
               {/* The compact stepper already says "Section n of 8" right above. */}
               {!compact && (
@@ -403,10 +403,13 @@ export function LeaseFormEditor(props: EditorProps) {
 
             <Box
               sx={{
-                display: 'flex', justifyContent: 'space-between', gap: 3, mt: 8, pt: 5, borderTop: `1px solid ${t.rule}`,
-                position: { xs: 'fixed', md: 'static' }, insetInline: { xs: 0, md: 'auto' }, bottom: { xs: 0, md: 'auto' }, zIndex: 5,
-                backgroundColor: { xs: t.surface, md: 'transparent' }, px: { xs: 4, md: 0 }, pb: { xs: 4, md: 0 },
-                boxShadow: { xs: '0 -8px 24px -16px rgba(0,0,0,0.25)', md: 'none' },
+                // On a phone the actions sit on a solid bar pinned to the bottom of the screen (clear of the
+                // home indicator); the section leaves room below so its last field scrolls clear of it.
+                display: 'flex', justifyContent: 'space-between', gap: 3, mt: { xs: 0, md: 8 }, pt: { xs: 3, md: 5 }, borderTop: `1px solid ${t.ruleStrong}`,
+                position: { xs: 'fixed', md: 'static' }, insetInline: { xs: 0, md: 'auto' }, bottom: { xs: 0, md: 'auto' }, zIndex: (th) => th.zIndex.appBar,
+                backgroundColor: { xs: t.surface, md: 'transparent' }, px: { xs: 4, md: 0 },
+                pb: { xs: 'calc(12px + env(safe-area-inset-bottom))', md: 0 },
+                boxShadow: { xs: `0 -10px 24px -14px ${t.mode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(40,30,10,0.28)'}`, md: 'none' },
               }}
             >
               <Button variant="outlined" onClick={() => prevStep && goto(prevStep)} disabled={!prevStep || busy} startIcon={<ArrowLeft size={15} style={theme.direction === 'rtl' ? { transform: 'scaleX(-1)' } : undefined} />}>
