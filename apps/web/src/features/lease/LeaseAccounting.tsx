@@ -120,7 +120,9 @@ export function LeaseAccounting({ leaseId, reference }: { leaseId: string; refer
   const td = { textAlign: 'end' as const, py: 1.25, px: 2, borderBottom: `1px solid ${t.rule}`, whiteSpace: 'nowrap' as const, fontSize: '0.8125rem' };
 
   return (
-    <Box sx={{ display: 'grid', gap: 7 }}>
+    // One column that may shrink below its content: an implicit auto column took the width of the
+    // period table (about 600px) though that table scrolls in its own frame.
+    <Box sx={{ display: 'grid', gap: 7, gridTemplateColumns: 'minmax(0, 1fr)' }}>
       <Box>
         <Box sx={{ fontSize: '0.875rem', color: t.inkSecondary, mb: 3 }}>
           <FormattedMessage

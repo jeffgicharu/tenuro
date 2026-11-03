@@ -45,6 +45,17 @@ test('on a phone no lease tab scrolls sideways', async ({ page }) => {
     await page.waitForLoadState('networkidle');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `horizontal overflow on the ${tab} tab, in px`).toBeLessThanOrEqual(0);
+    // Content can also run past the panel and be clipped by the page without making it scroll, so
+    // nothing in the panel may reach beyond it unless it sits in its own scrolling frame.
+    const strays = await page.locator(`#lease-panel-${tab}`).evaluate((panel) => {
+      const box = panel.getBoundingClientRect();
+      const scrolls = (el: Element) => { for (let p = el.parentElement; p && p !== panel; p = p.parentElement) { if (getComputedStyle(p).overflowX !== 'visible') return true; } return false; };
+      return [...panel.querySelectorAll('*')]
+        // 12px of slack: MUI's switch label deliberately starts 11px outside its box to align the switch.
+        .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && (r.right > box.right + 12 || r.left < box.left - 12) && !scrolls(el); })
+        .slice(0, 3).map((el) => `${el.tagName} ${Math.round(el.getBoundingClientRect().width)}px: ${(el.textContent ?? '').slice(0, 40)}`);
+    });
+    expect(strays, `content past the ${tab} panel's edge`).toEqual([]);
   }
   expect(problems).toEqual([]);
 });
