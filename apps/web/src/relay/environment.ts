@@ -26,8 +26,16 @@ const fetchGraphQL: FetchFunction = async (params, variables) => {
   if (!res.ok && res.status !== 200) {
     throw new NetworkError(res.status, res.status === 429 ? 'rate-limited' : `HTTP ${res.status}`);
   }
-  return checked((await res.json()) as GraphQLResponse);
+  const json = checked((await res.json()) as GraphQLResponse);
+  if (params.operationKind === 'mutation') announceWrite();
+  return json;
 };
+
+// A change was saved to this session, so anything that shows the session's write count can refresh.
+export const WROTE_EVENT = 'tenuro:wrote';
+export function announceWrite(): void {
+  window.dispatchEvent(new Event(WROTE_EVENT));
+}
 
 function checked(json: GraphQLResponse): GraphQLResponse {
   // Expected failures come back as typed union results, so any GraphQL error is unexpected:

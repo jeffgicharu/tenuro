@@ -20,6 +20,7 @@ import type { LeaseDocumentsPaginationQuery } from './__generated__/LeaseDocumen
 import { EmptyNote } from '../../components/DefinitionList.tsx';
 import { useFormat } from '../../i18n/format.ts';
 import { useToast } from '../../shell/Toast.tsx';
+import { announceWrite } from '../../relay/environment.ts';
 
 type Doc = LeaseDocuments_lease$data['documents']['edges'][number]['node'];
 
@@ -89,6 +90,7 @@ export function LeaseDocuments({ lease: ref, canEdit = false }: { lease: LeaseDo
       }
       toast.show(m('lease.documents.attached', { name: pending.file.name }));
       setPending(null);
+      announceWrite();
       refetch({}, { fetchPolicy: 'network-only' });
     } catch {
       setProblem(m('lease.documents.failed'));

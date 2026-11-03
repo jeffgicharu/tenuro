@@ -67,6 +67,21 @@ test.describe('main journeys', () => {
     expect(problems).toEqual([]);
   });
 
+  test('the first saved change offers "Reset my changes" at once, without a reload', async ({ page }) => {
+    const problems = watchPage(page);
+    await signIn(page, 'Mbuyu Court Holdings', 'Lease manager', '/leases?status=ACTIVE');
+    await expect(page.getByRole('button', { name: 'Reset my changes' })).toBeHidden();
+    await page.getByRole('grid').getByRole('row').nth(1).getByRole('link').first().click();
+    await page.getByRole('tab', { name: 'Tasks' }).click();
+    await page.getByRole('tabpanel').getByRole('button', { name: 'Add task' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a task' });
+    await dialog.getByLabel('What needs doing').fill('Confirm the insurance renewal');
+    await dialog.getByRole('button', { name: 'Add task' }).click();
+    await expect(page.getByText('Task added.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset my changes' })).toBeVisible();
+    expect(problems).toEqual([]);
+  });
+
   test('the lease form blocks an incomplete step with a summary', async ({ page }) => {
     const problems = watchPage(page);
     await signIn(page, 'Mbuyu Court Holdings', 'Lease manager');

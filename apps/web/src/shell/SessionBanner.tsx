@@ -1,5 +1,5 @@
-import { lazy, Suspense, useState } from 'react';
-import { graphql, useFragment, useMutation } from 'react-relay';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { fetchQuery, graphql, useFragment, useMutation, useRelayEnvironment } from 'react-relay';
 import { FormattedMessage, useIntl } from 'react-intl';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -8,7 +8,9 @@ import { useTheme } from '@mui/material/styles';
 import { Eye, LockKeyhole, RotateCcw } from 'lucide-react';
 import type { SessionBanner_viewer$key } from './__generated__/SessionBanner_viewer.graphql';
 import type { SessionBannerResetMutation } from './__generated__/SessionBannerResetMutation.graphql';
+import type { SessionBannerRefreshQuery } from './__generated__/SessionBannerRefreshQuery.graphql';
 import { queueToastAfterReload, useToast } from './Toast.tsx';
+import { WROTE_EVENT } from '../relay/environment.ts';
 
 const ResetDialog = lazy(async () => ({ default: (await import('./ResetDialog.tsx')).ResetDialog }));
 
@@ -39,6 +41,19 @@ export function SessionBanner({ viewer: ref }: { viewer: SessionBanner_viewer$ke
       }
     }
   `);
+
+  // The page's query told us the write count when it loaded; after each saved change, ask again,
+  // so "Reset my changes" appears as soon as there is something to reset.
+  const environment = useRelayEnvironment();
+  useEffect(() => {
+    const refresh = () => {
+      fetchQuery<SessionBannerRefreshQuery>(environment, graphql`
+        query SessionBannerRefreshQuery { viewer { ...SessionBanner_viewer } }
+      `, {}, { fetchPolicy: 'network-only' }).subscribe({});
+    };
+    window.addEventListener(WROTE_EVENT, refresh);
+    return () => window.removeEventListener(WROTE_EVENT, refresh);
+  }, [environment]);
 
   const sandbox = viewer.sandbox;
   const time = sandbox ? intl.formatTime(sandbox.nextResetAt, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : '';
